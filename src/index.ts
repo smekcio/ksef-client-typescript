@@ -11,6 +11,7 @@ export * from "./services/hwmCoordinator";
 export * from "./services/personTokenService";
 export * from "./services/verificationLinkService";
 export * from "./services/qrCodeService";
+export * from "./services/xades";
 export * from "./crypto/cryptographyService";
 export * from "./errors/errors";
 export * from "./utils/base64url";

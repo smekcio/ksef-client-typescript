@@ -5,6 +5,7 @@ Services to publiczne klasy i funkcje pomocnicze. Sa eksportowane z paczki i uzy
 ## Lista
 
 - `AuthCoordinator` (auth token / XAdES)
+- `XadesSignatureService` (XAdES enveloped)
 - `OnlineSessionWorkflow`
 - `BatchSessionWorkflow`
 - `InvoiceExportWorkflow`
@@ -23,6 +24,7 @@ Zobacz tez: [Workflows](../workflows/README.md).
 - [Auth](auth.md)
 - [Crypto](crypto.md)
 - [HWM](hwm.md)
+- [XAdES](xades.md)
 - [Person token](person-token.md)
 - [Verification link](verification-link.md)
 - [QR](qr.md)

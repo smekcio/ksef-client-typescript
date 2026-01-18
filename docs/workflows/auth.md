@@ -16,9 +16,6 @@ const client = await KsefClient.connect({
 
 ## Wariant B: XAdES (podpisany XML)
 
-SDK potrafi wyslac podpisany XML, ale nie generuje podpisu XAdES. Podpisujacy XML
-musisz przygotowac we wlasnym zakresie.
-
 ```ts
 import { AuthCoordinator } from "ksef-client-typescript";
 
@@ -26,6 +23,25 @@ const signedXml = "<AuthTokenRequest>...signed...</AuthTokenRequest>";
 
 const tokens = await client.workflows.auth.authenticateWithXadesSignature({
   signedXml,
+  verifyCertificateChain: true,
+});
+```
+
+## Wariant C: XAdES (certyfikat + klucz)
+
+```ts
+import { XadesKeyPair } from "ksef-client-typescript";
+
+const keyPair = XadesKeyPair.fromPem({
+  // Zawartosc PEM (nie sciezka do pliku)
+  certificatePem: process.env.KSEF_XADES_CERT_PEM!,
+  privateKeyPem: process.env.KSEF_XADES_KEY_PEM!,
+});
+
+const tokens = await client.workflows.auth.authenticateWithCertificate({
+  keyPair,
+  context: { type: "Nip", value: "5265877635" },
+  signaturePackaging: "enveloped",
   verifyCertificateChain: true,
 });
 ```

@@ -2,6 +2,8 @@ import { AuthClient } from "../api/authClient";
 import { SecurityClient } from "../api/securityClient";
 import { CryptographyService } from "../crypto/cryptographyService";
 import { KsefError } from "../errors/errors";
+import { buildAuthTokenRequestXml } from "./authXml";
+import { XadesKeyPair, XadesSignatureService } from "./xades";
 import { AuthTokenRedeemResponse, InitTokenAuthenticationRequest } from "../types/auth";
 import {
   AuthenticationInitResponse,
@@ -28,13 +30,26 @@ export interface AuthenticateWithXadesOptions {
   maxAttempts?: number;
 }
 
+export interface AuthenticateWithCertificateOptions {
+  keyPair: XadesKeyPair;
+  context: ContextIdentifier;
+  subjectIdentifierType?: "certificateSubject" | "certificateFingerprint";
+  authorizationPolicyXml?: string | null;
+  signaturePackaging?: "enveloped" | "enveloping";
+  verifyCertificateChain?: boolean;
+  pollIntervalMs?: number;
+  maxAttempts?: number;
+}
+
 export class AuthCoordinator {
   private readonly authClient: AuthClient;
   private readonly securityClient: SecurityClient;
+  private readonly xadesSignatureService: XadesSignatureService;
 
   constructor(authClient: AuthClient, securityClient: SecurityClient) {
     this.authClient = authClient;
     this.securityClient = securityClient;
+    this.xadesSignatureService = new XadesSignatureService();
   }
 
   async authenticateWithKsefToken(
@@ -81,6 +96,40 @@ export class AuthCoordinator {
     );
     await this.pollAuthStatus(init, options.pollIntervalMs ?? 2000, options.maxAttempts ?? 30);
     return await this.authClient.redeemToken(init.authenticationToken.token);
+  }
+
+  async authenticateWithCertificate(
+    options: AuthenticateWithCertificateOptions,
+  ): Promise<AuthTokenRedeemResponse> {
+    const challenge = await this.authClient.getChallenge();
+
+    const xml = buildAuthTokenRequestXml({
+      challenge: challenge.challenge,
+      contextIdentifierType: options.context.type,
+      contextIdentifierValue: options.context.value,
+      ...(options.subjectIdentifierType !== undefined && {
+        subjectIdentifierType: options.subjectIdentifierType,
+      }),
+      ...(options.authorizationPolicyXml !== undefined && {
+        authorizationPolicyXml: options.authorizationPolicyXml,
+      }),
+    });
+
+    const signedXml =
+      options.signaturePackaging === "enveloping"
+        ? this.xadesSignatureService.signXadesEnveloping({ xml, keyPair: options.keyPair })
+        : this.xadesSignatureService.signXadesEnveloped({ xml, keyPair: options.keyPair });
+
+    return await this.authenticateWithXadesSignature({
+      signedXml,
+      ...(options.verifyCertificateChain !== undefined && {
+        verifyCertificateChain: options.verifyCertificateChain,
+      }),
+      ...(options.pollIntervalMs !== undefined && {
+        pollIntervalMs: options.pollIntervalMs,
+      }),
+      ...(options.maxAttempts !== undefined && { maxAttempts: options.maxAttempts }),
+    });
   }
 
   private async pollAuthStatus(
