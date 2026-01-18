@@ -1,0 +1,62 @@
+{
+  "name": "ksef-client-typescript",
+  "version": "0.1.0",
+  "description": "KSeF 2.0 client library for Node.js (TypeScript)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && node --test test/**/*.test.js",
+    "test:unit": "npm run build && node --test test/unit/*.test.js",
+    "test:e2e": "npm run build && node --test test/e2e/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "fast-xml-parser": "^4.4.1",
+    "undici": "^6.19.8",
+    "yauzl": "^2.10.0",
+    "yazl": "^2.5.1"
+  },
+  "optionalDependencies": {
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/qrcode": "^1.5.5",
+    "@types/yauzl": "^2.10.0",
+    "@types/yazl": "^2.4.5",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.10.0",
+    "c8": "^10.1.2",
+    "eslint": "^9.11.1",
+    "fast-check": "^3.23.2",
+    "libxmljs2": "^0.37.0",
+    "prettier": "^3.3.3",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3"
+  }
+}
