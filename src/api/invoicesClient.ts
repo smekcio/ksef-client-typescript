@@ -4,6 +4,8 @@ import {
   InvoiceExportRequest,
   InvoiceExportStatusResponse,
   InvoiceMetadataResponse,
+  InvoiceQueryFilters,
+  validateInvoiceQueryFilters,
 } from "../types/invoices";
 
 export class InvoicesClient extends BaseClient {
@@ -21,11 +23,12 @@ export class InvoicesClient extends BaseClient {
   }
 
   async queryInvoiceMetadata(
-    filters: Record<string, unknown>,
+    filters: InvoiceQueryFilters,
     pageOffset?: number,
     pageSize?: number,
     sortOrder?: "Asc" | "Desc",
   ): Promise<InvoiceMetadataResponse> {
+    validateInvoiceQueryFilters(filters);
     const token = await this.getAccessToken();
     return this.http.request<InvoiceMetadataResponse>({
       method: "POST",
@@ -41,11 +44,14 @@ export class InvoicesClient extends BaseClient {
   }
 
   async exportInvoices(request: InvoiceExportRequest): Promise<InvoiceExportInitResponse> {
+    const { includeMetadata, ...body } = request;
+    validateInvoiceQueryFilters(body.filters);
     const token = await this.getAccessToken();
     return this.http.request<InvoiceExportInitResponse>({
       method: "POST",
       path: "/invoices/exports",
-      body: request,
+      ...(includeMetadata ? { headers: { "X-KSeF-Feature": "include-metadata" } } : {}),
+      body,
       authToken: token,
     });
   }

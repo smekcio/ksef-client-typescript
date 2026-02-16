@@ -1,7 +1,12 @@
 import { fetch, ProxyAgent, Headers } from "undici";
 import type { BodyInit, Dispatcher, RequestInit, Response } from "undici";
 import { HttpMethod, JsonObject } from "../types/common";
-import { KsefApiError, KsefHttpError, KsefRateLimitError } from "../errors/errors";
+import {
+  KsefApiError,
+  KsefAuthStatusError,
+  KsefHttpError,
+  KsefRateLimitError,
+} from "../errors/errors";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -22,7 +27,10 @@ export interface RetryOptions {
 export interface HttpRequestOptions {
   method: HttpMethod;
   path: string;
-  query?: Record<string, string | number | boolean | undefined | null>;
+  query?: Record<
+    string,
+    string | number | boolean | Array<string | number | boolean> | undefined | null
+  >;
   headers?: Record<string, string>;
   body?: JsonObject | Record<string, unknown> | object | string | Buffer | Uint8Array;
   responseType?: "json" | "text" | "buffer";
@@ -150,6 +158,12 @@ export class HttpClient {
         if (value === undefined || value === null) {
           continue;
         }
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            url.searchParams.append(key, String(item));
+          }
+          continue;
+        }
         url.searchParams.set(key, String(value));
       }
     }
@@ -208,6 +222,20 @@ export class HttpClient {
       if (status === 429) {
         throw new KsefRateLimitError(status, "Rate limit exceeded", payload, retryAfter);
       }
+      if (status === 460) {
+        const statusDetails = extractStatusDetails(payload);
+        if (statusDetails && isSuspendedCertificateStatus(statusDetails)) {
+          const detailsSuffix = statusDetails.length
+            ? ` Details: ${statusDetails.join(", ")}`
+            : "";
+          throw new KsefAuthStatusError(
+            status,
+            `Authentication failed with ${status}: certificate is suspended.${detailsSuffix}`,
+            payload,
+            statusDetails,
+          );
+        }
+      }
       throw new KsefApiError(status, `API request failed with ${status}`, payload);
     }
 
@@ -221,6 +249,46 @@ export class HttpClient {
 
 function isIdempotentMethod(method: HttpMethod): boolean {
   return method === "GET" || method === "PUT" || method === "DELETE";
+}
+
+function extractStatusDetails(payload: unknown): string[] | undefined {
+  if (!isPlainObject(payload)) {
+    return undefined;
+  }
+  const status = payload.status;
+  if (!isPlainObject(status)) {
+    return undefined;
+  }
+  const details = status.details;
+  if (typeof details === "string") {
+    return [details];
+  }
+  if (!Array.isArray(details)) {
+    return undefined;
+  }
+  const mapped = details.filter((item): item is string => typeof item === "string");
+  return mapped.length > 0 ? mapped : undefined;
+}
+
+function isSuspendedCertificateStatus(details: string[]): boolean {
+  return details.some((detail) => {
+    const normalized = normalizeForMatch(detail);
+    const hasCertificate =
+      normalized.includes("certyfikat") || normalized.includes("certificate");
+    const hasSuspended = normalized.includes("zawiesz") || normalized.includes("suspend");
+    return hasCertificate && hasSuspended;
+  });
+}
+
+function normalizeForMatch(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function computeRetryDelayMs(

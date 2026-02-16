@@ -64,6 +64,22 @@ export interface SessionStatusResponse {
   };
 }
 
+export type SessionType = "Online" | "Batch";
+export type SessionStatus = "Succeeded" | "InProgress" | "Failed" | "Cancelled";
+
+export interface GetSessionsQueryParams {
+  sessionType: SessionType;
+  referenceNumber?: string;
+  dateCreatedFrom?: string;
+  dateCreatedTo?: string;
+  dateClosedFrom?: string;
+  dateClosedTo?: string;
+  dateModifiedFrom?: string;
+  dateModifiedTo?: string;
+  statuses?: SessionStatus[];
+  pageSize?: number;
+}
+
 export type SessionsListResponse = JsonObject;
 export type SessionInvoicesResponse = JsonObject;
 export type SessionInvoiceStatusResponse = JsonObject;

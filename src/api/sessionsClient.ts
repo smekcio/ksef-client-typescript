@@ -1,5 +1,6 @@
 import { BaseClient } from "../client/baseClient";
 import {
+  GetSessionsQueryParams,
   OpenBatchSessionRequest,
   OpenBatchSessionResponse,
   OpenOnlineSessionRequest,
@@ -15,21 +16,29 @@ import {
 
 export class SessionsClient extends BaseClient {
   async getSessions(
-    pageSize?: number,
+    query: GetSessionsQueryParams,
     continuationToken?: string,
-    params?: Record<string, string | number | boolean | undefined>,
   ): Promise<SessionsListResponse> {
     const token = await this.getAccessToken();
     const headers =
       continuationToken !== undefined ? { "x-continuation-token": continuationToken } : undefined;
+    const queryParams = {
+      sessionType: query.sessionType,
+      referenceNumber: query.referenceNumber,
+      dateCreatedFrom: query.dateCreatedFrom,
+      dateCreatedTo: query.dateCreatedTo,
+      dateClosedFrom: query.dateClosedFrom,
+      dateClosedTo: query.dateClosedTo,
+      dateModifiedFrom: query.dateModifiedFrom,
+      dateModifiedTo: query.dateModifiedTo,
+      statuses: query.statuses,
+      pageSize: query.pageSize,
+    };
     return this.http.request<SessionsListResponse>({
       method: "GET",
       path: "/sessions",
       ...(headers ? { headers } : {}),
-      query: {
-        pageSize,
-        ...(params ?? {}),
-      },
+      query: queryParams,
       authToken: token,
     });
   }

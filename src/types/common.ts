@@ -52,8 +52,18 @@ export interface AuthenticationInitResponse {
   authenticationToken: TokenInfo;
 }
 
+export interface AuthenticationMethodInfo {
+  category: string;
+  code: string;
+  displayName: string;
+}
+
 export interface AuthenticationOperationStatusResponse {
   startDate: string;
+  authenticationMethodInfo: AuthenticationMethodInfo;
+  /**
+   * @deprecated Use `authenticationMethodInfo` instead.
+   */
   authenticationMethod: string;
   status: StatusInfo;
 }

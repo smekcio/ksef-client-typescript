@@ -8,6 +8,7 @@ import {
   InvoiceExportStatusResponse,
   InvoicePackagePart,
   InvoiceQueryFilters,
+  validateInvoiceQueryFilters,
 } from "../types/invoices";
 import { StatusInfo } from "../types/common";
 import { unzip } from "../utils/zip";
@@ -49,6 +50,7 @@ export class InvoiceExportWorkflow {
   }
 
   async startExport(options: ExportStartOptions): Promise<ExportResult> {
+    validateInvoiceQueryFilters(options.filters);
     const encryptionData =
       options.encryptionData ??
       (await this.buildEncryptionData(options.publicCertificateBase64Der));

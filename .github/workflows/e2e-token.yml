@@ -1,0 +1,113 @@
+name: E2E Token Flows
+
+on:
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-token-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-test-token:
+    name: TEST token flow
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+
+    env:
+      KSEF_ENV: TEST
+      KSEF_TOKEN: ${{ secrets.KSEF_TEST_TOKEN }}
+      KSEF_CONTEXT_TYPE: ${{ secrets.KSEF_TEST_CONTEXT_TYPE }}
+      KSEF_CONTEXT_VALUE: ${{ secrets.KSEF_TEST_CONTEXT_VALUE }}
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate and mask required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_vars=(KSEF_TOKEN KSEF_CONTEXT_TYPE KSEF_CONTEXT_VALUE)
+          for var_name in "${required_vars[@]}"; do
+            value="${!var_name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret for $var_name in TEST flow."
+              exit 1
+            fi
+            echo "::add-mask::$value"
+          done
+
+      - name: Run lightweight e2e connect test
+        run: |
+          npm run build
+          node --test test/e2e/connect.test.js
+
+  e2e-demo-token:
+    name: DEMO token flow
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+
+    env:
+      KSEF_ENV: DEMO
+      KSEF_TOKEN: ${{ secrets.KSEF_DEMO_TOKEN }}
+      KSEF_CONTEXT_TYPE: ${{ secrets.KSEF_DEMO_CONTEXT_TYPE }}
+      KSEF_CONTEXT_VALUE: ${{ secrets.KSEF_DEMO_CONTEXT_VALUE }}
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate and mask required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_vars=(KSEF_TOKEN KSEF_CONTEXT_TYPE KSEF_CONTEXT_VALUE)
+          for var_name in "${required_vars[@]}"; do
+            value="${!var_name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret for $var_name in DEMO flow."
+              exit 1
+            fi
+            echo "::add-mask::$value"
+          done
+
+      - name: Run lightweight e2e connect test
+        run: |
+          npm run build
+          node --test test/e2e/connect.test.js

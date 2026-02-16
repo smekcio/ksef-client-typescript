@@ -1,5 +1,12 @@
 import { BaseClient } from "../client/baseClient";
-import { TestdataRequest, TestdataResponse } from "../types/testdata";
+import {
+  TestDataContextBlockRequest,
+  TestDataContextBlockResponse,
+  TestDataContextUnblockRequest,
+  TestDataContextUnblockResponse,
+  TestdataRequest,
+  TestdataResponse,
+} from "../types/testdata";
 
 export class TestdataClient extends BaseClient {
   async enableAttachments(request: TestdataRequest): Promise<TestdataResponse> {
@@ -18,6 +25,16 @@ export class TestdataClient extends BaseClient {
     return this.post("/testdata/permissions/revoke", request);
   }
 
+  async blockContext(request: TestDataContextBlockRequest): Promise<TestDataContextBlockResponse> {
+    return this.post("/testdata/context/block", request);
+  }
+
+  async unblockContext(
+    request: TestDataContextUnblockRequest,
+  ): Promise<TestDataContextUnblockResponse> {
+    return this.post("/testdata/context/unblock", request);
+  }
+
   async createPerson(request: TestdataRequest): Promise<TestdataResponse> {
     return this.post("/testdata/person", request);
   }
@@ -34,9 +51,12 @@ export class TestdataClient extends BaseClient {
     return this.post("/testdata/subject/remove", request);
   }
 
-  private async post(path: string, body: TestdataRequest): Promise<TestdataResponse> {
+  private async post<TResponse = TestdataResponse>(
+    path: string,
+    body: object,
+  ): Promise<TResponse> {
     const token = await this.getAccessToken();
-    return this.http.request<TestdataResponse>({
+    return this.http.request<TResponse>({
       method: "POST",
       path,
       body,

@@ -20,8 +20,12 @@ const tokens = await client.workflows.auth.authenticateWithKsefToken({
 const result = await client.workflows.auth.authenticateWithXadesSignature({
   signedXml: "<AuthTokenRequest>...signed...</AuthTokenRequest>",
   verifyCertificateChain: true,
+  enforceXadesCompliance: true,
 });
 ```
+
+`enforceXadesCompliance: true` wlacza naglowek
+`X-KSeF-Feature: enforce-xades-compliance`.
 
 ## authenticateWithCertificate
 
@@ -42,6 +46,7 @@ const result = await client.workflows.auth.authenticateWithCertificate({
   subjectIdentifierType: "certificateSubject",
   signaturePackaging: "enveloped", // albo "enveloping"
   verifyCertificateChain: true,
+  enforceXadesCompliance: true,
 });
 ```
 
@@ -58,3 +63,8 @@ const xml = buildAuthTokenRequestXml({
   contextIdentifierValue: "5265877635",
 });
 ```
+
+## getAuthStatus: parity fields
+
+W statusie uwierzytelniania uzywaj `authenticationMethodInfo`.
+Pole `authenticationMethod` jest deprecated i zostanie usuniete po `2026-11-16`.

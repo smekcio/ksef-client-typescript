@@ -3,6 +3,7 @@ import {
   PermissionsGrantRequest,
   PermissionsListResponse,
   PermissionsOperationResponse,
+  PermissionsQueryPaging,
   PermissionsQueryRequest,
 } from "../types/permissions";
 
@@ -49,34 +50,77 @@ export class PermissionsClient extends BaseClient {
     return this.deleteOperation(`/permissions/common/grants/${encodeURIComponent(permissionId)}`);
   }
 
-  async queryAuthorizations(request: PermissionsQueryRequest): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/authorizations/grants", request);
+  async queryAuthorizations(
+    request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
+    return this.postQuery("/permissions/query/authorizations/grants", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
-  async queryEntitiesRoles(): Promise<PermissionsListResponse> {
-    return this.getQuery("/permissions/query/entities/roles");
+  async queryEntitiesRoles(pageOffset?: number, pageSize?: number): Promise<PermissionsListResponse> {
+    return this.getQuery("/permissions/query/entities/roles", {
+      pageOffset,
+      pageSize,
+    });
   }
 
-  async queryEuEntitiesGrants(request: PermissionsQueryRequest): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/eu-entities/grants", request);
+  async queryEuEntitiesGrants(
+    request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
+    return this.postQuery("/permissions/query/eu-entities/grants", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
-  async queryPersonalGrants(request: PermissionsQueryRequest): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/personal/grants", request);
+  async queryPersonalGrants(
+    request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
+    return this.postQuery("/permissions/query/personal/grants", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
-  async queryPersonsGrants(request: PermissionsQueryRequest): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/persons/grants", request);
+  async queryPersonsGrants(
+    request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
+    return this.postQuery("/permissions/query/persons/grants", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
   async querySubordinateEntitiesRoles(
     request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
   ): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/subordinate-entities/roles", request);
+    return this.postQuery("/permissions/query/subordinate-entities/roles", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
-  async querySubunitsGrants(request: PermissionsQueryRequest): Promise<PermissionsListResponse> {
-    return this.postQuery("/permissions/query/subunits/grants", request);
+  async querySubunitsGrants(
+    request: PermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
+    return this.postQuery("/permissions/query/subunits/grants", request, {
+      pageOffset,
+      pageSize,
+    });
   }
 
   async getAttachmentPermissionStatus(): Promise<PermissionsOperationResponse> {
@@ -122,21 +166,38 @@ export class PermissionsClient extends BaseClient {
   private async postQuery(
     path: string,
     body: PermissionsQueryRequest,
+    paging?: PermissionsQueryPaging,
   ): Promise<PermissionsListResponse> {
     const token = await this.getAccessToken();
+    const query =
+      paging && (paging.pageOffset !== undefined || paging.pageSize !== undefined)
+        ? {
+            pageOffset: paging.pageOffset,
+            pageSize: paging.pageSize,
+          }
+        : undefined;
     return this.http.request<PermissionsListResponse>({
       method: "POST",
       path,
+      ...(query ? { query } : {}),
       body,
       authToken: token,
     });
   }
 
-  private async getQuery(path: string): Promise<PermissionsListResponse> {
+  private async getQuery(path: string, paging?: PermissionsQueryPaging): Promise<PermissionsListResponse> {
     const token = await this.getAccessToken();
+    const query =
+      paging && (paging.pageOffset !== undefined || paging.pageSize !== undefined)
+        ? {
+            pageOffset: paging.pageOffset,
+            pageSize: paging.pageSize,
+          }
+        : undefined;
     return this.http.request<PermissionsListResponse>({
       method: "GET",
       path,
+      ...(query ? { query } : {}),
       authToken: token,
     });
   }

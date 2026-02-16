@@ -26,6 +26,7 @@ export interface AuthenticateWithKsefTokenOptions {
 export interface AuthenticateWithXadesOptions {
   signedXml: string;
   verifyCertificateChain?: boolean;
+  enforceXadesCompliance?: boolean;
   pollIntervalMs?: number;
   maxAttempts?: number;
 }
@@ -37,6 +38,7 @@ export interface AuthenticateWithCertificateOptions {
   authorizationPolicyXml?: string | null;
   signaturePackaging?: "enveloped" | "enveloping";
   verifyCertificateChain?: boolean;
+  enforceXadesCompliance?: boolean;
   pollIntervalMs?: number;
   maxAttempts?: number;
 }
@@ -93,6 +95,7 @@ export class AuthCoordinator {
     const init = await this.authClient.authenticateWithXadesSignature(
       options.signedXml,
       options.verifyCertificateChain,
+      options.enforceXadesCompliance,
     );
     await this.pollAuthStatus(init, options.pollIntervalMs ?? 2000, options.maxAttempts ?? 30);
     return await this.authClient.redeemToken(init.authenticationToken.token);
@@ -124,6 +127,9 @@ export class AuthCoordinator {
       signedXml,
       ...(options.verifyCertificateChain !== undefined && {
         verifyCertificateChain: options.verifyCertificateChain,
+      }),
+      ...(options.enforceXadesCompliance !== undefined && {
+        enforceXadesCompliance: options.enforceXadesCompliance,
       }),
       ...(options.pollIntervalMs !== undefined && {
         pollIntervalMs: options.pollIntervalMs,

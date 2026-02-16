@@ -1,53 +1,80 @@
 # KSeF TypeScript SDK - dokumentacja
 
-Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz scenariusze workflow (auth, sesje, eksport). Kontrakty API i schemy XSD znajduja sie w `ksef-docs/`.
+Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz gotowe workflowy do auth, sesji i eksportu.
+Kontrakty API i dokumenty procesowe znajduja sie w `ksef-docs/`.
 
 ## Wymagania
 
 - Node.js >= 20
-- Dostep do srodowiska KSeF (TEST/DEMO/PRD) oraz dane uwierzytelniajace
+- Dostep do srodowiska KSeF (`TEST`, `DEMO`, `PRD`)
+- Dane uwierzytelniajace (token KSeF lub XAdES)
 
-## Struktura SDK
+## Struktura i flow
 
-Biblioteka udostepnia dwa poziomy uzycia:
+Ta dokumentacja jest ulozona tak samo jak w `ksef-client-python/docs`:
 
-1. **Thin API clients** - `KsefClient` + podklienci (`client.auth`, `client.sessions`, ...). Metody odpowiadaja endpointom KSeF.
-2. **Workflows** - gotowe scenariusze w `client.workflows` oraz `services/*` (np. `OnlineSessionWorkflow`, `BatchSessionWorkflow`, `InvoiceExportWorkflow`).
+1. Konfiguracja: [configuration.md](configuration.md), [getting-started.md](getting-started.md)
+2. Uwierzytelnianie: [api/auth.md](api/auth.md), [workflows/auth.md](workflows/auth.md)
+3. API (thin clients): [docs/api](api/README.md)
+4. Workflowy: [docs/workflows](workflows/README.md)
+5. Bledy i retry: [errors.md](errors.md)
+
+Biblioteka ma dwa poziomy uzycia:
+
+1. Thin API clients (`client.auth`, `client.sessions`, `client.invoices`, ...).
+2. Workflows (`client.workflows.auth`, `client.workflows.sessions.*`, `client.workflows.exports`).
+
+## Szybki przyklad: `connect(...)` + query
+
+```ts
+import { KsefClient } from "ksef-client-typescript";
+
+const client = await KsefClient.connect({
+  environment: "DEMO",
+  token: process.env.KSEF_TOKEN!,
+  context: { type: "Nip", value: "5265877635" },
+});
+
+const metadata = await client.invoices.queryInvoiceMetadata(
+  {
+    subjectType: "Subject1",
+    dateRange: { dateType: "Issue", from: "2025-01-01", to: "2025-01-31" },
+  },
+  0,
+  10,
+  "Desc",
+);
+
+console.log(metadata);
+```
+
+## Szybki przyklad: manual auth i ustawienie tokenow
+
+```ts
+import { KsefClient } from "ksef-client-typescript";
+
+const client = new KsefClient({ environment: "DEMO" });
+
+const tokens = await client.workflows.auth.authenticateWithKsefToken({
+  token: process.env.KSEF_TOKEN!,
+  context: { type: "Nip", value: "5265877635" },
+  pollIntervalMs: 2000,
+  maxAttempts: 60,
+});
+
+client.authManager.setTokens(tokens);
+
+const xml = await client.invoices.getInvoice("KSEF_NUMBER");
+console.log(xml.slice(0, 120));
+```
 
 ## Nawigacja
 
-- [Start](getting-started.md)
-- [Konfiguracja klienta](configuration.md)
-- [Bledy i retry](errors.md)
-
-**API (thin clients):**
-
-- [KsefClient](api/client.md)
-- [Auth](api/auth.md)
-- [Active sessions](api/active-sessions.md)
-- [Sessions](api/sessions.md)
-- [Invoices](api/invoices.md)
-- [Permissions](api/permissions.md)
-- [Certificates](api/certificates.md)
-- [Tokens](api/tokens.md)
-- [Limits](api/limits.md)
-- [Security](api/security.md)
-- [Testdata](api/testdata.md)
-- [Peppol](api/peppol.md)
-
-**Workflows:**
-
-- [Uwierzytelnianie](workflows/auth.md)
-- [Sesja interaktywna](workflows/online-session.md)
-- [Sesja wsadowa](workflows/batch-session.md)
-- [Eksport paczek](workflows/export.md)
-
-**Services / Utils / XML:**
-
-- [Services](services/README.md)
-- [Utils](utils/README.md)
-- [XML](xml/README.md)
-
-**Przyklady:**
-
-- [Przyklady](examples/README.md)
+- Start: [getting-started.md](getting-started.md)
+- Konfiguracja: [configuration.md](configuration.md)
+- API: [api/README.md](api/README.md)
+- Workflows: [workflows/README.md](workflows/README.md)
+- Services: [services/README.md](services/README.md)
+- Przyklady: [examples/README.md](examples/README.md)
+- Bledy: [errors.md](errors.md)
+- Raport parity: [parity-ksef-docs.md](parity-ksef-docs.md)

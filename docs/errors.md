@@ -6,6 +6,7 @@ SDK mapuje bledy HTTP na klasy domenowe:
 - `KsefHttpError` - bledy HTTP bez JSON
 - `KsefApiError` - bledy API z JSON
 - `KsefRateLimitError` - 429 + `retryAfter`
+- `KsefAuthStatusError` - specjalny blad auth status (np. 460, zawieszony certyfikat)
 - `KsefSessionExpiredError` - brak lub wygasly token
 - `KsefValidationError` - bledy walidacji danych wejsciowych
 
@@ -19,6 +20,31 @@ try {
 } catch (err) {
   if (err instanceof KsefRateLimitError) {
     console.error("Retry-After:", err.retryAfter);
+  }
+  throw err;
+}
+```
+
+## Przyklad obslugi 460: certyfikat zawieszony
+
+```ts
+import { KsefAuthStatusError } from "ksef-client-typescript";
+
+try {
+  await client.workflows.auth.authenticateWithXadesSignature({
+    signedXml: "<AuthTokenRequest>...signed...</AuthTokenRequest>",
+  });
+} catch (err) {
+  if (err instanceof KsefAuthStatusError && err.statusCode === 460) {
+    const suspended = err.statusDetails?.some((item) =>
+      item.toLowerCase().includes("certyfikat zawiesz"),
+    );
+
+    if (suspended) {
+      console.error("Uwierzytelnienie odrzucone: Certyfikat zawieszony.");
+      // np. fallback na inny certyfikat lub przerwanie procesu
+      throw err;
+    }
   }
   throw err;
 }

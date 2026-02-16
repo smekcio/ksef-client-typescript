@@ -51,11 +51,18 @@ export class CertificatesClient extends BaseClient {
     });
   }
 
-  async queryCertificates(request: CertificatesQueryRequest): Promise<CertificatesQueryResponse> {
+  async queryCertificates(
+    request: CertificatesQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<CertificatesQueryResponse> {
     const token = await this.getAccessToken();
+    const query =
+      pageOffset !== undefined || pageSize !== undefined ? { pageOffset, pageSize } : undefined;
     return this.http.request<CertificatesQueryResponse>({
       method: "POST",
       path: "/certificates/query",
+      ...(query ? { query } : {}),
       body: request,
       authToken: token,
     });

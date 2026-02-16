@@ -40,6 +40,21 @@ export class KsefRateLimitError extends KsefApiError {
   }
 }
 
+export class KsefAuthStatusError extends KsefApiError {
+  override name = "KsefAuthStatusError";
+  readonly statusDetails: string[] | undefined;
+
+  constructor(
+    statusCode: number,
+    message: string,
+    responseBody: unknown,
+    statusDetails?: string[],
+  ) {
+    super(statusCode, message, responseBody);
+    this.statusDetails = statusDetails;
+  }
+}
+
 export class KsefSessionExpiredError extends KsefError {
   override name = "KsefSessionExpiredError";
 }

@@ -28,6 +28,7 @@ export class AuthClient extends BaseClient {
   async authenticateWithXadesSignature(
     signedXml: string,
     verifyCertificateChain?: boolean,
+    enforceXadesCompliance?: boolean,
   ): Promise<AuthenticationInitResponse> {
     return this.http.request<AuthenticationInitResponse>({
       method: "POST",
@@ -39,6 +40,9 @@ export class AuthClient extends BaseClient {
       headers: {
         "Content-Type": "application/xml",
         Accept: "application/json",
+        ...(enforceXadesCompliance && {
+          "X-KSeF-Feature": "enforce-xades-compliance",
+        }),
       },
     });
   }

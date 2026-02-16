@@ -8,6 +8,53 @@ const DS_NS = "http://www.w3.org/2000/09/xmldsig#";
 const XADES_NS = "http://uri.etsi.org/01903/v1.3.2#";
 const SIGNED_PROPERTIES_TYPE = "http://uri.etsi.org/01903#SignedProperties";
 
+type XmlDocument = ReturnType<DOMParser["parseFromString"]>;
+type XmlElement = ReturnType<XmlDocument["createElementNS"]>;
+type XmlChildNode = ReturnType<XmlElement["cloneNode"]>;
+
+interface SignedXmlReferenceLike {
+  xpath?: string;
+  transforms?: string[];
+  digestAlgorithm: string;
+  isEmptyUri?: boolean;
+  type?: string;
+  uri?: string;
+  inclusiveNamespacesPrefixList?: string[];
+}
+
+interface SignedXmlAlgorithmLike {
+  getAlgorithmName(): string;
+}
+
+interface SignedXmlLike {
+  signatureAlgorithm: string;
+  canonicalizationAlgorithm: string;
+  privateKey: crypto.KeyObject;
+  publicCert: string;
+  namespaceResolver?: { lookupNamespaceURI: () => null };
+  signatureNode?: XmlElement;
+  SignatureAlgorithms?: Record<string, new () => SignedXmlAlgorithmLike>;
+  addReference(reference: {
+    xpath: string;
+    transforms: string[];
+    digestAlgorithm: string;
+    isEmptyUri?: boolean;
+  }): void;
+  getReferences(): SignedXmlReferenceLike[];
+  createSignedInfo(doc: XmlDocument, prefix?: string): string;
+  calculateSignatureValue(doc: XmlDocument): void;
+  createSignature(prefix?: string): XmlChildNode;
+  getKeyInfo(prefix?: string): string;
+  ensureHasId(node: unknown): string;
+  findCanonicalizationAlgorithm(uri: string): { getAlgorithmName(): string };
+  getCanonReferenceXml(doc: XmlDocument, reference: SignedXmlReferenceLike, node: unknown): string;
+  findHashAlgorithm(uri: string): { getAlgorithmName(): string; getHash(input: string): string };
+}
+
+interface SignedXmlConstructor {
+  new (): SignedXmlLike;
+}
+
 export interface XadesPemKeyPairOptions {
   certificatePem: string;
   privateKeyPem: string;
@@ -102,10 +149,8 @@ export class XadesSignatureService {
 
     const signatureAlgorithm = signatureAlgorithmForCertificate(certificate);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { SignedXml } = xmlCrypto as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sig = new SignedXml() as any;
+    const { SignedXml } = xmlCrypto as unknown as { SignedXml: SignedXmlConstructor };
+    const sig = new SignedXml();
 
     sig.signatureAlgorithm = signatureAlgorithm;
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
@@ -146,28 +191,25 @@ export class XadesSignatureService {
     });
     doc.documentElement.appendChild(signatureNode);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).namespaceResolver = { lookupNamespaceURI: () => null };
+    sig.namespaceResolver = { lookupNamespaceURI: () => null };
 
     const signedInfoNode = parseIntoDocument(
       doc,
-      `<ds:Signature xmlns:ds="${DS_NS}">${(sig as any).createSignedInfo(doc, "ds")}</ds:Signature>`,
+      `<ds:Signature xmlns:ds="${DS_NS}">${sig.createSignedInfo(doc, "ds")}</ds:Signature>`,
     );
     if (!signedInfoNode) {
       throw new Error("Failed to create SignedInfo node.");
     }
     signatureNode.insertBefore(signedInfoNode, signatureNode.firstChild);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).signatureNode = signatureNode;
+    sig.signatureNode = signatureNode;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).calculateSignatureValue(doc);
+    sig.calculateSignatureValue(doc);
 
-    const signatureValueNode = (sig as any).createSignature("ds") as ChildNode;
+    const signatureValueNode = sig.createSignature("ds");
     signatureNode.insertBefore(signatureValueNode, signedInfoNode.nextSibling);
 
-    const keyInfoXml = (sig as any).getKeyInfo("ds") as string;
+    const keyInfoXml = sig.getKeyInfo("ds");
     if (keyInfoXml) {
       const keyInfoNode = parseIntoDocument(
         doc,
@@ -193,10 +235,8 @@ export class XadesSignatureService {
 
     const signatureAlgorithm = signatureAlgorithmForCertificate(certificate);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { SignedXml } = xmlCrypto as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sig = new SignedXml() as any;
+    const { SignedXml } = xmlCrypto as unknown as { SignedXml: SignedXmlConstructor };
+    const sig = new SignedXml();
 
     sig.signatureAlgorithm = signatureAlgorithm;
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
@@ -224,12 +264,13 @@ export class XadesSignatureService {
     signatureNode.appendChild(dataObjectNode);
 
     // Move AuthTokenRequest into ds:Object and assign Id so Reference can target it
-    const authTokenRequestNode = originalDoc.documentElement.cloneNode(true) as Element;
+    const authTokenRequestNode = originalDoc.documentElement.cloneNode(true) as XmlElement;
     authTokenRequestNode.setAttribute("Id", objectDataId);
-    dataObjectNode.appendChild(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (signatureDoc as any).importNode ? (signatureDoc as any).importNode(authTokenRequestNode, true) : authTokenRequestNode,
-    );
+    const importedAuthTokenRequestNode =
+      typeof signatureDoc.importNode === "function"
+        ? (signatureDoc.importNode(authTokenRequestNode, true) as XmlElement)
+        : authTokenRequestNode;
+    dataObjectNode.appendChild(importedAuthTokenRequestNode);
 
     // XAdES object
     const xadesObjectNode = signatureDoc.createElementNS(DS_NS, "ds:Object");
@@ -259,25 +300,22 @@ export class XadesSignatureService {
     });
     (sig.getReferences().at(-1) as unknown as { type?: string }).type = SIGNED_PROPERTIES_TYPE;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).namespaceResolver = { lookupNamespaceURI: () => null };
+    sig.namespaceResolver = { lookupNamespaceURI: () => null };
 
     const signedInfoNode = parseIntoDocument(
       signatureDoc,
-      `<ds:Signature xmlns:ds="${DS_NS}">${(sig as any).createSignedInfo(signatureDoc, "ds")}</ds:Signature>`,
+      `<ds:Signature xmlns:ds="${DS_NS}">${sig.createSignedInfo(signatureDoc, "ds")}</ds:Signature>`,
     );
     signatureNode.insertBefore(signedInfoNode, signatureNode.firstChild);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).signatureNode = signatureNode;
+    sig.signatureNode = signatureNode;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sig as any).calculateSignatureValue(signatureDoc);
+    sig.calculateSignatureValue(signatureDoc);
 
-    const signatureValueNode = (sig as any).createSignature("ds") as ChildNode;
+    const signatureValueNode = sig.createSignature("ds");
     signatureNode.insertBefore(signatureValueNode, signedInfoNode.nextSibling);
 
-    const keyInfoXml = (sig as any).getKeyInfo("ds") as string;
+    const keyInfoXml = sig.getKeyInfo("ds");
     if (keyInfoXml) {
       const keyInfoNode = parseIntoDocument(
         signatureDoc,
@@ -302,14 +340,12 @@ function signatureAlgorithmForCertificate(certificate: crypto.X509Certificate): 
 }
 
 function createSignatureSkeleton(options: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  doc: any;
+  doc: XmlDocument;
   signatureId: string;
   signedPropertiesId: string;
   certificate: crypto.X509Certificate;
   signingTime: Date;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-}): any {
+}): XmlElement {
   const signature = options.doc.createElementNS(DS_NS, "ds:Signature");
   signature.setAttribute("Id", options.signatureId);
 
@@ -329,13 +365,12 @@ function createSignatureSkeleton(options: {
 }
 
 function createQualifyingPropertiesNode(options: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  doc: any;
+  doc: XmlDocument;
   signatureId: string;
   signedPropertiesId: string;
   certificate: crypto.X509Certificate;
   signingTime: Date;
-}): Element {
+}): XmlElement {
   const qualifyingProps = options.doc.createElementNS(XADES_NS, "xades:QualifyingProperties");
   qualifyingProps.setAttribute("Target", `#${options.signatureId}`);
 
@@ -400,25 +435,19 @@ function serialNumberDecimal(serialNumberHex: string): string {
   return BigInt(`0x${serialNumberHex}`).toString(10);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseIntoDocument(doc: any, xml: string): any {
+function parseIntoDocument(doc: XmlDocument, xml: string): XmlChildNode {
   const parsed = new DOMParser().parseFromString(xml, "application/xml");
   if (!parsed.documentElement?.firstChild) {
     throw new Error("Failed to parse XML fragment.");
   }
   // xmldom allows moving nodes between documents; clone to be safe.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const imported = (doc as any).importNode
-    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (doc as any).importNode(parsed.documentElement.firstChild, true)
+  const imported = typeof doc.importNode === "function"
+    ? doc.importNode(parsed.documentElement.firstChild, true)
     : parsed.documentElement.firstChild.cloneNode(true);
-  return imported as ChildNode;
+  return imported as XmlChildNode;
 }
 
-function ensureEcdsaSha256Algorithm(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sig: any,
-): void {
+function ensureEcdsaSha256Algorithm(sig: SignedXmlLike): void {
   const uri = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
   if (sig.SignatureAlgorithms?.[uri]) {
     return;
@@ -426,15 +455,13 @@ function ensureEcdsaSha256Algorithm(
   sig.SignatureAlgorithms = {
     ...(sig.SignatureAlgorithms ?? {}),
     [uri]: class EcdsaSha256 {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getSignature(signedInfo: any, privateKey: any): string {
+      getSignature(signedInfo: string, privateKey: crypto.KeyLike): string {
         const signer = crypto.createSign("SHA256");
         signer.update(signedInfo);
-        return signer.sign({ key: privateKey, dsaEncoding: "der" }, "base64");
+        return signer.sign(privateKey, "base64");
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      verifySignature(material: any, key: any, signatureValue: string): boolean {
+      verifySignature(material: string, key: crypto.KeyLike, signatureValue: string): boolean {
         const verifier = crypto.createVerify("SHA256");
         verifier.update(material);
         return verifier.verify(key, signatureValue, "base64");
@@ -447,17 +474,18 @@ function ensureEcdsaSha256Algorithm(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function patchSignedXmlCreateReferences(sig: any): void {
+function patchSignedXmlCreateReferences(sig: SignedXmlLike): void {
   // xml-crypto does not emit Reference/@Type, but XAdES requires it for SignedProperties.
   // Patch the method at runtime to keep upstream dependency untouched.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (sig as any).createReferences = function createReferences(doc: any, prefix?: string) {
+  type SignedXmlWithCreateReferences = SignedXmlLike & {
+    createReferences: (doc: XmlDocument, prefix?: string) => string;
+  };
+  const mutableSig = sig as SignedXmlWithCreateReferences;
+  mutableSig.createReferences = function createReferences(doc: XmlDocument, prefix?: string) {
     let res = "";
     let currentPrefix = prefix || "";
     currentPrefix = currentPrefix ? `${currentPrefix}:` : currentPrefix;
 
-    // eslint-disable-next-line deprecation/deprecation
     for (const ref of this.getReferences()) {
       const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
       if (!Array.isArray(nodes) || nodes.length === 0) {
