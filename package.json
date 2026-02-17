@@ -2,6 +2,23 @@
   "name": "ksef-client-typescript",
   "version": "0.1.0",
   "description": "KSeF 2.0 client library for Node.js (TypeScript)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smekcio/ksef-client-typescript.git"
+  },
+  "homepage": "https://github.com/smekcio/ksef-client-typescript#readme",
+  "bugs": {
+    "url": "https://github.com/smekcio/ksef-client-typescript/issues"
+  },
+  "keywords": [
+    "ksef",
+    "typescript",
+    "nodejs",
+    "sdk",
+    "e-invoice",
+    "poland"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
