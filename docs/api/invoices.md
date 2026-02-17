@@ -1,37 +1,42 @@
-# Invoices
+# Faktury (`invoices`)
 
-Thin client dla `/invoices/*`.
+Niskopoziomowy klient dla endpointów `/invoices/*`.
 
-## Metody
+## Dostępne metody
 
 - `getInvoice(ksefNumber)`
 - `queryInvoiceMetadata(filters, pageOffset?, pageSize?, sortOrder?)`
 - `exportInvoices(request)`
 - `getInvoiceExportStatus(referenceNumber)`
 
-`exportInvoices(request)` obsluguje tez opcjonalne `includeMetadata: true`.
-Przy tej opcji SDK ustawia naglowek `X-KSeF-Feature: include-metadata`.
+## Najważniejsze informacje
+
+- `getInvoice(...)` zwraca XML faktury jako `string`.
+- `exportInvoices(...)` obsługuje opcjonalne `includeMetadata`. Gdy ustawisz `includeMetadata: true`, SDK dodaje nagłówek `X-KSeF-Feature: include-metadata` (potwierdzone testami jednostkowymi).
+- `queryInvoiceMetadata(...)` i `exportInvoices(...)` wykonują lokalną walidację `filters` przed wywołaniem HTTP.
 
 ## Walidacja `dateRange` (lokalna, przed HTTP)
 
-SDK waliduje `filters.dateRange` w `queryInvoiceMetadata(...)` i `exportInvoices(...)`:
+SDK waliduje `filters.dateRange` według poniższych zasad:
 
-- wymagane: `subjectType`, `dateRange.dateType`, `dateRange.from`,
-- `from` musi byc ISO (`YYYY-MM-DD` albo ISO date-time),
-- `to` (jesli ustawione) musi byc ISO i `>= from`,
-- gdy `to` nie jest podane, SDK uzywa aktualnej daty/czasu UTC,
-- zakres nie moze przekroczyc 3 miesiecy.
+- wymagane są `subjectType`, `dateRange.dateType` i `dateRange.from`,
+- `from` musi być poprawną datą ISO (`YYYY-MM-DD` lub ISO date-time),
+- `to` (jeżeli podane) musi być poprawną datą ISO i nie może być wcześniejsze niż `from`,
+- jeżeli `to` nie jest podane, SDK używa bieżącego czasu UTC,
+- zakres `from` -> `to` nie może przekroczyć 3 miesięcy.
 
-Przy naruszeniu tych warunkow rzucany jest `KsefValidationError`.
+W przypadku naruszenia warunków rzucany jest `KsefValidationError`.
 
-## Przyklad 1: pobranie XML faktury
+## Przykłady TypeScript
+
+### Pobranie XML faktury
 
 ```ts
 const xml = await client.invoices.getInvoice("KSEF_NUMBER");
 console.log(xml.slice(0, 200));
 ```
 
-## Przyklad 2: query metadata z paginacja i sortowaniem
+### Zapytanie o metadane z paginacją i sortowaniem
 
 ```ts
 const metadata = await client.invoices.queryInvoiceMetadata(
@@ -51,7 +56,7 @@ const metadata = await client.invoices.queryInvoiceMetadata(
 console.log(metadata);
 ```
 
-## Przyklad 3: start eksportu i polling statusu
+### Start eksportu i polling statusu
 
 ```ts
 const init = await client.invoices.exportInvoices({
@@ -71,20 +76,26 @@ const init = await client.invoices.exportInvoices({
   },
 });
 
+let completed = false;
 for (let attempt = 0; attempt < 60; attempt += 1) {
   const status = await client.invoices.getInvoiceExportStatus(init.referenceNumber);
   if (status.status.code === 200) {
-    console.log("Export ready", status.package?.parts?.length ?? 0);
+    console.log("Pakiet gotowy:", status.package?.parts?.length ?? 0);
+    completed = true;
     break;
   }
   if (status.status.code !== 100) {
-    throw new Error(`Export failed: ${status.status.code} ${status.status.description}`);
+    throw new Error(`Eksport nieudany: ${status.status.code} ${status.status.description}`);
   }
   await new Promise((resolve) => setTimeout(resolve, 2000));
 }
+
+if (!completed) {
+  throw new Error("Przekroczono czas oczekiwania na zakończenie eksportu.");
+}
 ```
 
-## Przyklad 4: blad walidacji (`dateRange` > 3 miesiace)
+### Obsługa błędu walidacji (`dateRange` > 3 miesiące)
 
 ```ts
 import { KsefValidationError } from "ksef-client-typescript";
@@ -100,14 +111,14 @@ try {
   });
 } catch (error) {
   if (error instanceof KsefValidationError) {
-    console.error(error.message); // Invoice query filters.dateRange cannot exceed 3 months.
-    console.error(error.details); // from/to szczegoly
+    console.error(error.message);
+    console.error(error.details);
   }
   throw error;
 }
 ```
 
-## Przyklad 5: otwarty zakres (`to` pomijane)
+### Otwarty zakres dat (`to` pominięte)
 
 ```ts
 await client.invoices.queryInvoiceMetadata({
@@ -115,9 +126,9 @@ await client.invoices.queryInvoiceMetadata({
   dateRange: {
     dateType: "Issue",
     from: "2025-02-01",
-    // to: brak -> SDK podstawia aktualny czas UTC
   },
 });
 ```
 
-Przy pelnym scenariuszu eksportu (pobranie partow, deszyfrowanie, unzip) uzyj: [../workflows/export.md](../workflows/export.md).
+Pełny scenariusz eksportu (pobranie części, deszyfrowanie, rozpakowanie) opisuje:
+[../workflows/export.md](../workflows/export.md).

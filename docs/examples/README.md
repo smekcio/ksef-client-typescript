@@ -1,24 +1,51 @@
-# Przyklady
+# Przykłady (TypeScript)
 
-Ponizej sa praktyczne scenariusze TypeScript. Wszystkie przyklady zakladaja Node >= 20.
+Ten dokument zawiera praktyczne fragmenty kodu dla najczęstszych scenariuszy integracyjnych.
+Przykłady zakładają uruchamianie z katalogu `ksef-client-typescript`.
 
-## Zmienne srodowiskowe
+## Wymagania
 
-- `KSEF_ENV` - `TEST`, `DEMO` albo `PRD`
+- Node.js `>= 20`
+- zainstalowana biblioteka `ksef-client-typescript`
+- dostęp do środowiska KSeF (`TEST`, `DEMO` albo `PRD`) i danych uwierzytelniających
+
+## Zmienne środowiskowe
+
+Podstawowe:
+
+- `KSEF_ENV` - `TEST`, `DEMO` albo `PRD` (domyślnie `DEMO`)
+- `KSEF_NIP` - NIP kontekstu (np. `5265877635`)
 - `KSEF_TOKEN` - token KSeF (systemowy)
-- `KSEF_NIP` - NIP kontekstu
-- `KSEF_XADES_CERT_PEM` - certyfikat XAdES (PEM)
-- `KSEF_XADES_KEY_PEM` - klucz prywatny XAdES (PEM)
 
-## 1) Connect + query metadata
+XAdES (wariant PEM):
+
+- `KSEF_XADES_CERT_PEM` - certyfikat XAdES w PEM
+- `KSEF_XADES_KEY_PEM` - klucz prywatny XAdES w PEM
+- `KSEF_XADES_KEY_PASSWORD` - hasło do klucza (opcjonalnie)
+
+XAdES (wariant PKCS#12):
+
+- `KSEF_XADES_PKCS12_PATH` - ścieżka do `.p12` / `.pfx`
+- `KSEF_XADES_PKCS12_PASSWORD` - hasło do kontenera (opcjonalnie)
+
+## Szkielet startowy
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
 
+const env = (process.env.KSEF_ENV as "TEST" | "DEMO" | "PRD") ?? "DEMO";
+const nip = process.env.KSEF_NIP ?? "5265877635";
+```
+
+## 1) `connect(...)` + query metadata
+
+```ts
 const client = await KsefClient.connect({
-  environment: (process.env.KSEF_ENV as "TEST" | "DEMO" | "PRD") ?? "DEMO",
+  environment: env,
   token: process.env.KSEF_TOKEN!,
-  context: { type: "Nip", value: process.env.KSEF_NIP ?? "5265877635" },
+  context: { type: "Nip", value: nip },
+  pollIntervalMs: 2000,
+  maxAttempts: 90,
 });
 
 const result = await client.invoices.queryInvoiceMetadata(
@@ -34,39 +61,39 @@ const result = await client.invoices.queryInvoiceMetadata(
 console.log(result);
 ```
 
-## 2) Manual auth token workflow + ustawienie tokenow
+## 2) Manualny auth tokenem KSeF
 
 ```ts
-import { KsefClient } from "ksef-client-typescript";
-
-const client = new KsefClient({ environment: "DEMO" });
+const client = new KsefClient({ environment: env });
 
 const tokens = await client.workflows.auth.authenticateWithKsefToken({
   token: process.env.KSEF_TOKEN!,
-  context: { type: "Nip", value: process.env.KSEF_NIP ?? "5265877635" },
-  maxAttempts: 90,
+  context: { type: "Nip", value: nip },
   pollIntervalMs: 2000,
+  maxAttempts: 90,
 });
 
 client.authManager.setTokens(tokens);
 console.log(tokens.accessToken.validUntil, tokens.refreshToken.validUntil);
 ```
 
-## 3) XAdES auth z `enforceXadesCompliance`
+## 3) Auth XAdES (certyfikat + klucz PEM)
 
 ```ts
-import { KsefClient, XadesKeyPair } from "ksef-client-typescript";
+import { XadesKeyPair } from "ksef-client-typescript";
 
-const client = new KsefClient({ environment: "DEMO" });
+const client = new KsefClient({ environment: env });
 
 const keyPair = XadesKeyPair.fromPem({
   certificatePem: process.env.KSEF_XADES_CERT_PEM!,
   privateKeyPem: process.env.KSEF_XADES_KEY_PEM!,
+  privateKeyPassword: process.env.KSEF_XADES_KEY_PASSWORD,
 });
 
 const tokens = await client.workflows.auth.authenticateWithCertificate({
   keyPair,
-  context: { type: "Nip", value: process.env.KSEF_NIP ?? "5265877635" },
+  context: { type: "Nip", value: nip },
+  subjectIdentifierType: "certificateSubject",
   verifyCertificateChain: true,
   enforceXadesCompliance: true,
   signaturePackaging: "enveloped",
@@ -75,21 +102,45 @@ const tokens = await client.workflows.auth.authenticateWithCertificate({
 client.authManager.setTokens(tokens);
 ```
 
-## 4) Sesja online: open -> send -> close -> UPO
+## 4) Auth XAdES z PKCS#12 (`.p12` / `.pfx`)
+
+```ts
+import { KsefClient, XadesKeyPair } from "ksef-client-typescript";
+
+const client = new KsefClient({ environment: env });
+
+const keyPair = await XadesKeyPair.fromPkcs12File({
+  pkcs12Path: process.env.KSEF_XADES_PKCS12_PATH!,
+  pkcs12Password: process.env.KSEF_XADES_PKCS12_PASSWORD,
+});
+
+const tokens = await client.workflows.auth.authenticateWithCertificate({
+  keyPair,
+  context: { type: "Nip", value: nip },
+});
+
+client.authManager.setTokens(tokens);
+```
+
+Uwaga: wariant PKCS#12 wymaga opcjonalnej zależności `node-forge`.
+
+Poniższe przykłady (5-10) zakładają, że masz już uwierzytelniony obiekt `client`.
+
+## 5) Sesja online: open -> send -> close -> UPO
 
 ```ts
 const session = await client.workflows.sessions.online.open({
   formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
 });
 
-await session.sendInvoice({ invoice: "<Faktura>...</Faktura>" });
+const send = await session.sendInvoice({ invoice: "<Faktura>...</Faktura>" });
 await session.close();
 
 const upoXml = await session.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 });
-console.log(upoXml);
+console.log(send.referenceNumber, Boolean(upoXml));
 ```
 
-## 5) Sesja batch: openUploadAndClose + UPO
+## 6) Sesja batch: `openUploadAndClose(...)` + UPO
 
 ```ts
 const batch = await client.workflows.sessions.batch.openUploadAndClose({
@@ -101,11 +152,11 @@ const batch = await client.workflows.sessions.batch.openUploadAndClose({
   parallelism: 4,
 });
 
-const upo = await batch.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 120 });
-console.log(batch.referenceNumber, Boolean(upo));
+const upoXml = await batch.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 120 });
+console.log(batch.referenceNumber, Boolean(upoXml));
 ```
 
-## 6) Eksport: start -> wait -> download + decrypt + unzip
+## 7) Eksport: start -> wait -> download + decrypt + unzip
 
 ```ts
 const { referenceNumber, encryptionData } = await client.workflows.exports.startExport({
@@ -115,7 +166,11 @@ const { referenceNumber, encryptionData } = await client.workflows.exports.start
   },
 });
 
-const status = await client.workflows.exports.waitForExport(referenceNumber);
+const status = await client.workflows.exports.waitForExport(referenceNumber, {
+  pollIntervalMs: 2000,
+  maxAttempts: 120,
+});
+
 const pkg = await client.workflows.exports.downloadAndProcessPackage(status, encryptionData, {
   verifyHashes: true,
 });
@@ -123,19 +178,25 @@ const pkg = await client.workflows.exports.downloadAndProcessPackage(status, enc
 console.log(pkg.metadataSummaries.length, Object.keys(pkg.invoiceXmlFiles).length);
 ```
 
-## 7) Testdata block/unblock context
+## 8) Eksport przyrostowy z continuation points
 
 ```ts
-await client.testdata.blockContext({
-  contextIdentifier: { type: "Nip", value: "5265877635" },
+const continuationPoints: Record<string, string | undefined> = {};
+
+const incremental = await client.workflows.exportsIncremental.run({
+  subjectType: "Subject1",
+  windowFrom: "2025-01-01",
+  windowTo: "2025-01-31",
+  continuationPoints,
+  verifyHashes: true,
+  maxIterations: 20,
 });
 
-await client.testdata.unblockContext({
-  contextIdentifier: { type: "Nip", value: "5265877635" },
-});
+console.log(incremental.referenceNumbers);
+console.log(incremental.continuationPoints.Subject1);
 ```
 
-## 8) Tryb offline: wysylka + instrukcje postepowania
+## 9) Tryb offline: wysyłka + instrukcje
 
 ```ts
 const result = await client.workflows.offline.sendOfflineInvoice({
@@ -150,8 +211,20 @@ console.log(result.invoiceReferenceNumber, guide.sendDeadline);
 console.log(guide.operationalSteps);
 ```
 
-## Dalej
+## 10) Blokowanie/odblokowanie kontekstu (testdata)
 
+```ts
+await client.testdata.blockContext({
+  contextIdentifier: { type: "Nip", value: nip },
+});
+
+await client.testdata.unblockContext({
+  contextIdentifier: { type: "Nip", value: nip },
+});
+```
+
+## Dalsza dokumentacja
+
+- Workflowy: [../workflows/README.md](../workflows/README.md)
 - API reference: [../api/README.md](../api/README.md)
-- Workflows: [../workflows/README.md](../workflows/README.md)
-- Bledy i retry: [../errors.md](../errors.md)
+- Błędy i retry: [../errors.md](../errors.md)

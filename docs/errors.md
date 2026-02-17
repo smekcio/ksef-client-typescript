@@ -1,31 +1,35 @@
-# Bledy i retry
+# Błędy, rate limits i retry
 
-SDK mapuje bledy HTTP na klasy domenowe:
+SDK mapuje błędy HTTP i błędy walidacji na dedykowane klasy wyjątków.
 
-- `KsefError` - bazowy blad SDK
-- `KsefHttpError` - bledy HTTP bez JSON
-- `KsefApiError` - bledy API z JSON
-- `KsefRateLimitError` - 429 + `retryAfter`
-- `KsefAuthStatusError` - specjalny blad auth status (np. 460, zawieszony certyfikat)
-- `KsefSessionExpiredError` - brak lub wygasly token
-- `KsefValidationError` - bledy walidacji danych wejsciowych
+## Typy błędów
 
-## Przyklad obslugi 429
+| Klasa | Kiedy występuje | Najważniejsze pola |
+| --- | --- | --- |
+| `KsefError` | Bazowy błąd SDK (np. błędy workflow). | `message` |
+| `KsefHttpError` | Odpowiedź HTTP >= 400 bez JSON. | `statusCode`, `responseBody` |
+| `KsefApiError` | Odpowiedź HTTP >= 400 z JSON. | `statusCode`, `responseBody` |
+| `KsefRateLimitError` | `429 Too Many Requests`. | `statusCode`, `responseBody`, `retryAfter` |
+| `KsefAuthStatusError` | Specjalny przypadek `460` (status auth wskazujący m.in. zawieszony certyfikat). | `statusCode`, `responseBody`, `statusDetails` |
+| `KsefSessionExpiredError` | Brak tokena dostępowego lub nieudane odświeżenie sesji. | `message` |
+| `KsefValidationError` | Błąd lokalnej walidacji danych wejściowych. | `message`, `details` |
+
+## Przykład obsługi `429` i `Retry-After`
 
 ```ts
 import { KsefRateLimitError } from "ksef-client-typescript";
 
 try {
   await client.invoices.queryInvoiceMetadata({ subjectType: "Subject1" });
-} catch (err) {
-  if (err instanceof KsefRateLimitError) {
-    console.error("Retry-After:", err.retryAfter);
+} catch (error) {
+  if (error instanceof KsefRateLimitError) {
+    console.error("Przekroczono limit. Retry-After:", error.retryAfter);
   }
-  throw err;
+  throw error;
 }
 ```
 
-## Przyklad obslugi 460: certyfikat zawieszony
+## Przykład obsługi `460` (status auth)
 
 ```ts
 import { KsefAuthStatusError } from "ksef-client-typescript";
@@ -34,29 +38,51 @@ try {
   await client.workflows.auth.authenticateWithXadesSignature({
     signedXml: "<AuthTokenRequest>...signed...</AuthTokenRequest>",
   });
-} catch (err) {
-  if (err instanceof KsefAuthStatusError && err.statusCode === 460) {
-    const suspended = err.statusDetails?.some((item) =>
-      item.toLowerCase().includes("certyfikat zawiesz"),
-    );
-
-    if (suspended) {
-      console.error("Uwierzytelnienie odrzucone: Certyfikat zawieszony.");
-      // np. fallback na inny certyfikat lub przerwanie procesu
-      throw err;
-    }
+} catch (error) {
+  if (error instanceof KsefAuthStatusError && error.statusCode === 460) {
+    console.error("Uwierzytelnianie odrzucone:", error.statusDetails);
   }
-  throw err;
+  throw error;
 }
 ```
 
-## Automatyczny retry na 429
+## Przykład obsługi wygaśnięcia sesji
 
-Domyslnie SDK automatycznie ponawia requesty na `429` tylko dla metod idempotentnych (`GET`, `PUT`, `DELETE`), z uwzglednieniem naglowka `Retry-After` (jesli jest).
+```ts
+import { KsefSessionExpiredError } from "ksef-client-typescript";
 
-Mozesz to wylaczyc globalnie przez `retryOn429: false` w `KsefClientOptions`.
+try {
+  await client.invoices.queryInvoiceMetadata({
+    subjectType: "Subject1",
+    dateRange: { dateType: "Issue", from: "2025-01-01", to: "2025-01-31" },
+  });
+} catch (error) {
+  if (error instanceof KsefSessionExpiredError) {
+    console.error("Sesja wygasła. Wymagane ponowne uwierzytelnienie.");
+  }
+  throw error;
+}
+```
 
-## Auth i wygasniecie sesji
+## Automatyczny retry na `429`
 
-Gdy odswiezenie tokena sie nie uda, SDK rzuci `KsefSessionExpiredError`. W takim
-przypadku nalezy ponownie wykonac `KsefClient.connect(...)`.
+Domyślnie biblioteka ponawia żądania tylko dla metod idempotentnych:
+
+- `GET`
+- `PUT`
+- `DELETE`
+
+Mechanizm retry:
+- respektuje nagłówek `Retry-After` (sekundy lub data HTTP),
+- gdy nagłówek nie występuje, stosuje opóźnienie wykładnicze z jitterem,
+- ogranicza opóźnienie przez `maxRetryDelayMs`.
+
+Konfiguracja globalna znajduje się w `KsefClientOptions`:
+
+- `retryOn429`
+- `maxRetryAttempts`
+- `maxRetryDelayMs`
+
+## Błędy workflow uwierzytelniania
+
+`AuthCoordinator` może zgłosić `KsefError`, jeżeli status uwierzytelniania zakończy się kodem innym niż oczekiwany (`100` w trakcie lub `200` po sukcesie), albo gdy przekroczony zostanie limit prób odpytywania.

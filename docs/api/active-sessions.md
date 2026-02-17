@@ -1,61 +1,64 @@
-# Active sessions
+# Aktywne sesje (`activeSessions`)
 
-Thin client dla `/auth/sessions`.
+Niskopoziomowy klient dla endpointów `/auth/sessions`.
 
-## Metody
+## Dostępne metody
 
 - `listActiveSessions(pageSize?, continuationToken?)`
 - `revokeCurrentSession()`
 - `revokeSession(referenceNumber)`
 
-## Co warto wiedziec
+## Najważniejsze informacje
 
-- Endpointy aktywnych sesji wymagaja `accessToken`.
-- Stronicowanie korzysta z naglowka `x-continuation-token`.
-- Odpowiedz ma typ `AuthenticationListResponse`.
-- W pojedynczym wpisie sesji (`AuthenticationListItem`) pole `authenticationMethod` jest deprecated.
-- Preferowany opis metody auth to `authenticationMethodInfo` (`category`, `code`, `displayName`).
+- Wszystkie metody wymagają aktywnego `accessToken`.
+- Stronicowanie działa przez nagłówek `x-continuation-token`.
+- `listActiveSessions` zwraca `AuthenticationListResponse`.
+- Pole `authenticationMethod` jest oznaczone jako przestarzałe; używaj `authenticationMethodInfo`.
 
-## Struktura odpowiedzi
+## Przykłady TypeScript
+
+### Pobranie listy aktywnych sesji
 
 ```ts
 const list = await client.activeSessions.listActiveSessions(100);
-console.log(list.continuationToken);
-console.log(list.items.length);
+
+console.log("continuationToken:", list.continuationToken);
+console.log("liczba sesji:", list.items.length);
 
 for (const item of list.items) {
   console.log(item.referenceNumber);
   console.log(item.authenticationMethodInfo.category); // XadesSignature | NationalNode | Token | Other
   console.log(item.authenticationMethodInfo.code);
   console.log(item.authenticationMethodInfo.displayName);
-  console.log(item.authenticationMethod); // deprecated
 }
 ```
 
-## Przyklad 2: pobranie kolejnej strony
+### Pobranie kolejnej strony
 
 ```ts
 const firstPage = await client.activeSessions.listActiveSessions(50);
-const continuation = firstPage.continuationToken;
 
-if (continuation) {
-  const secondPage = await client.activeSessions.listActiveSessions(50, continuation);
-  console.log(secondPage);
+if (firstPage.continuationToken) {
+  const secondPage = await client.activeSessions.listActiveSessions(
+    50,
+    firstPage.continuationToken,
+  );
+  console.log(secondPage.items.length);
 }
 ```
 
-## Przyklad 3: revoke jednej sesji
+### Wycofanie pojedynczej sesji
 
 ```ts
-const list = await client.activeSessions.listActiveSessions(100);
-const sessions = list.items;
+const list = await client.activeSessions.listActiveSessions(20);
+const session = list.items[0];
 
-if (sessions.length > 0 && sessions[0].referenceNumber) {
-  await client.activeSessions.revokeSession(sessions[0].referenceNumber);
+if (session?.referenceNumber) {
+  await client.activeSessions.revokeSession(session.referenceNumber);
 }
 ```
 
-## Przyklad 4: revoke biezacej sesji
+### Wycofanie bieżącej sesji
 
 ```ts
 await client.activeSessions.revokeCurrentSession();

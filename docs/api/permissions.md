@@ -1,100 +1,113 @@
-# Permissions
+# Uprawnienia (`permissions`)
 
-Thin client dla `/permissions/*`.
+Niskopoziomowy klient dla endpointów `/permissions/*`.
 
-## Metody
+## Dostępne metody
 
-- Nadawanie:
-  - `grantAuthorizations(request)`
-  - `grantEntities(request)`
-  - `grantEuEntitiesAdministration(request)`
-  - `grantEuEntities(request)`
-  - `grantIndirect(request)`
-  - `grantPersons(request)`
-  - `grantSubunits(request)`
-- Cofanie:
-  - `revokeAuthorizationGrant(permissionId)`
-  - `revokeCommonGrant(permissionId)`
-- Query:
-  - `queryAuthorizations(request, pageOffset?, pageSize?)`
-  - `queryEntitiesRoles(pageOffset?, pageSize?)`
-  - `queryEuEntitiesGrants(request, pageOffset?, pageSize?)`
-  - `queryPersonalGrants(request, pageOffset?, pageSize?)`
-  - `queryPersonsGrants(request, pageOffset?, pageSize?)`
-  - `querySubordinateEntitiesRoles(request, pageOffset?, pageSize?)`
-  - `querySubunitsGrants(request, pageOffset?, pageSize?)`
-- Statusy:
-  - `getAttachmentPermissionStatus()`
-  - `getOperationStatus(referenceNumber)`
+- `grantAuthorizations(request)`
+- `grantEntities(request)`
+- `grantEuEntitiesAdministration(request)`
+- `grantEuEntities(request)`
+- `grantIndirect(request)`
+- `grantPersons(request)`
+- `grantSubunits(request)`
+- `revokeAuthorizationGrant(permissionId)`
+- `revokeCommonGrant(permissionId)`
+- `queryAuthorizations(request, pageOffset?, pageSize?)`
+- `queryEntitiesRoles(pageOffset?, pageSize?)`
+- `queryEuEntitiesGrants(request, pageOffset?, pageSize?)`
+- `queryPersonalGrants(request, pageOffset?, pageSize?)`
+- `queryPersonsGrants(request, pageOffset?, pageSize?)`
+- `querySubordinateEntitiesRoles(request, pageOffset?, pageSize?)`
+- `querySubunitsGrants(request, pageOffset?, pageSize?)`
+- `getAttachmentPermissionStatus()`
+- `getOperationStatus(referenceNumber)`
 
-## Co warto wiedziec
+## Najważniejsze informacje
 
-- Wiekszosc operacji `grant*` jest asynchroniczna (`202`) i zwraca numer referencyjny operacji.
-- Po `grant*` warto odpytywac `getOperationStatus(...)` do momentu `status.code === 200`.
-- Payloady sa przekazywane jako obiekty JSON zgodne z kontraktem KSeF (OpenAPI/XSD w `ksef-docs`).
-- Dla metod `query*` paginacja (`pageOffset`, `pageSize`) jest przekazywana jako query parametry HTTP.
+- Operacje `grant*` zwykle są asynchroniczne i zwracają numer referencyjny operacji.
+- Status operacji możesz odpytywać przez `getOperationStatus(referenceNumber)`.
+- Metody `query*` obsługują paginację przez `pageOffset` i `pageSize` przekazywane jako parametry query.
+- `queryEntitiesRoles(...)` to jedyna metoda query oparta o `GET`; pozostałe `query*` używają `POST` z ciałem.
 
-## Przyklad 1: grant + polling statusu operacji
+## Przykłady TypeScript
+
+### Nadanie uprawnień i polling statusu
 
 ```ts
-const request = {
-  // Przykladowy payload - dopasuj do kontraktu /permissions/persons/grants.
-  grants: [
-    {
-      permission: "InvoiceRead",
-      personIdentifier: { type: "Pesel", value: "90010112345" },
-    },
-  ],
+import { PermissionsGrantRequest } from "ksef-client-typescript";
+
+const request: PermissionsGrantRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /permissions/persons/grants.
 };
 
-const op = await client.permissions.grantPersons(request);
-const referenceNumber = String(op.referenceNumber ?? "");
+const operation = await client.permissions.grantPersons(request);
+const referenceNumber = String(
+  (operation as { referenceNumber?: string }).referenceNumber ?? "",
+);
 
+let completed = false;
 for (let attempt = 0; attempt < 60; attempt += 1) {
   const status = await client.permissions.getOperationStatus(referenceNumber);
   const code = Number((status as { status?: { code?: number } }).status?.code ?? 0);
+
   if (code === 200) {
+    completed = true;
     break;
   }
   if (code !== 100) {
-    throw new Error(`Permissions operation failed: ${JSON.stringify(status)}`);
+    throw new Error(`Operacja uprawnień zakończona błędem: ${JSON.stringify(status)}`);
   }
   await new Promise((resolve) => setTimeout(resolve, 2000));
 }
+
+if (!completed) {
+  throw new Error("Przekroczono czas oczekiwania na zakończenie operacji uprawnień.");
+}
 ```
 
-## Przyklad 2: query persons grants
+### Zapytanie o uprawnienia osób z paginacją
 
 ```ts
-const result = await client.permissions.queryPersonsGrants({
-  // Dalsze filtry wedlug kontraktu KSeF.
-}, 0, 20);
+const result = await client.permissions.queryPersonsGrants(
+  {
+    queryCriteria: {
+      personIdentifier: { type: "Pesel", value: "90010112345" },
+    },
+  },
+  0,
+  50,
+);
 
 console.log(result);
 ```
 
-## Przyklad 3: check attachment permission status
+### Odczyt statusu uprawnień do załączników
 
 ```ts
 const attachmentStatus = await client.permissions.getAttachmentPermissionStatus();
 console.log(attachmentStatus);
 ```
 
-## Przyklad 4: revoke grant
+### Cofnięcie uprawnienia
 
 ```ts
 await client.permissions.revokeAuthorizationGrant("PERMISSION_ID");
 await client.permissions.revokeCommonGrant("PERMISSION_ID");
 ```
 
-## Przyklad 5: roles query
+### Zapytanie o role podmiotów
 
 ```ts
 const entityRoles = await client.permissions.queryEntitiesRoles(0, 50);
 
-const subordinateRoles = await client.permissions.querySubordinateEntitiesRoles({
-  // body query
-}, 0, 50);
+const subordinateRoles = await client.permissions.querySubordinateEntitiesRoles(
+  {
+    queryCriteria: {},
+  },
+  0,
+  50,
+);
 
 console.log(entityRoles, subordinateRoles);
 ```

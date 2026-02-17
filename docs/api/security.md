@@ -1,46 +1,48 @@
-# Security
+# Bezpieczeństwo (`security`)
 
-Thin client dla `/security/public-key-certificates`.
+Niskopoziomowy klient dla endpointu `/security/public-key-certificates`.
 
-## Metody
+## Dostępne metody
 
 - `getPublicKeyCertificates()`
 
-## Co warto wiedziec
+## Najważniejsze informacje
 
 - Endpoint nie wymaga `accessToken`.
-- Typowy scenariusz to wybor certyfikatow po `usage`:
-  - `KsefTokenEncryption` dla szyfrowania tokena KSeF,
-  - `SymmetricKeyEncryption` dla sesji online/batch i eksportu.
+- Certyfikaty zwracają pole `usage`.
+- `KsefTokenEncryption` służy do szyfrowania tokena KSeF.
+- `SymmetricKeyEncryption` służy do szyfrowania danych sesji online/batch i eksportu.
 
-## Przyklad 1: pobranie certyfikatow i wybor po usage
+## Przykłady TypeScript
+
+### Pobranie certyfikatów i wybór po `usage`
 
 ```ts
 const certs = await client.security.getPublicKeyCertificates();
 const tokenCert = certs.find((c) => c.usage.includes("KsefTokenEncryption"));
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+const symmetricCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
 
-if (!tokenCert || !symCert) {
-  throw new Error("Missing required public key certificates");
+if (!tokenCert || !symmetricCert) {
+  throw new Error("Brak wymaganych certyfikatów publicznych");
 }
 ```
 
-## Przyklad 2: przygotowanie danych szyfrowania dla sesji
+### Przygotowanie danych szyfrowania dla sesji
 
 ```ts
 import { CryptographyService } from "ksef-client-typescript";
 
 const certs = await client.security.getPublicKeyCertificates();
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
-if (!symCert) {
-  throw new Error("Missing SymmetricKeyEncryption certificate");
+const symmetricCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+if (!symmetricCert) {
+  throw new Error("Brak certyfikatu z usage=SymmetricKeyEncryption");
 }
 
-const encryption = CryptographyService.getEncryptionData(symCert.certificate);
+const encryption = CryptographyService.getEncryptionData(symmetricCert.certificate);
 console.log(encryption.encryptionInfo);
 ```
 
-## Przyklad 3: szyfrowanie tokena KSeF
+### Szyfrowanie tokena KSeF
 
 ```ts
 import { CryptographyService } from "ksef-client-typescript";
@@ -48,7 +50,7 @@ import { CryptographyService } from "ksef-client-typescript";
 const certs = await client.security.getPublicKeyCertificates();
 const tokenCert = certs.find((c) => c.usage.includes("KsefTokenEncryption"));
 if (!tokenCert) {
-  throw new Error("Missing KsefTokenEncryption certificate");
+  throw new Error("Brak certyfikatu z usage=KsefTokenEncryption");
 }
 
 const encryptedToken = CryptographyService.encryptKsefToken(
@@ -56,5 +58,6 @@ const encryptedToken = CryptographyService.encryptKsefToken(
   Date.now(),
   tokenCert.certificate,
 );
+
 console.log(encryptedToken.slice(0, 24));
 ```

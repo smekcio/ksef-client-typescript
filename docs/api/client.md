@@ -1,6 +1,38 @@
-# KsefClient (glowny klient)
+# Klient główny (`KsefClient`)
 
-`KsefClient` grupuje wszystkie podklienci API oraz udostepnia `workflows` i pomocnicze services.
+`KsefClient` agreguje podklienty API, workflow i usługi pomocnicze.
+
+## Zakres
+
+Podklienci domenowi:
+
+- `client.auth`
+- `client.activeSessions`
+- `client.sessions`
+- `client.invoices`
+- `client.permissions`
+- `client.certificates`
+- `client.tokens`
+- `client.limits`
+- `client.security`
+- `client.testdata`
+- `client.peppol`
+
+Warstwa workflow:
+
+- `client.workflows.auth`
+- `client.workflows.sessions.online`
+- `client.workflows.sessions.batch`
+- `client.workflows.offline`
+- `client.workflows.exports`
+- `client.workflows.exportsIncremental`
+
+Usługi pomocnicze:
+
+- `client.verificationLinks`
+- `client.qr`
+- `client.personToken`
+- `client.authManager`
 
 ## Inicjalizacja
 
@@ -12,24 +44,69 @@ const client = new KsefClient({
 });
 ```
 
-## Connect (token KSeF)
+Możesz też użyć jawnego `baseUrl`:
 
 ```ts
+import { KsefClient } from "ksef-client-typescript";
+
+const client = new KsefClient({
+  baseUrl: "https://api-demo.ksef.mf.gov.pl",
+});
+```
+
+Szczegóły opcji: [`../configuration.md`](../configuration.md).
+
+## Szybkie połączenie (`KsefClient.connect`)
+
+```ts
+import { KsefClient } from "ksef-client-typescript";
+
 const client = await KsefClient.connect({
   environment: "DEMO",
   token: process.env.KSEF_TOKEN!,
   context: { type: "Nip", value: "5265877635" },
+  pollIntervalMs: 2000,
+  maxAttempts: 60,
 });
 ```
 
-## Dostepne pola
+`connect(...)`:
 
-- `client.auth`, `client.sessions`, ... (thin API)
-- `client.workflows.auth` - AuthCoordinator
-- `client.workflows.sessions.online` - OnlineSessionWorkflow
-- `client.workflows.sessions.batch` - BatchSessionWorkflow
-- `client.workflows.exports` - InvoiceExportWorkflow
-- `client.workflows.exportsIncremental` - IncrementalExportWorkflow
-- `client.verificationLinks` - linki QR
-- `client.qr` - generowanie PNG/SVG/Data URL (wymaga `qrcode`)
-- `client.personToken` - parser JWT tokena osoby
+1. tworzy instancję klienta,
+2. wykonuje workflow `authenticateWithKsefToken(...)`,
+3. zapisuje uzyskane tokeny w `client.authManager`.
+
+## `authManager`
+
+`authManager` przechowuje `accessToken` i `refreshToken`, a przy zbliżającym się wygaśnięciu automatycznie odświeża token dostępu.
+
+Ręczne ustawienie tokenów:
+
+```ts
+const tokens = await client.workflows.auth.authenticateWithKsefToken({
+  token: process.env.KSEF_TOKEN!,
+  context: { type: "Nip", value: "5265877635" },
+});
+
+client.authManager.setTokens(tokens);
+```
+
+## Przykład pierwszego wywołania API
+
+```ts
+const metadata = await client.invoices.queryInvoiceMetadata(
+  {
+    subjectType: "Subject1",
+    dateRange: {
+      dateType: "Issue",
+      from: "2025-01-01",
+      to: "2025-01-31",
+    },
+  },
+  0,
+  10,
+  "Desc",
+);
+
+console.log(metadata);
+```

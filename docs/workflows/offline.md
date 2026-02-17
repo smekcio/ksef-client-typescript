@@ -1,14 +1,46 @@
 # Workflow: tryb offline
 
-`OfflineInvoiceWorkflow` realizuje gotowy flow do wysylki faktur gdy system dziala w trybie offline:
+`OfflineInvoiceWorkflow` udostępnia gotowy scenariusz wysyłki faktur w trybach offline.
+Workflow bazuje na sesji interaktywnej (`open -> send -> close`) i wymusza `offlineMode=true` przy wysyłce.
 
-- `sendOfflineInvoice(...)` - standardowa wysylka offline z `offlineMode=true`,
-- `sendOfflineTechnicalCorrection(...)` - korekta techniczna z `hashOfCorrectedInvoice`,
-- `getProcedureInstructions(mode)` - instrukcja operacyjna dla `offline24`, `offline`, `awaryjny`.
+Dostęp: `client.workflows.offline`.
 
-Workflow jest dostepny pod `client.workflows.offline`.
+## Metody
 
-## Przyklad 1: wysylka faktury offline
+- `sendOfflineInvoice(options)`
+- `sendOfflineTechnicalCorrection(options)`
+- `getProcedureInstructions(mode)`
+- `listProcedureInstructions()`
+
+## Tryby i instrukcje
+
+`getProcedureInstructions(mode)` zwraca instrukcje operacyjne dla:
+
+- `offline24`
+- `offline`
+- `awaryjny`
+
+Każda instrukcja zawiera:
+
+- `mode`
+- `responsibility`
+- `sendDeadline`
+- `legalBasis`
+- `operationalSteps`
+
+## Opcje `sendOfflineInvoice(options)`
+
+- pola z `OnlineSessionOpenOptions`: `formCode`, `publicCertificateBase64Der`, `upoV43`
+- `invoice` (wymagane)
+- `waitForUpo` (opcjonalnie; domyślnie `true`)
+- `waitForUpoOptions` (opcjonalnie; `pollIntervalMs`, `maxAttempts`)
+
+## Opcje `sendOfflineTechnicalCorrection(options)`
+
+- wszystko z `sendOfflineInvoice(options)`
+- `hashOfCorrectedInvoice` (wymagane, niepuste)
+
+## Przykład 1: standardowa wysyłka offline
 
 ```ts
 const result = await client.workflows.offline.sendOfflineInvoice({
@@ -23,15 +55,27 @@ const result = await client.workflows.offline.sendOfflineInvoice({
 
 console.log(result.sessionReferenceNumber);
 console.log(result.invoiceReferenceNumber);
-console.log(Boolean(result.upoXml));
+console.log(Boolean(result.upoXml), Boolean(result.upo));
 ```
 
-## Przyklad 2: korekta techniczna faktury offline
+## Przykład 2: wysyłka offline bez czekania na UPO
+
+```ts
+const result = await client.workflows.offline.sendOfflineInvoice({
+  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
+  invoice: "<Faktura>...</Faktura>",
+  waitForUpo: false,
+});
+
+console.log(result.invoiceReferenceNumber, result.upoXml); // upoXml === null
+```
+
+## Przykład 3: korekta techniczna faktury offline
 
 ```ts
 const result = await client.workflows.offline.sendOfflineTechnicalCorrection({
   formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
-  invoice: "<Faktura>...</Faktura>",
+  invoice: "<FakturaKorygujaca>...</FakturaKorygujaca>",
   hashOfCorrectedInvoice: "BASE64_SHA256_ODRZUCONEJ_FAKTURY",
   waitForUpo: true,
 });
@@ -39,31 +83,33 @@ const result = await client.workflows.offline.sendOfflineTechnicalCorrection({
 console.log(result.invoiceReferenceNumber);
 ```
 
-## Przyklad 3: instrukcje postepowania dla operatora
+## Przykład 4: instrukcje dla operatora
 
 ```ts
 const guide = client.workflows.offline.getProcedureInstructions("offline24");
-console.log(guide.sendDeadline);
+console.log(guide.mode, guide.sendDeadline, guide.legalBasis);
 console.log(guide.operationalSteps);
 ```
 
-## Instrukcje postepowania (checklista)
+## Przykład 5: pobranie wszystkich instrukcji
 
-1. Zidentyfikuj tryb pracy (`offline24`, `offline`, `awaryjny`) i pobierz instrukcje:
-   - `client.workflows.offline.getProcedureInstructions(mode)`
-2. Wystaw fakture zgodna z FA(3) i wyslij ja z `offlineMode=true`:
-   - `client.workflows.offline.sendOfflineInvoice(...)`
-3. Po wystawieniu dokumentu wygeneruj i przekaz nabywcy kody QR:
-   - QR-I (weryfikacja faktury) i QR-II (potwierdzenie wystawcy).
-4. Monitoruj komunikaty KSeF/BIP:
-   - awaria moze zmienic termin doslania faktur (przesuniecie/reset licznika).
-5. Zachowaj artefakty audytowe:
-   - referencje sesji i faktury, UPO, hash faktury, tryb offline.
-6. Jesli faktura offline zostanie odrzucona technicznie:
-   - wyslij `sendOfflineTechnicalCorrection(...)` z `hashOfCorrectedInvoice`.
+```ts
+const guides = client.workflows.offline.listProcedureInstructions();
+for (const guide of guides) {
+  console.log(guide.mode, guide.responsibility, guide.sendDeadline);
+}
+```
+
+## Checklista operacyjna
+
+1. Ustal aktywny tryb (`offline24`, `offline`, `awaryjny`) i pobierz instrukcje przez `getProcedureInstructions(mode)`.
+2. Wystaw fakturę FA(3) i wyślij ją przez `sendOfflineInvoice(...)`.
+3. Zachowaj referencje sesji/faktury oraz UPO (lub zapisz zadanie na późniejszy polling UPO).
+4. Monitoruj komunikaty KSeF/BIP, bo mogą zmienić termin dosłania dokumentów.
+5. Jeśli dokument zostanie odrzucony technicznie, wyślij korektę przez `sendOfflineTechnicalCorrection(...)` z `hashOfCorrectedInvoice`.
 
 ## Uwagi
 
-- Workflow `offline` wykorzystuje sesje interaktywna pod spodem (`open -> send -> close`).
-- Korekta techniczna nie sluzy do merytorycznej zmiany tresci faktury, tylko do poprawy bledow technicznych.
-- Sredowisko i terminy nalezy walidowac zgodnie z aktualnymi komunikatami MF/KSeF.
+- Ten workflow nie zmienia merytorycznej treści faktury; odpowiada za sposób wysyłki i obsługę procesu.
+- `sendOfflineTechnicalCorrection(...)` służy do korekty technicznej, nie biznesowej.
+- Informacje o terminach i podstawach prawnych w instrukcjach traktuj jako wsparcie operacyjne; ostateczna interpretacja powinna opierać się o aktualne komunikaty MF/KSeF i przepisy.

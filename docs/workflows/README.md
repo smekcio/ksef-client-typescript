@@ -1,22 +1,28 @@
-# Workflows
+# Workflowy
 
-Workflowy to gotowe scenariusze, ktore lacza endpointy API z operacjami lokalnymi (szyfrowanie, ZIP, polling).
-Sa dostepne pod `client.workflows`.
+Workflowy to gotowe scenariusze, które łączą endpointy API KSeF z operacjami lokalnymi
+(kryptografia, ZIP, upload/download partów, polling statusów).
 
-## Strony
+W TypeScript są dostępne pod `client.workflows`.
 
-- [Uwierzytelnianie](auth.md)
-- [Sesja interaktywna](online-session.md)
-- [Sesja wsadowa](batch-session.md)
-- [Tryb offline](offline.md)
-- [Eksport paczek](export.md)
+## Dostępne workflowy
 
-## Kiedy workflow zamiast thin API
+- [Uwierzytelnianie (token KSeF / XAdES)](auth.md)
+- [Sesja interaktywna (open -> send -> close -> UPO)](online-session.md)
+- [Sesja wsadowa (ZIP -> podział -> szyfrowanie -> upload -> close)](batch-session.md)
+- [Tryb offline (offline24 / offline / awaryjny)](offline.md)
+- [Eksport paczek i eksport przyrostowy](export.md)
 
-- Uzyj thin API, gdy chcesz 1:1 kontrolowac request/response endpointu.
-- Uzyj workflow, gdy potrzebujesz kompletnego procesu (auth, online, batch, eksport).
+## Kiedy workflow, a kiedy thin API
 
-## Przyklad 1: auth + online (end-to-end)
+- Użyj workflow, gdy chcesz gotowy proces end-to-end z sensownymi domyślnymi ustawieniami.
+- Użyj thin API (`client.auth`, `client.sessions`, `client.invoices`), gdy potrzebujesz pełnej kontroli nad każdym requestem i pollingiem.
+
+## Wspólne założenia
+
+- Workflowy sesji, eksportu i offline wymagają ustawionego `accessToken` w `authManager`.
+- Najkrótsza ścieżka to `KsefClient.connect(...)`, który uruchamia tokenowy workflow auth i zapisuje tokeny.
+- W przypadku manualnego auth ustaw tokeny przez `client.authManager.setTokens(...)`.
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -24,44 +30,25 @@ import { KsefClient } from "ksef-client-typescript";
 const client = await KsefClient.connect({
   environment: "DEMO",
   token: process.env.KSEF_TOKEN!,
-  context: { type: "Nip", value: "5265877635" },
+  context: { type: "Nip", value: process.env.KSEF_NIP ?? "5265877635" },
+  pollIntervalMs: 2000,
+  maxAttempts: 90,
 });
-
-const online = await client.workflows.sessions.online.open({
-  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
-});
-
-await online.sendInvoice({ invoice: "<Faktura>...</Faktura>" });
-await online.close();
-
-const upo = await online.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 });
-console.log(Boolean(upo));
 ```
 
-## Przyklad 2: eksport + incremental continuation points
+## Szybki wybór workflowu
 
-```ts
-const continuationPoints: Record<string, string | undefined> = {};
+| Potrzeba | Workflow |
+| --- | --- |
+| Uzyskanie tokenów (`accessToken`, `refreshToken`) | `client.workflows.auth.*` |
+| Wysyłka pojedynczych faktur w sesji online | `client.workflows.sessions.online.*` |
+| Wysyłka paczki faktur jako ZIP | `client.workflows.sessions.batch.openUploadAndClose(...)` |
+| Wysyłka faktury z `offlineMode=true` + instrukcje operacyjne | `client.workflows.offline.*` |
+| Eksport i obróbka paczek faktur | `client.workflows.exports.*` |
+| Eksport przyrostowy z continuation points | `client.workflows.exportsIncremental.run(...)` |
 
-const result = await client.workflows.exportsIncremental.run({
-  subjectType: "Subject1",
-  windowFrom: "2025-01-01",
-  windowTo: "2025-01-31",
-  continuationPoints,
-  verifyHashes: true,
-});
+## Powiązane dokumenty
 
-console.log(result.referenceNumbers, result.continuationPoints);
-```
-
-## Przyklad 3: workflow offline
-
-```ts
-const offline = await client.workflows.offline.sendOfflineInvoice({
-  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
-  invoice: "<Faktura>...</Faktura>",
-  waitForUpo: true,
-});
-
-console.log(offline.sessionReferenceNumber, offline.invoiceReferenceNumber);
-```
+- API reference: [../api/README.md](../api/README.md)
+- Praktyczne fragmenty kodu: [../examples/README.md](../examples/README.md)
+- Błędy i retry: [../errors.md](../errors.md)

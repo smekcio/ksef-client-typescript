@@ -1,10 +1,10 @@
-# Testdata
+# Dane testowe (`testdata`)
 
-Thin client dla `/testdata/*`.
+Niskopoziomowy klient dla endpointów `/testdata/*`.
 
-Endpointy sa przeznaczone do srodowisk testowych (TEST/DEMO), np. do przygotowania danych, uprawnien i scenariuszy testowych.
+Endpointy testdata są przeznaczone dla środowisk testowych (`TEST` i `DEMO`) do przygotowania danych oraz scenariuszy integracyjnych.
 
-## Metody
+## Dostępne metody
 
 - `enableAttachments(request)`
 - `revokeAttachments(request)`
@@ -17,66 +17,66 @@ Endpointy sa przeznaczone do srodowisk testowych (TEST/DEMO), np. do przygotowan
 - `createSubject(request)`
 - `removeSubject(request)`
 
-## Co warto wiedziec
+## Najważniejsze informacje
 
-- `blockContext(...)` i `unblockContext(...)` przyjmuja `contextIdentifier` z typem:
-  - `Nip`
-  - `InternalId`
-  - `NipVatUe`
-  - `PeppolId`
-- Dla wiekszosci wywolan wymagany jest aktywny `accessToken`.
+- Wszystkie metody tego klienta używają `accessToken`.
+- `blockContext(...)` i `unblockContext(...)` przyjmują `contextIdentifier`.
+- Dozwolone typy `contextIdentifier.type` to: `Nip`, `InternalId`, `NipVatUe`, `PeppolId`.
 
-## Przyklad 1: create/remove subject
+## Przykłady TypeScript
 
-```ts
-await client.testdata.createSubject({
-  // Przykladowy payload - dopasuj do kontraktu POST /testdata/subject.
-  subject: {
-    identifier: { type: "Nip", value: "5265877635" },
-    name: "Test Subject",
-  },
-});
-
-await client.testdata.removeSubject({
-  subject: {
-    identifier: { type: "Nip", value: "5265877635" },
-  },
-});
-```
-
-## Przyklad 2: create/remove person
+### Tworzenie i usuwanie podmiotu testowego
 
 ```ts
-await client.testdata.createPerson({
-  // Przykladowy payload - dopasuj do kontraktu POST /testdata/person.
-  person: {
-    firstName: "Jan",
-    lastName: "Kowalski",
-    pesel: "90010112345",
-  },
-});
+import { TestdataRequest } from "ksef-client-typescript";
 
-await client.testdata.removePerson({
-  person: {
-    pesel: "90010112345",
-  },
-});
+const createSubjectRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/subject.
+};
+
+const removeSubjectRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/subject/remove.
+};
+
+await client.testdata.createSubject(createSubjectRequest);
+await client.testdata.removeSubject(removeSubjectRequest);
 ```
 
-## Przyklad 3: grant/revoke test permissions
+### Tworzenie i usuwanie osoby testowej
 
 ```ts
-await client.testdata.grantPermissions({
-  // Przykladowy payload - dopasuj do kontraktu POST /testdata/permissions.
-  permissions: [{ permission: "InvoiceRead", assignee: "90010112345" }],
-});
+import { TestdataRequest } from "ksef-client-typescript";
 
-await client.testdata.revokePermissions({
-  permissions: [{ permission: "InvoiceRead", assignee: "90010112345" }],
-});
+const createPersonRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/person.
+};
+
+const removePersonRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/person/remove.
+};
+
+await client.testdata.createPerson(createPersonRequest);
+await client.testdata.removePerson(removePersonRequest);
 ```
 
-## Przyklad 4: block/unblock context dla `Nip`
+### Nadanie i cofnięcie uprawnień testowych
+
+```ts
+import { TestdataRequest } from "ksef-client-typescript";
+
+const grantRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/permissions.
+};
+
+const revokeRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/permissions/revoke.
+};
+
+await client.testdata.grantPermissions(grantRequest);
+await client.testdata.revokePermissions(revokeRequest);
+```
+
+### Blokada i odblokowanie kontekstu dla `Nip`
 
 ```ts
 await client.testdata.blockContext({
@@ -88,7 +88,7 @@ await client.testdata.unblockContext({
 });
 ```
 
-## Przyklad 5: block/unblock context dla `InternalId`
+### Blokada i odblokowanie kontekstu dla `InternalId`
 
 ```ts
 await client.testdata.blockContext({
@@ -100,15 +100,19 @@ await client.testdata.unblockContext({
 });
 ```
 
-## Przyklad 6: enable/revoke attachments
+### Włączenie i cofnięcie prawa do załączników
 
 ```ts
-await client.testdata.enableAttachments({
-  // Przykladowy payload - dopasuj do kontraktu POST /testdata/attachment.
-  contextIdentifier: { type: "Nip", value: "5265877635" },
-});
+import { TestdataRequest } from "ksef-client-typescript";
 
-await client.testdata.revokeAttachments({
-  contextIdentifier: { type: "Nip", value: "5265877635" },
-});
+const enableRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/attachment.
+};
+
+const revokeRequest: TestdataRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/attachment/revoke.
+};
+
+await client.testdata.enableAttachments(enableRequest);
+await client.testdata.revokeAttachments(revokeRequest);
 ```

@@ -1,6 +1,26 @@
-# XML
+# XML (`ksef-client-typescript`)
 
-Modul XML zawiera parser i builder dla dokumentow KSeF oraz helpery do faktur FA(2)/FA(3).
+Moduł `xml` udostępnia:
 
-- [Serialize/parse](serialization.md)
-- [Faktura FA](invoice.md)
+- narzędzia ogólne do parsowania i budowania XML (`parseXml`, `buildXml`, `buildXmlFromObject`),
+- builder dokumentów fakturowych FA (`buildFakturaXml`),
+- serializację wejść fakturowych i PEF do `Buffer` (`serializeInvoiceXml`),
+- builder UBL dla PEF/PEF_KOR (`buildPefXml`),
+- parser UPO (`parseUpoXml`).
+
+## Strony
+
+- [Serializacja i parser XML](serialization.md)
+- [Faktury FA/PEF i `serializeInvoiceXml`](invoice.md)
+
+## Przykład importu
+
+```ts
+import {
+  buildFakturaXml,
+  buildPefXml,
+  parseUpoXml,
+  parseXml,
+  serializeInvoiceXml,
+} from "ksef-client-typescript";
+```

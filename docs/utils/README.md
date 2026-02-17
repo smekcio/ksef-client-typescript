@@ -1,12 +1,24 @@
-# Utils
+# Narzędzia (`utils`)
 
-Moduly pomocnicze eksportowane z paczki:
+Moduł `utils` udostępnia lekkie funkcje pomocnicze używane przez workflowy i integracje własne.
+Wszystkie poniższe funkcje są eksportowane z głównego wejścia pakietu (`ksef-client-typescript`).
 
-- `base64url` (toBase64Url, fromBase64Url)
-- `ksef-number` (validateKsefNumber)
-- `zip` (createZip, unzip)
-- `buffer` (splitBuffer)
-- `jwt` (decodeJwtPayload, getJwtExpiryMs)
-- `crc8` (crc8Hex)
+## Spis narzędzi
 
-Dla XML zobacz: [XML](../xml/README.md).
+- [Base64Url](base64url.md) - konwersja `Buffer <-> Base64Url`
+- [Buffer](buffer.md) - dzielenie bufora na części (`splitBuffer`)
+- [CRC-8](crc8.md) - obliczanie sumy kontrolnej (`crc8`, `crc8Hex`)
+- [JWT](jwt.md) - dekodowanie payloadu tokena i odczyt daty wygaśnięcia
+- [Numer KSeF](ksef-number.md) - lokalna walidacja numeru wraz z checksumą
+- [ZIP](zip.md) - tworzenie i rozpakowanie archiwów z limitami bezpieczeństwa
+
+## Przykład importu
+
+```ts
+import { crc8Hex, splitBuffer, unzip } from "ksef-client-typescript";
+```
+
+## Powiązane
+
+- [XML](../xml/README.md)
+- [Usługi](../services/README.md)

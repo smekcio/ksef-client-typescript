@@ -1,13 +1,13 @@
-# Start
+# Pierwsze kroki
 
-Ten dokument prowadzi przez pierwszy, produkcyjny flow w kolejnosci:
-`konfiguracja -> auth -> API -> workflowy -> bledy`.
+Ten przewodnik pokazuje zalecany przebieg pierwszej integracji:
+`konfiguracja -> uwierzytelnianie -> pierwsze wywołanie API -> workflow -> obsługa błędów`.
 
-Kompatybilnosc SDK: **KSeF API `2.1.1`**.
+Kompatybilność SDK: **KSeF API `v2.1.1`**.
 
-## 1) Konfiguracja klienta
+## 1) Inicjalizacja klienta
 
-Mozesz uzyc `environment` albo `baseUrl`:
+Możesz użyć gotowego środowiska (`environment`) albo własnego adresu (`baseUrl`):
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -15,16 +15,16 @@ import { KsefClient } from "ksef-client-typescript";
 const client = new KsefClient({
   environment: "DEMO",
   timeoutMs: 45_000,
+  headers: { "X-App-Name": "ksef-integration" },
   retryOn429: true,
   maxRetryAttempts: 3,
   maxRetryDelayMs: 10_000,
-  headers: { "X-App-Name": "ksef-integration" },
 });
 ```
 
-Pelna lista opcji: [configuration.md](configuration.md).
+Pełna lista opcji: [configuration.md](configuration.md).
 
-## 2) Auth - najkrotsza sciezka (`KsefClient.connect`)
+## 2) Uwierzytelnianie tokenem KSeF (najkrótsza ścieżka)
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -38,9 +38,9 @@ const client = await KsefClient.connect({
 });
 ```
 
-`connect(...)` uruchamia workflow tokenowy, a potem ustawia `accessToken` i `refreshToken` w `authManager`.
+`KsefClient.connect(...)` uruchamia workflow tokenowy i automatycznie zapisuje `accessToken` oraz `refreshToken` w `authManager`.
 
-## 3) Auth - manualnie przez workflow auth
+## 3) Uwierzytelnianie manualne (workflow auth)
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -50,14 +50,16 @@ const client = new KsefClient({ environment: "DEMO" });
 const tokens = await client.workflows.auth.authenticateWithKsefToken({
   token: process.env.KSEF_TOKEN!,
   context: { type: "Nip", value: "5265877635" },
-  encryptionMethod: "rsa", // albo "ec"
-  ecOutputFormat: "java",  // istotne tylko dla "ec"
+  encryptionMethod: "rsa", // lub "ec"
+  ecOutputFormat: "java", // istotne tylko dla "ec"
+  pollIntervalMs: 2000,
+  maxAttempts: 60,
 });
 
 client.authManager.setTokens(tokens);
 ```
 
-## 4) Pierwsze wywolanie API
+## 4) Pierwsze wywołanie API
 
 ```ts
 const metadata = await client.invoices.queryInvoiceMetadata(
@@ -77,13 +79,9 @@ const metadata = await client.invoices.queryInvoiceMetadata(
 console.log(metadata);
 ```
 
-`dateRange` jest walidowany lokalnie. SDK rzuci `KsefValidationError`, gdy:
-- `from` lub `to` nie sa poprawnym ISO,
-- `to < from`,
-- zakres przekroczy 3 miesiace,
-- brak `subjectType` albo `dateRange`.
+`queryInvoiceMetadata(...)` waliduje `dateRange` lokalnie. SDK zgłosi `KsefValidationError`, m.in. gdy zakres dat jest niepoprawny lub przekracza 3 miesiące.
 
-## 5) Pierwszy workflow biznesowy (sesja online)
+## 5) Pierwszy workflow biznesowy: sesja online
 
 ```ts
 const session = await client.workflows.sessions.online.open({
@@ -95,35 +93,27 @@ const send = await session.sendInvoice({ invoice: "<Faktura>...</Faktura>" });
 console.log(send.referenceNumber);
 
 await session.close();
-const upoXml = await session.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 });
-console.log(upoXml ? "UPO gotowe" : "Brak UPO w limicie prob");
-```
 
-## 6) Auth status i `authenticationMethodInfo`
-
-```ts
-const init = await client.auth.authenticateWithKsefToken({
-  challenge: "...",
-  contextIdentifier: { type: "Nip", value: "5265877635" },
-  encryptedToken: "BASE64",
+const upoXml = await session.waitForUpo({
+  pollIntervalMs: 2000,
+  maxAttempts: 60,
 });
-
-const status = await client.auth.getAuthStatus(
-  init.referenceNumber,
-  init.authenticationToken.token,
-);
-
-console.log(status.authenticationMethodInfo.code); // np. "ksefToken" / "xades"
+console.log(upoXml ? "UPO odebrane" : "Brak UPO w zadanym limicie prób");
 ```
 
-`authenticationMethod` jest polem deprecated; uzywaj `authenticationMethodInfo`.
+## 6) Istotne zachowania API
 
-## 7) Obsluga bledow
+- `POST /auth/token/redeem` jest jednorazowe dla danego `authenticationToken`.
+- `POST /auth/token/refresh` wymaga przekazania refresh tokena jako `Authorization: Bearer <refreshToken>`; `authManager` realizuje to automatycznie.
+- wysyłka/pobieranie partów przez pre-signed URL (workflow batch/eksport) odbywa się bez Bearer tokena.
+- `429 Too Many Requests` zwraca `Retry-After`; SDK respektuje ten nagłówek przy automatycznym retry metod idempotentnych.
+
+## 7) Obsługa błędów
 
 ```ts
 import {
-  KsefAuthStatusError,
   KsefRateLimitError,
+  KsefSessionExpiredError,
   KsefValidationError,
 } from "ksef-client-typescript";
 
@@ -134,19 +124,14 @@ try {
   });
 } catch (error) {
   if (error instanceof KsefValidationError) {
-    console.error("Walidacja:", error.message, error.details);
+    console.error("Błąd walidacji:", error.message, error.details);
+  } else if (error instanceof KsefRateLimitError) {
+    console.error("Rate limit, Retry-After:", error.retryAfter);
+  } else if (error instanceof KsefSessionExpiredError) {
+    console.error("Sesja wygasła, wymagane ponowne uwierzytelnienie.");
   }
-
-  if (error instanceof KsefAuthStatusError) {
-    console.error("Auth status:", error.statusCode, error.statusDetails);
-  }
-
-  if (error instanceof KsefRateLimitError) {
-    console.error("Retry-After:", error.retryAfter);
-  }
-
   throw error;
 }
 ```
 
-Szczegoly: [errors.md](errors.md).
+Szczegóły: [errors.md](errors.md).

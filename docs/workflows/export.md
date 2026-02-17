@@ -1,25 +1,48 @@
 # Workflow: eksport paczek
 
-`InvoiceExportWorkflow` realizuje flow:
-`start export -> wait status -> download parts -> decrypt -> unzip -> parse metadata/XML`.
+Eksport obejmuje:
 
-Dodatkowo `IncrementalExportWorkflow` obsluguje eksport przyrostowy z continuation points.
+1. start eksportu (`POST /invoices/exports`),
+2. polling statusu eksportu,
+3. pobranie partów z pre-signed URL,
+4. odszyfrowanie, scalenie i rozpakowanie paczki,
+5. odczyt `_metadata.json` i faktur XML.
 
-## Metody
+W SDK odpowiadają za to:
 
-- `client.workflows.exports.startExport(options)`
-- `client.workflows.exports.waitForExport(referenceNumber, options?)`
-- `client.workflows.exports.downloadAndProcessPackage(status, encryptionData, options?)`
-- `client.workflows.exportsIncremental.run(options)`
+- `InvoiceExportWorkflow` (`client.workflows.exports`)
+- `IncrementalExportWorkflow` (`client.workflows.exportsIncremental`)
 
-## Co warto wiedziec
+## Metody `InvoiceExportWorkflow`
 
-- `startExport(...)` i `invoices.exportInvoices(...)` korzystaja z tej samej walidacji `dateRange`.
-- `to` jest opcjonalne; gdy go brak, SDK bierze aktualny czas UTC.
-- Maksymalny zakres `dateRange` to 3 miesiace.
-- Part download idzie przez pre-signed URL (bez Bearer tokena).
+- `startExport(options)`
+- `waitForExport(referenceNumber, options?)`
+- `downloadAndProcessPackage(status, encryptionData, options?)`
 
-## Przyklad 1: pelny eksport paczki
+## Metoda `IncrementalExportWorkflow`
+
+- `run(options)`
+
+## `startExport(options)` - opcje
+
+- `filters` (wymagane)
+- `encryptionData` (opcjonalnie)
+- `publicCertificateBase64Der` (opcjonalnie; alternatywa do `encryptionData`)
+
+Gdy nie podasz `encryptionData` ani `publicCertificateBase64Der`, workflow sam pobierze certyfikat
+`SymmetricKeyEncryption` i zbuduje dane szyfrowania.
+
+## Walidacja `dateRange`
+
+Walidacja uruchamia się lokalnie przed requestem.
+
+- `subjectType` musi być niepustym stringiem.
+- `dateRange.from` i `dateRange.to` muszą być poprawnym ISO date/date-time.
+- `to` może być puste (`undefined`/`null`) - wtedy SDK przyjmuje aktualny czas UTC.
+- `to` nie może być mniejsze od `from`.
+- zakres nie może przekraczać 3 miesięcy.
+
+## Przykład 1: pełny eksport paczki
 
 ```ts
 const started = await client.workflows.exports.startExport({
@@ -49,13 +72,13 @@ console.log(processed.metadataSummaries.length);
 console.log(Object.keys(processed.invoiceXmlFiles).length);
 ```
 
-## Przyklad 2: start export z jawnie podanym `encryptionData`
+## Przykład 2: jawne `encryptionData`
 
 ```ts
 import { CryptographyService } from "ksef-client-typescript";
 
 const certs = await client.security.getPublicKeyCertificates();
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+const symCert = certs.find((item) => item.usage.includes("SymmetricKeyEncryption"));
 if (!symCert) {
   throw new Error("Missing SymmetricKeyEncryption certificate");
 }
@@ -73,7 +96,7 @@ const started = await client.workflows.exports.startExport({
 console.log(started.referenceNumber);
 ```
 
-## Przyklad 3: incremental export (continuation points)
+## Przykład 3: eksport przyrostowy (continuation points)
 
 ```ts
 const continuationPoints: Record<string, string | undefined> = {
@@ -86,7 +109,26 @@ const result = await client.workflows.exportsIncremental.run({
   windowTo: "2025-01-31",
   continuationPoints,
   verifyHashes: true,
+  pollIntervalMs: 2000,
+  maxAttempts: 120,
   maxIterations: 10,
+});
+
+console.log(result.referenceNumbers);
+console.log(result.continuationPoints.Subject1);
+console.log(result.metadataSummaries.length);
+```
+
+Ważne: `continuationPoints` są aktualizowane in-place i zwracane też w `result.continuationPoints`.
+
+## Przykład 4: incremental export z `filtersFactory`
+
+```ts
+const result = await client.workflows.exportsIncremental.run({
+  subjectType: "Subject1",
+  windowFrom: "2025-01-01",
+  windowTo: "2025-01-31",
+  continuationPoints: {},
   filtersFactory: (from, to) => ({
     subjectType: "Subject1",
     dateRange: {
@@ -99,10 +141,9 @@ const result = await client.workflows.exportsIncremental.run({
 });
 
 console.log(result.referenceNumbers);
-console.log(result.continuationPoints.Subject1);
 ```
 
-## Przyklad 4: obsluga walidacji `dateRange`
+## Przykład 5: obsługa błędu walidacji `dateRange`
 
 ```ts
 import { KsefValidationError } from "ksef-client-typescript";
@@ -123,23 +164,12 @@ try {
 }
 ```
 
-## Przyklad 5: eksport z otwartym `to`
-
-```ts
-await client.workflows.exports.startExport({
-  filters: {
-    subjectType: "Subject1",
-    dateRange: {
-      dateType: "Issue",
-      from: "2025-01-01",
-      // to: brak -> SDK uzyje aktualnego UTC
-    },
-  },
-});
-```
-
 ## Uwagi operacyjne
 
-- URL-e partow eksportu moga wygasac, pobieraj je bez zbednej zwloki.
-- `verifyHashes: true` zwieksza bezpieczenstwo, ale kosztuje dodatkowe hashowanie.
-- `metadataSummaries` zawiera rekordy z `_metadata.json`; `invoiceXmlFiles` to mapa `nazwa.xml -> tresc`.
+- `waitForExport(...)` uznaje `status.code=200` za sukces, `100` za trwające przetwarzanie, a inne statusy przerywają proces błędem.
+- Domyślny polling eksportu: `pollIntervalMs=2000`, `maxAttempts=60`.
+- Download partów eksportu odbywa się z pre-signed URL (bez Bearer tokena).
+- URL-e partów mogą wygasać, dlatego paczkę warto pobrać bez zbędnej zwłoki.
+- `verifyHashes: true` zwiększa bezpieczeństwo, ale dokłada koszt hashowania.
+- `metadataSummaries` pochodzi z `_metadata.json`, a `invoiceXmlFiles` jest mapą `nazwa.xml -> treść XML`.
+- W `exportsIncremental.run(...)` wynikowe `metadataSummaries` są deduplikowane po `ksefNumber`/`KsefNumber`.

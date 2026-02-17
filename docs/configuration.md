@@ -1,21 +1,63 @@
-# Konfiguracja klienta
+# Konfiguracja klienta (`KsefClientOptions`)
 
-## KsefClientOptions
+Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(...)`.
 
-Dostepne opcje dla `new KsefClient(...)` oraz `KsefClient.connect(...)`:
+## Najważniejsze zasady
 
-- `baseUrl`: pelny adres API, np. `https://api-demo.ksef.mf.gov.pl/v2`.
-- `environment`: `"TEST" | "DEMO" | "PRD"` (uzyj zamiast `baseUrl`).
-- `timeoutMs`: timeout dla zapytan HTTP.
-- `proxy`: adres proxy (np. `http://127.0.0.1:8080`).
-- `noProxy`: lista hostow bez proxy (`"*.mf.gov.pl,localhost"`).
-- `headers`: dodatkowe naglowki domyslne.
-- `baseQrUrl`: baza dla linkow QR (domyslnie per srodowisko).
-- `retryOn429`: automatyczny retry na 429 (domyslnie `true` dla metod idempotentnych).
-- `maxRetryAttempts`: maksymalna liczba prob (domyslnie `3`).
-- `maxRetryDelayMs`: limit opoznienia retry (domyslnie `10000`).
+- wymagane jest podanie `environment` lub `baseUrl`,
+- gdy ustawisz `baseUrl` bez sufiksu `/v2`, biblioteka automatycznie doda `/v2`,
+- `KsefClient.connect(...)` rozszerza `KsefClientOptions` o opcje potrzebne do logowania tokenem KSeF.
 
-## Przyklad
+## `KsefClientOptions`
+
+| Pole | Typ | Opis | Domyślnie |
+| --- | --- | --- | --- |
+| `baseUrl` | `string` | Pełny adres API, np. `https://api-demo.ksef.mf.gov.pl/v2`. | Brak |
+| `environment` | `"TEST" \| "DEMO" \| "PRD"` | Skrót środowiska zamiast `baseUrl`. | Brak |
+| `timeoutMs` | `number` | Timeout pojedynczego żądania HTTP. | `30000` |
+| `proxy` | `string` | Proxy HTTP(S), np. `http://127.0.0.1:8080`. | `HTTPS_PROXY` lub `HTTP_PROXY` |
+| `noProxy` | `string` | Lista hostów bez proxy (CSV), np. `localhost,mf.gov.pl`. | `NO_PROXY` |
+| `headers` | `Record<string, string>` | Dodatkowe nagłówki domyślne dla wszystkich żądań. | `{}` |
+| `baseQrUrl` | `string` | Baza linków weryfikacyjnych QR. | mapowanie zależne od środowiska |
+| `retryOn429` | `boolean` | Czy ponawiać żądania po `429` dla metod idempotentnych. | `true` |
+| `maxRetryAttempts` | `number` | Maksymalna liczba prób żądania (łącznie z pierwszą). | `3` |
+| `maxRetryDelayMs` | `number` | Górny limit opóźnienia między próbami. | `10000` |
+
+### `environment`
+
+Obsługiwane wartości:
+
+- `TEST` -> `https://api-test.ksef.mf.gov.pl/v2`
+- `DEMO` -> `https://api-demo.ksef.mf.gov.pl/v2`
+- `PRD` -> `https://api.ksef.mf.gov.pl/v2`
+
+### `baseQrUrl`
+
+Jeżeli nie ustawisz `baseQrUrl`, klient użyje domyślnego adresu QR dla wskazanego `environment`.
+Przy własnym `baseUrl` bez `environment` domyślną bazą QR będzie adres dla środowiska TEST, dlatego warto podać `baseQrUrl` jawnie.
+
+### `noProxy`
+
+`noProxy` jest interpretowane jako lista rozdzielona przecinkami:
+
+- wpis dokładny (`api-demo.ksef.mf.gov.pl`),
+- wpis domenowy (`mf.gov.pl`, dopasowanie także do subdomen),
+- wildcard `*` (wyłączenie proxy dla wszystkich hostów).
+
+## `KsefConnectOptions`
+
+`KsefConnectOptions` zawiera wszystkie pola `KsefClientOptions` oraz:
+
+| Pole | Typ | Opis |
+| --- | --- | --- |
+| `token` | `string` | Token KSeF używany do inicjalizacji uwierzytelnienia. |
+| `context` | `ContextIdentifier` | Kontekst uwierzytelnienia, np. `{ type: "Nip", value: "5265877635" }`. |
+| `authorizationPolicy` | `AuthorizationPolicy` | Opcjonalna polityka IP przekazywana do `/auth/ksef-token`. |
+| `pollIntervalMs` | `number` | Interwał odpytywania statusu uwierzytelnienia. |
+| `maxAttempts` | `number` | Maksymalna liczba odpytań statusu uwierzytelnienia. |
+| `publicCertificateBase64Der` | `string` | Własny certyfikat publiczny KSeF do szyfrowania tokena. |
+
+## Przykład konfiguracji klienta
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -25,28 +67,34 @@ const client = new KsefClient({
   timeoutMs: 45_000,
   proxy: process.env.HTTPS_PROXY,
   noProxy: process.env.NO_PROXY,
-  headers: { "X-App-Name": "demo" },
+  headers: { "X-App-Name": "ksef-integration" },
   retryOn429: true,
   maxRetryAttempts: 3,
   maxRetryDelayMs: 10_000,
 });
 ```
 
-## Proxy z env
-
-Jesli nie ustawisz `proxy`, SDK czyta:
-
-- `HTTPS_PROXY`
-- `HTTP_PROXY`
-- `NO_PROXY`
-
-## baseQrUrl
-
-Mozesz nadpisac adres dla linkow QR (np. w testach):
+## Przykład `KsefClient.connect(...)`
 
 ```ts
+import { KsefClient } from "ksef-client-typescript";
+
+const client = await KsefClient.connect({
+  environment: "DEMO",
+  token: process.env.KSEF_TOKEN!,
+  context: { type: "Nip", value: "5265877635" },
+  pollIntervalMs: 2000,
+  maxAttempts: 60,
+});
+```
+
+## Przykład niestandardowego `baseUrl` i `baseQrUrl`
+
+```ts
+import { KsefClient } from "ksef-client-typescript";
+
 const client = new KsefClient({
-  baseUrl: "https://api-demo.ksef.mf.gov.pl/v2",
+  baseUrl: "https://api-demo.ksef.mf.gov.pl",
   baseQrUrl: "https://qr-demo.ksef.mf.gov.pl",
 });
 ```

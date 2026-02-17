@@ -1,52 +1,54 @@
-# Tokens
+# Tokeny (`tokens`)
 
-Thin client dla `/tokens/*`.
+Niskopoziomowy klient dla endpointów `/tokens/*`.
 
-Tokeny KSeF (systemowe) to inna kategoria niz `accessToken`/`refreshToken`.
-Moga byc uzywane np. w workflow `authenticateWithKsefToken(...)`.
+Token KSeF (systemowy) to inny artefakt niż sesyjne `accessToken` i `refreshToken`.
+Token KSeF możesz wykorzystać np. w autoryzacji przez `authenticateWithKsefToken(...)`.
 
-## Metody
+## Dostępne metody
 
 - `listTokens(params?, continuationToken?)`
 - `generateToken(request)`
 - `getToken(referenceNumber)`
 - `revokeToken(referenceNumber)`
 
-## `listTokens(params?, continuationToken?)`
+## Najważniejsze informacje
 
-Obslugiwane filtry:
-- `status`: tablica statusow (`"Pending"`, `"Active"`, `"Revoking"`, `"Revoked"`, `"Failed"`)
-- `description`
-- `authorIdentifier`
-- `authorIdentifierType` (`"Nip"`, `"Pesel"`, `"Fingerprint"`)
-- `pageSize`
+- `listTokens(...)` obsługuje filtry: `status`, `description`, `authorIdentifier`, `authorIdentifierType`, `pageSize`.
+- Dostępne wartości `status`: `"Pending"`, `"Active"`, `"Revoking"`, `"Revoked"`, `"Failed"`.
+- Dostępne wartości `authorIdentifierType`: `"Nip"`, `"Pesel"`, `"Fingerprint"`.
+- Stronicowanie listy tokenów działa przez nagłówek `x-continuation-token` (potwierdzone testami jednostkowymi).
 
-## Przyklad 1: generowanie tokena + status
+## Przykłady TypeScript
+
+### Generowanie tokena i odczyt statusu
 
 ```ts
-const createRequest = {
-  // Przykladowy payload - dopasuj do kontraktu POST /tokens.
-  description: "integration token",
-  contextIdentifier: { type: "Nip", value: "5265877635" },
+import { KsefTokenRequest } from "ksef-client-typescript";
+
+const createRequest: KsefTokenRequest = {
+  // Uzupełnij zgodnie z kontraktem OpenAPI dla POST /tokens.
 };
 
 const created = await client.tokens.generateToken(createRequest);
-const referenceNumber = String(created.referenceNumber ?? "");
+const referenceNumber = String(
+  (created as { referenceNumber?: string }).referenceNumber ?? "",
+);
 
 const status = await client.tokens.getToken(referenceNumber);
 console.log(status);
 ```
 
-## Przyklad 2: listowanie tokenow z continuation token
+### Listowanie tokenów z continuation token
 
 ```ts
-const firstPage = await client.tokens.listTokens(
-  {
-    pageSize: 20,
-    status: ["Active", "Pending"],
-  },
-  undefined,
-);
+const firstPage = await client.tokens.listTokens({
+  pageSize: 25,
+  status: ["Active", "Revoking"],
+  description: "operator token",
+  authorIdentifier: "5265877635",
+  authorIdentifierType: "Nip",
+});
 
 const continuation =
   typeof firstPage === "object" && firstPage !== null
@@ -56,7 +58,7 @@ const continuation =
 if (continuation) {
   const nextPage = await client.tokens.listTokens(
     {
-      pageSize: 20,
+      pageSize: 25,
       status: ["Active"],
     },
     continuation,
@@ -65,13 +67,13 @@ if (continuation) {
 }
 ```
 
-## Przyklad 3: revoke token
+### Cofnięcie tokena
 
 ```ts
 await client.tokens.revokeToken("TOKEN_REFERENCE_NUMBER");
 ```
 
-## Przyklad 4: token jako wejscie do `KsefClient.connect`
+### `KsefClient.connect` z tokenem KSeF
 
 ```ts
 import { KsefClient } from "ksef-client-typescript";
@@ -82,10 +84,10 @@ const client = await KsefClient.connect({
   context: { type: "Nip", value: "5265877635" },
 });
 
-console.log("Connected with access token valid until:", await client.authManager.getAccessToken());
+console.log(await client.authManager.getAccessToken());
 ```
 
-## Przyklad 5: osobny flow auth z tokenem
+### Workflow autoryzacji tokenowej
 
 ```ts
 const tokens = await client.workflows.auth.authenticateWithKsefToken({

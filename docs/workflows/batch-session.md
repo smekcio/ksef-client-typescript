@@ -3,20 +3,29 @@
 `BatchSessionWorkflow` realizuje flow:
 `prepare zip -> split parts -> encrypt -> open batch -> upload parts -> close`.
 
+Dostęp: `client.workflows.sessions.batch`.
+
 ## Metoda
 
 - `client.workflows.sessions.batch.openUploadAndClose(options)`
 
-`options`:
+Workflow zwraca `BatchSessionHandle` z metodami:
+
+- `status()`
+- `waitForUpo(options?)`
+- `waitForUpoParsed(options?)`
+
+## Opcje `openUploadAndClose(options)`
+
 - `formCode` (wymagane)
-- `invoices` albo `zipBytes` (jedno z dwoch)
-- `publicCertificateBase64Der` (opcjonalnie)
+- `invoices` albo `zipBytes` (wymagane jedno z dwóch)
+- `publicCertificateBase64Der` (opcjonalnie; domyślnie certyfikat `SymmetricKeyEncryption`)
 - `offlineMode` (opcjonalnie)
 - `upoV43` (opcjonalnie)
-- `parallelism` (opcjonalnie)
-- `maxPartSizeBytes` (opcjonalnie; domyslnie 100 MB)
+- `parallelism` (opcjonalnie; domyślnie `1`)
+- `maxPartSizeBytes` (opcjonalnie; domyślnie `100 * 1024 * 1024`)
 
-## Przyklad 1: batch z listy faktur
+## Przykład 1: batch z listy faktur
 
 ```ts
 const batch = await client.workflows.sessions.batch.openUploadAndClose({
@@ -31,7 +40,7 @@ const batch = await client.workflows.sessions.batch.openUploadAndClose({
 console.log(batch.referenceNumber);
 ```
 
-## Przyklad 2: batch z gotowego ZIP
+## Przykład 2: batch z gotowego ZIP
 
 ```ts
 import { readFile } from "node:fs/promises";
@@ -48,9 +57,14 @@ const batch = await client.workflows.sessions.batch.openUploadAndClose({
 console.log(batch.referenceNumber);
 ```
 
-## Przyklad 3: polling UPO dla sesji batch
+## Przykład 3: polling statusu i UPO
+
+Zakłada obiekt `batch` z przykładu 1 albo 2.
 
 ```ts
+const status = await batch.status();
+console.log(status.status.code, status.failedInvoiceCount);
+
 const upoXml = await batch.waitForUpo({
   pollIntervalMs: 2000,
   maxAttempts: 120,
@@ -59,21 +73,20 @@ const upoXml = await batch.waitForUpo({
 console.log(upoXml ? "UPO ready" : "No UPO in polling window");
 ```
 
-## Przyklad 4: status sesji i lista blednych faktur
+## Przykład 4: lista faktur błędnych
+
+Zakłada obiekt `batch` z przykładu 1 albo 2.
 
 ```ts
-const status = await batch.status();
-console.log(status.status.code, status.failedInvoiceCount);
-
 const failed = await client.sessions.getSessionFailedInvoices(batch.referenceNumber, 100);
 console.log(failed);
 ```
 
-## Przyklad 5: custom cert + custom part size
+## Przykład 5: jawny certyfikat i mniejszy rozmiar partów
 
 ```ts
 const certs = await client.security.getPublicKeyCertificates();
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+const symCert = certs.find((item) => item.usage.includes("SymmetricKeyEncryption"));
 if (!symCert) {
   throw new Error("Missing SymmetricKeyEncryption certificate");
 }
@@ -83,11 +96,15 @@ await client.workflows.sessions.batch.openUploadAndClose({
   invoices: [{ fileName: "invoice.xml", invoice: "<Faktura>...</Faktura>" }],
   publicCertificateBase64Der: symCert.certificate,
   maxPartSizeBytes: 10 * 1024 * 1024,
+  offlineMode: false,
+  parallelism: 3,
 });
 ```
 
-## Uwagi
+## Uwagi operacyjne
 
-- Upload partow idzie na pre-signed URL (bez Bearer tokena).
-- `parallelism` kontroluje rownoleglosc uploadu partow.
-- Po `close` status i UPO sa asynchroniczne, wiec wymagany jest polling.
+- Upload partów odbywa się na pre-signed URL, czyli bez Bearer tokena.
+- Podział ZIP musi nastąpić przed szyfrowaniem; workflow robi to automatycznie.
+- `parallelism` kontroluje równoległość uploadu partów.
+- Po `close` status i UPO są asynchroniczne, dlatego polling jest wymagany.
+- Czas na wysyłkę w sesji wsadowej zależy od liczby partów, więc zbyt mały `maxPartSizeBytes` może niepotrzebnie zwiększyć ryzyko timeoutu procesu.

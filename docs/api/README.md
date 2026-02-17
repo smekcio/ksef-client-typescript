@@ -1,19 +1,22 @@
-# API (thin clients)
+# API (endpointy) – referencja
 
-Kazdy podklient odpowiada tagowi z OpenAPI. Metody mapuja sie bezposrednio na endpointy KSeF.
+Ta część dokumentacji opisuje metody dostępne w podklientach `KsefClient`.
 
-Podklienci dostepni z `KsefClient`:
+Podklienci stanowią cienką warstwę nad HTTP: mapują metody bezpośrednio na endpointy KSeF i zwracają odpowiedzi typowane zgodnie z modelami SDK.
 
-- `client.auth`
-- `client.activeSessions`
-- `client.sessions`
-- `client.invoices`
-- `client.permissions`
-- `client.certificates`
-- `client.tokens`
-- `client.limits`
-- `client.security`
-- `client.testdata`
-- `client.peppol`
+Dla scenariuszy wieloetapowych (uwierzytelnianie, sesje, eksport) używaj warstwy workflow: [`../workflows/README.md`](../workflows/README.md).
 
-Dla gotowych scenariuszy (auth, sesje, eksport) zobacz `docs/workflows/*`.
+## Strony
+
+- [`KsefClient`](client.md)
+- [`client.auth`](auth.md)
+- [`client.activeSessions`](active-sessions.md)
+- [`client.sessions`](sessions.md)
+- [`client.invoices`](invoices.md)
+- [`client.permissions`](permissions.md)
+- [`client.certificates`](certificates.md)
+- [`client.tokens`](tokens.md)
+- [`client.limits`](limits.md)
+- [`client.security`](security.md)
+- [`client.testdata`](testdata.md)
+- [`client.peppol`](peppol.md)

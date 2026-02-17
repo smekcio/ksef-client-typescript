@@ -1,36 +1,36 @@
-# Parity report: `ksef-client-typescript` vs `ksef-docs` + `ksef-client-python`
+# Raport parity: `ksef-client-typescript` vs `ksef-docs` + `ksef-client-python`
 
-Data analizy: 2026-02-17
+Data analizy: **2026-02-17**
 
-## Zakres i zrodla
+## Zakres i źródła
 
-- Kontrakt API: `ksef-docs/open-api.json` (`0261ff1`, tag `2.1.1`).
-- Changelog: `ksef-docs/api-changelog.md` (2.1.0, 2.1.1).
-- Wzorzec implementacyjny i dokumentacyjny: `ksef-client-python` (`4eaf3e1`).
-- Implementacja TS: `src/api/*`, `src/types/*`, `src/services/*`, `docs/*`, `.github/workflows/*`.
+- Kontrakt API: `ksef-docs/open-api.json` (`0261ff1`, tag `2.1.1`)
+- Changelog: `ksef-docs/api-changelog.md` (wersje `2.1.0`, `2.1.1`)
+- Wzorzec implementacyjny i dokumentacyjny: `ksef-client-python` (`4eaf3e1`)
+- Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/utils/*`, `src/xml/*`, `docs/*`, `.github/workflows/*`
 
-## Najwazniejszy wynik
+## Wynik ogólny
 
-- Pokrycie endpointow OpenAPI: **77/77**.
-- Braki endpointowe: **0**.
-- Nadmiarowe endpointy po stronie TS: **0**.
+- Pokrycie endpointów OpenAPI: **77/77**
+- Braki endpointowe: **0**
+- Nadmiarowe endpointy po stronie TS: **0**
 
-## Co zmienilo sie w `ksef-docs` (2.1.x)
+## Zmiany po stronie `ksef-docs` (2.1.x)
 
-1. Dodane endpointy testdata:
+1. Dodane endpointy testowe kontekstu:
    - `POST /testdata/context/block`
    - `POST /testdata/context/unblock`
 2. Rozszerzenie modeli auth:
-   - nowe `authenticationMethodInfo` (`category`, `code`, `displayName`),
-   - `authenticationMethodInfo` oznaczone jako required m.in. dla:
-     - `GET /auth/{referenceNumber}`,
-     - `GET /auth/sessions`.
-3. Dla XAdES:
-   - wsparcie naglowka `X-KSeF-Feature: enforce-xades-compliance` (DEMO/PRD).
+   - nowe pole `authenticationMethodInfo` (`category`, `code`, `displayName`)
+   - oznaczenie `authenticationMethodInfo` jako wymagane m.in. dla:
+     - `GET /auth/{referenceNumber}`
+     - `GET /auth/sessions`
+3. XAdES:
+   - wsparcie nagłówka `X-KSeF-Feature: enforce-xades-compliance` (DEMO/PRD)
 
-## Weryfikacja parity endpointow (moduly)
+## Weryfikacja parity endpointów
 
-| Modul | OpenAPI | TS SDK | Status |
+| Moduł | OpenAPI | TS SDK | Status |
 | --- | --- | --- | --- |
 | Auth | 9 | 9/9 | OK |
 | Active Sessions | 3 | 3/3 | OK |
@@ -46,28 +46,29 @@ Data analizy: 2026-02-17
 
 ## Parity funkcjonalny (TS vs Python)
 
-1. Auth:
-   - `enforceXadesCompliance` wspierane w thin client i workflow.
-   - `authenticationMethodInfo` traktowane jako glowny model statusu.
+1. Uwierzytelnianie:
+   - `enforceXadesCompliance` wspierane w thin client i workflow
+   - `authenticationMethodInfo` obsługiwane jako podstawowa część modelu statusu
 2. Testdata:
-   - `blockContext` / `unblockContext` zaimplementowane i udokumentowane.
+   - `blockContext` i `unblockContext` zaimplementowane oraz udokumentowane
 3. Typowanie:
-   - dopiete typy odpowiedzi aktywnych sesji (`AuthenticationListResponse`).
+   - dopięte typy odpowiedzi aktywnych sesji (`AuthenticationListResponse`)
 4. CI/E2E:
-   - token flow: TEST + DEMO,
-   - XAdES flow: TEST + DEMO (sekrety cert/key raw lub Base64, guard dla fork PR).
+   - flow tokenowy: TEST + DEMO
+   - flow XAdES: TEST + DEMO (sekrety cert/key jako RAW lub Base64, guard dla fork PR)
 
 ## Parity dokumentacji
 
-Dokumentacja TS zostala zaktualizowana tak, by odpowiadala Python SDK i KSeF 2.1.1:
+Dokumentacja TS została zaktualizowana do spójności z Python SDK i KSeF `2.1.1`:
 
-- jawna informacja o kompatybilnosci API (`2.1.1`),
-- opisy i przyklady dla `authenticationMethodInfo.category` (w tym `NationalNode`),
-- doprecyzowanie `activeSessions` na typowane odpowiedzi zamiast surowego `JsonObject`,
-- utrzymane przykłady i workflowy dla token i XAdES.
+- jawna deklaracja kompatybilności API (`2.1.1`)
+- opisy i przykłady `authenticationMethodInfo.category` (w tym `NationalNode`)
+- doprecyzowanie `activeSessions` na odpowiedzi typowane zamiast surowego `JsonObject`
+- utrzymane scenariusze i przykłady dla tokenów oraz XAdES
+- uzupełnione opisy modułów `utils` i `xml` zgodnie z aktualnym API TS
 
-## Obszary dalszego rozwoju
+## Dalszy rozwój
 
-1. Wieksza precyzja typow dla pozostalych `JsonObject` (tokens/permissions/certificates).
-2. Automatyczna walidacja kontraktu OpenAPI w CI (detekcja dryfu przed release).
-3. Rozszerzenie executable examples o scenariusze certyfikaty/uprawnienia.
+1. Zwiększenie precyzji typów dla pozostałych obszarów `JsonObject` (`tokens`, `permissions`, `certificates`)
+2. Automatyczna walidacja kontraktu OpenAPI w CI (detekcja dryfu przed release)
+3. Rozszerzenie executable examples o scenariusze certyfikatów i uprawnień

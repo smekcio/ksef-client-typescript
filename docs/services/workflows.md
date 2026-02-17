@@ -1,27 +1,23 @@
-# Workflows (services)
+# Workflowy i scenariusze (`ksef-client-typescript/services`)
 
-Ta strona opisuje workflow classes z warstwy services oraz ich praktyczne uzycie.
+Workflowy łączą API KSeF z operacjami lokalnymi (kryptografia, ZIP, parsowanie UPO) w gotowe scenariusze integracyjne.
 
-## Dostepne klasy
+W `KsefClient` są dostępne pod:
+- `client.workflows.auth`
+- `client.workflows.sessions.online`
+- `client.workflows.sessions.batch`
+- `client.workflows.exports`
+- `client.workflows.exportsIncremental`
+- `client.workflows.offline`
 
-- `AuthCoordinator`
-- `OnlineSessionWorkflow`
-- `BatchSessionWorkflow`
-- `OfflineInvoiceWorkflow`
-- `InvoiceExportWorkflow`
-- `IncrementalExportWorkflow`
+## `AuthCoordinator`
 
-W praktyce najczesciej korzystasz z ich instancji pod `client.workflows.*`.
+Najczęściej używane metody:
+- `authenticateWithKsefToken(options)`
+- `authenticateWithXadesSignature(options)`
+- `authenticateWithCertificate(options)`
 
-## 1) `AuthCoordinator`
-
-Flow:
-- challenge,
-- init auth (token lub XAdES),
-- polling statusu,
-- redeem tokenow.
-
-Przyklad:
+Przykład:
 
 ```ts
 const tokens = await client.workflows.auth.authenticateWithKsefToken({
@@ -34,16 +30,15 @@ const tokens = await client.workflows.auth.authenticateWithKsefToken({
 client.authManager.setTokens(tokens);
 ```
 
-## 2) `OnlineSessionWorkflow`
+## `OnlineSessionWorkflow` i `OnlineSessionHandle`
 
-Flow:
-- budowa danych szyfrowania z certyfikatu `SymmetricKeyEncryption`,
-- open session,
-- encrypt + send invoice,
-- close session,
-- polling UPO.
+Przepływ:
+1. `open(...)` -> pobranie certyfikatu `SymmetricKeyEncryption`, budowa `EncryptionData`, otwarcie sesji
+2. `sendInvoice(...)` -> szyfrowanie faktury i wysyłka
+3. `close()`
+4. opcjonalnie `waitForUpo()` / `waitForUpoParsed()`
 
-Przyklad:
+Przykład:
 
 ```ts
 const online = await client.workflows.sessions.online.open({
@@ -54,42 +49,41 @@ const online = await client.workflows.sessions.online.open({
 await online.sendInvoice({ invoice: "<Faktura>...</Faktura>" });
 await online.close();
 
-const upo = await online.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 });
-console.log(Boolean(upo));
+const upoXml = await online.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 });
+console.log(Boolean(upoXml));
 ```
 
-## 3) `BatchSessionWorkflow`
+## `BatchSessionWorkflow` i `BatchSessionHandle`
 
-Flow:
-- ZIP (z `invoices` albo gotowy `zipBytes`),
-- split partow (domyslnie 100 MB),
-- AES encryption,
-- open batch,
-- upload partow na pre-signed URL,
-- close batch.
+Przepływ:
+1. budowa/pobranie ZIP
+2. podział na party (limit 100 MB na część)
+3. szyfrowanie AES
+4. `openBatchSession`
+5. upload partów na pre-signed URL
+6. `closeBatchSession`
 
-Przyklad:
+Przykład:
 
 ```ts
 const batch = await client.workflows.sessions.batch.openUploadAndClose({
   formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
   invoices: [{ fileName: "invoice.xml", invoice: "<Faktura>...</Faktura>" }],
   parallelism: 4,
-  maxPartSizeBytes: 25 * 1024 * 1024,
 });
 
 const status = await batch.status();
-console.log(status.status.code);
+console.log(batch.referenceNumber, status.status.code);
 ```
 
-## 4) `InvoiceExportWorkflow`
+## `InvoiceExportWorkflow`
 
-Flow:
-- `startExport` (z walidacja `dateRange`),
-- `waitForExport`,
-- `downloadAndProcessPackage` (download, decrypt, unzip, parse metadata).
+Najważniejsze metody:
+- `startExport({ filters, ... })`
+- `waitForExport(referenceNumber, options?)`
+- `downloadAndProcessPackage(status, encryptionData, { verifyHashes? })`
 
-Przyklad:
+Przykład:
 
 ```ts
 const started = await client.workflows.exports.startExport({
@@ -109,16 +103,39 @@ const processed = await client.workflows.exports.downloadAndProcessPackage(
 console.log(processed.metadataSummaries.length, Object.keys(processed.invoiceXmlFiles).length);
 ```
 
-## 5) `OfflineInvoiceWorkflow`
+## `IncrementalExportWorkflow`
 
-Flow:
-- open sesji interaktywnej,
-- wysylka faktury z `offlineMode=true`,
-- close sesji,
-- opcjonalny polling UPO,
-- instrukcje operacyjne dla trybow offline.
+`run(options)` wykonuje wielokrotne okna eksportu i automatycznie:
+- aktualizuje continuation points (`updateContinuationPoint`)
+- deduplikuje metadane po `ksefNumber`
 
-Przyklad:
+Przykład:
+
+```ts
+const continuationPoints: Record<string, string | undefined> = {};
+
+const result = await client.workflows.exportsIncremental.run({
+  subjectType: "Subject1",
+  windowFrom: "2025-01-01",
+  windowTo: "2025-01-31",
+  continuationPoints,
+  maxIterations: 20,
+  verifyHashes: false,
+});
+
+console.log(result.referenceNumbers);
+console.log(result.continuationPoints);
+```
+
+## `OfflineInvoiceWorkflow`
+
+Wysyłka faktury offline oparta na sesji interaktywnej:
+- `sendOfflineInvoice(options)`
+- `sendOfflineTechnicalCorrection(options)`
+- `getProcedureInstructions(mode)`
+- `listProcedureInstructions()`
+
+Przykład:
 
 ```ts
 const result = await client.workflows.offline.sendOfflineInvoice({
@@ -131,58 +148,8 @@ const guide = client.workflows.offline.getProcedureInstructions("offline24");
 console.log(result.invoiceReferenceNumber, guide.sendDeadline);
 ```
 
-## 6) `IncrementalExportWorkflow`
-
-Flow:
-- iteracyjne uruchamianie eksportu,
-- aktualizacja continuation points po kazdej paczce,
-- deduplikacja po `ksefNumber`.
-
-Przyklad:
-
-```ts
-const continuationPoints: Record<string, string | undefined> = {};
-
-const incremental = await client.workflows.exportsIncremental.run({
-  subjectType: "Subject1",
-  windowFrom: "2025-01-01",
-  windowTo: "2025-01-31",
-  continuationPoints,
-  maxIterations: 20,
-  verifyHashes: false,
-});
-
-console.log(incremental.referenceNumbers);
-console.log(incremental.continuationPoints);
-```
-
-## 7) Obsluga bledow workflow
-
-```ts
-import { KsefAuthStatusError, KsefValidationError } from "ksef-client-typescript";
-
-try {
-  await client.workflows.auth.authenticateWithXadesSignature({
-    signedXml: "<AuthTokenRequest>...signed...</AuthTokenRequest>",
-    enforceXadesCompliance: true,
-  });
-} catch (error) {
-  if (error instanceof KsefAuthStatusError) {
-    console.error(error.statusCode, error.statusDetails);
-  }
-  throw error;
-}
-
-try {
-  await client.workflows.exports.startExport({
-    filters: {
-      subjectType: "Subject1",
-      dateRange: { dateType: "Issue", from: "2025-01-01", to: "2025-05-01" },
-    },
-  });
-} catch (error) {
-  if (error instanceof KsefValidationError) {
-    console.error(error.message, error.details);
-  }
-}
-```
+Powiązane strony:
+- [Auth (XML i proces uwierzytelnienia)](auth.md)
+- [Batch (podział, szyfrowanie, upload)](batch.md)
+- [Kryptografia i metadane](crypto.md)
+- [HWM i deduplikacja](hwm.md)

@@ -1,8 +1,8 @@
-# Sessions
+# Sesje (`sessions`)
 
-Thin client dla endpointow sesji online i batch oraz UPO.
+Niskopoziomowy klient dla sesji online i batch oraz dokumentów UPO.
 
-## Metody
+## Dostępne metody
 
 - `getSessions(query, continuationToken?)`
 - `getSessionStatus(referenceNumber)`
@@ -18,36 +18,25 @@ Thin client dla endpointow sesji online i batch oraz UPO.
 - `openBatchSession(request, upoV43?)`
 - `closeBatchSession(referenceNumber)`
 
-## `getSessions(query, continuationToken?)`
+## Najważniejsze informacje
 
-`query.sessionType` jest wymagane i musi miec wartosc `"Online"` albo `"Batch"`.
+- W `getSessions(...)` parametr `query.sessionType` jest wymagany i przyjmuje `"Online"` albo `"Batch"`.
+- Filtry `getSessions(...)` obejmują m.in. `referenceNumber`, zakresy dat, `statuses` i `pageSize`.
+- Dla `openOnlineSession(..., true)` oraz `openBatchSession(..., true)` SDK ustawia nagłówek `X-KSeF-Feature: upo-v4-3`.
+- `sendOnlineInvoice(...)` wymaga zaszyfrowanego ładunku `SendInvoiceRequest` (`invoiceHash`, `encryptedInvoiceContent` itd.).
+- Metody `getSessionInvoiceUpoByReferenceNumber`, `getSessionInvoiceUpoByKsefNumber` i `getSessionUpo` zwracają XML jako `string`.
+- W sesji batch upload części odbywa się po `partUploadRequests` na pre-signed URL i nie korzysta z Bearer tokena.
 
-Opcjonalne filtry:
-- `referenceNumber`
-- `dateCreatedFrom`, `dateCreatedTo`
-- `dateClosedFrom`, `dateClosedTo`
-- `dateModifiedFrom`, `dateModifiedTo`
-- `statuses` (tablica: `["InProgress", "Succeeded", "Failed", "Cancelled"]`)
-- `pageSize`
+## Przykłady TypeScript
 
-## Co warto wiedziec
-
-- `openOnlineSession(..., true)` i `openBatchSession(..., true)` dodaja `X-KSeF-Feature: upo-v4-3`.
-- `sendOnlineInvoice(...)` wymaga zaszyfrowanego payloadu (`invoiceHash`, `encryptedInvoiceContent`, ...).
-- Upload partow batch odbywa sie na pre-signed URL (`partUploadRequests`) i nie wymaga Bearer tokena.
-- Odpowiedz dla list i statusow ma czesciowo typowanie `JsonObject` (forward-compatible z nowymi polami API).
-
-## Przyklad 1: listowanie sesji + pagination
+### Listowanie sesji z kontynuacją
 
 ```ts
-const firstPage = await client.sessions.getSessions(
-  {
-    sessionType: "Online",
-    statuses: ["InProgress", "Succeeded"],
-    pageSize: 20,
-  },
-  undefined,
-);
+const firstPage = await client.sessions.getSessions({
+  sessionType: "Online",
+  statuses: ["InProgress", "Succeeded"],
+  pageSize: 20,
+});
 
 const continuationToken =
   typeof firstPage === "object" && firstPage !== null
@@ -66,20 +55,20 @@ if (continuationToken) {
 }
 ```
 
-## Przyklad 2: online session (thin client)
+### Sesja online: otwarcie, wysyłka faktury, zamknięcie
 
 ```ts
 import { CryptographyService } from "ksef-client-typescript";
 
 const certs = await client.security.getPublicKeyCertificates();
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
-if (!symCert) {
-  throw new Error("Missing SymmetricKeyEncryption certificate");
+const symmetricCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+if (!symmetricCert) {
+  throw new Error("Brak certyfikatu z usage=SymmetricKeyEncryption");
 }
 
-const encryption = CryptographyService.getEncryptionData(symCert.certificate);
+const encryption = CryptographyService.getEncryptionData(symmetricCert.certificate);
 
-const open = await client.sessions.openOnlineSession(
+const opened = await client.sessions.openOnlineSession(
   {
     formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
     encryption: encryption.encryptionInfo,
@@ -87,20 +76,20 @@ const open = await client.sessions.openOnlineSession(
   true,
 );
 
-const invoiceBytes = Buffer.from("<Faktura>...</Faktura>", "utf8");
+const invoiceXml = Buffer.from("<Faktura>...</Faktura>", "utf8");
 const payload = CryptographyService.prepareInvoicePayload(
-  invoiceBytes,
+  invoiceXml,
   encryption.cipherKey,
   encryption.cipherIv,
 );
 
-const send = await client.sessions.sendOnlineInvoice(open.referenceNumber, payload);
-console.log(send.referenceNumber);
+const sent = await client.sessions.sendOnlineInvoice(opened.referenceNumber, payload);
+console.log("invoiceReferenceNumber:", sent.referenceNumber);
 
-await client.sessions.closeOnlineSession(open.referenceNumber);
+await client.sessions.closeOnlineSession(opened.referenceNumber);
 ```
 
-## Przyklad 3: status i UPO dla sesji/faktury
+### Statusy i UPO
 
 ```ts
 const sessionStatus = await client.sessions.getSessionStatus(sessionReferenceNumber);
@@ -116,12 +105,10 @@ const invoiceUpoByRef = await client.sessions.getSessionInvoiceUpoByReferenceNum
   sessionReferenceNumber,
   invoiceReferenceNumber,
 );
-
 const invoiceUpoByKsef = await client.sessions.getSessionInvoiceUpoByKsefNumber(
   sessionReferenceNumber,
   "KSEF_NUMBER",
 );
-
 const sessionUpo = await client.sessions.getSessionUpo(
   sessionReferenceNumber,
   "UPO_REFERENCE_NUMBER",
@@ -130,26 +117,26 @@ const sessionUpo = await client.sessions.getSessionUpo(
 console.log(invoiceUpoByRef.length, invoiceUpoByKsef.length, sessionUpo.length);
 ```
 
-## Przyklad 4: batch session (manual open/upload/close)
+### Sesja batch: ręczne open/upload/close
 
 ```ts
 import { CryptographyService } from "ksef-client-typescript";
 
-const sourceZip = Buffer.from("...zip bytes...", "base64");
+const sourceZip = Buffer.from("...zip-bytes...", "base64");
 const certs = await client.security.getPublicKeyCertificates();
-const symCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
-if (!symCert) {
-  throw new Error("Missing SymmetricKeyEncryption certificate");
+const symmetricCert = certs.find((c) => c.usage.includes("SymmetricKeyEncryption"));
+if (!symmetricCert) {
+  throw new Error("Brak certyfikatu z usage=SymmetricKeyEncryption");
 }
 
-const encryption = CryptographyService.getEncryptionData(symCert.certificate);
+const encryption = CryptographyService.getEncryptionData(symmetricCert.certificate);
 const encryptedPart = CryptographyService.encryptAes256Cbc(
   sourceZip,
   encryption.cipherKey,
   encryption.cipherIv,
 );
 
-const open = await client.sessions.openBatchSession(
+const opened = await client.sessions.openBatchSession(
   {
     formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
     encryption: encryption.encryptionInfo,
@@ -168,7 +155,7 @@ const open = await client.sessions.openBatchSession(
   true,
 );
 
-for (const part of open.partUploadRequests) {
+for (const part of opened.partUploadRequests) {
   const headers = Object.fromEntries(
     Object.entries(part.headers ?? {}).filter((entry): entry is [string, string] =>
       typeof entry[1] === "string" && entry[1].length > 0,
@@ -182,7 +169,8 @@ for (const part of open.partUploadRequests) {
   });
 }
 
-await client.sessions.closeBatchSession(open.referenceNumber);
+await client.sessions.closeBatchSession(opened.referenceNumber);
 ```
 
-W praktyce dla batch rekomendowany jest workflow: [../workflows/batch-session.md](../workflows/batch-session.md).
+Dla scenariusza produkcyjnego sesji batch zwykle wygodniejszy jest workflow:
+[../workflows/batch-session.md](../workflows/batch-session.md).

@@ -1,12 +1,28 @@
-# PersonTokenService
+# Person token (`PersonTokenService`)
 
-Parser dla JWT tokena osoby (claims).
+`PersonTokenService` służy do inspekcji claimów JWT dla person tokenów KSeF.
 
-## Przyklad
+## Ważne ograniczenie bezpieczeństwa
+
+Parser nie weryfikuje podpisu JWT. Używaj go wyłącznie do diagnostyki/prezentacji danych tokenów, którym już ufasz.
+
+## `PersonTokenService.parse(jwtToken) -> PersonToken`
+
+Zwraca ujednoliconą strukturę m.in. z polami:
+- `issuer`, `audiences`
+- `issuedAt`, `expiresAt`
+- `roles`, `permissions`, `permissionsExcluded`, `permissionsEffective`
+- `contextIdType`, `contextIdValue`
+- `subjectDetails`, `ipPolicy`
+- `authMethod`, `authRequestNumber`
+
+Przykład:
 
 ```ts
 import { PersonTokenService } from "ksef-client-typescript";
 
-const info = new PersonTokenService().parse(accessToken);
-console.log(info.roles);
+const parsed = new PersonTokenService().parse(jwtToken);
+
+console.log(parsed.contextIdType, parsed.contextIdValue);
+console.log(parsed.roles);
 ```
