@@ -84,3 +84,4 @@ if (upo) {
 
 - Workflow sam przygotowuje encryption payload dla `sendInvoice(...)`.
 - Dla niestandardowego flow mozesz uzyc bezposrednio `client.sessions.*`.
+- Dla gotowego scenariusza offline + checklisty operacyjnej uzyj [workflow offline](offline.md).

@@ -3,6 +3,8 @@
 Ten dokument prowadzi przez pierwszy, produkcyjny flow w kolejnosci:
 `konfiguracja -> auth -> API -> workflowy -> bledy`.
 
+Kompatybilnosc SDK: **KSeF API `2.1.1`**.
+
 ## 1) Konfiguracja klienta
 
 Mozesz uzyc `environment` albo `baseUrl`:

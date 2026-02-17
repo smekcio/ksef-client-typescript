@@ -7,6 +7,7 @@ Ta strona opisuje workflow classes z warstwy services oraz ich praktyczne uzycie
 - `AuthCoordinator`
 - `OnlineSessionWorkflow`
 - `BatchSessionWorkflow`
+- `OfflineInvoiceWorkflow`
 - `InvoiceExportWorkflow`
 - `IncrementalExportWorkflow`
 
@@ -108,7 +109,29 @@ const processed = await client.workflows.exports.downloadAndProcessPackage(
 console.log(processed.metadataSummaries.length, Object.keys(processed.invoiceXmlFiles).length);
 ```
 
-## 5) `IncrementalExportWorkflow`
+## 5) `OfflineInvoiceWorkflow`
+
+Flow:
+- open sesji interaktywnej,
+- wysylka faktury z `offlineMode=true`,
+- close sesji,
+- opcjonalny polling UPO,
+- instrukcje operacyjne dla trybow offline.
+
+Przyklad:
+
+```ts
+const result = await client.workflows.offline.sendOfflineInvoice({
+  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
+  invoice: "<Faktura>...</Faktura>",
+  waitForUpo: true,
+});
+
+const guide = client.workflows.offline.getProcedureInstructions("offline24");
+console.log(result.invoiceReferenceNumber, guide.sendDeadline);
+```
+
+## 6) `IncrementalExportWorkflow`
 
 Flow:
 - iteracyjne uruchamianie eksportu,
@@ -133,7 +156,7 @@ console.log(incremental.referenceNumbers);
 console.log(incremental.continuationPoints);
 ```
 
-## 6) Obsluga bledow workflow
+## 7) Obsluga bledow workflow
 
 ```ts
 import { KsefAuthStatusError, KsefValidationError } from "ksef-client-typescript";

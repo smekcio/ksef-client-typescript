@@ -1,4 +1,4 @@
-name: E2E Token Flows
+name: E2E Auth Flows
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-token-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: e2e-auth-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -111,3 +111,161 @@ jobs:
         run: |
           npm run build
           node --test test/e2e/connect.test.js
+
+  e2e-test-xades:
+    name: TEST XAdES flow
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+
+    env:
+      KSEF_ENV: TEST
+      KSEF_CONTEXT_TYPE: ${{ secrets.KSEF_TEST_CONTEXT_TYPE }}
+      KSEF_CONTEXT_VALUE: ${{ secrets.KSEF_TEST_CONTEXT_VALUE }}
+      KSEF_XADES_CERT_CRT: ${{ secrets.KSEF_TEST_XADES_CERT_CRT }}
+      KSEF_XADES_CERT_CRT_B64: ${{ secrets.KSEF_TEST_XADES_CERT_CRT_B64 }}
+      KSEF_XADES_PRIVATE_KEY_PEM: ${{ secrets.KSEF_TEST_XADES_PRIVATE_KEY_PEM }}
+      KSEF_XADES_PRIVATE_KEY_PEM_B64: ${{ secrets.KSEF_TEST_XADES_PRIVATE_KEY_PEM_B64 }}
+      KSEF_XADES_PRIVATE_KEY_PASSWORD: ${{ secrets.KSEF_TEST_XADES_PRIVATE_KEY_PASSWORD }}
+      KSEF_XADES_SUBJECT_IDENTIFIER_TYPE: certificateSubject
+      KSEF_XADES_ENFORCE_COMPLIANCE: "1"
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate and mask required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_context=(KSEF_CONTEXT_TYPE KSEF_CONTEXT_VALUE)
+          for var_name in "${required_context[@]}"; do
+            value="${!var_name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret for $var_name in TEST XAdES flow."
+              exit 1
+            fi
+          done
+
+          if [ -z "${KSEF_XADES_CERT_CRT:-}" ] && [ -z "${KSEF_XADES_CERT_CRT_B64:-}" ]; then
+            echo "::error::Missing KSEF_TEST_XADES_CERT_CRT or KSEF_TEST_XADES_CERT_CRT_B64."
+            exit 1
+          fi
+
+          if [ -z "${KSEF_XADES_PRIVATE_KEY_PEM:-}" ] && [ -z "${KSEF_XADES_PRIVATE_KEY_PEM_B64:-}" ]; then
+            echo "::error::Missing KSEF_TEST_XADES_PRIVATE_KEY_PEM or KSEF_TEST_XADES_PRIVATE_KEY_PEM_B64."
+            exit 1
+          fi
+
+          to_mask=(
+            "${KSEF_CONTEXT_TYPE:-}"
+            "${KSEF_CONTEXT_VALUE:-}"
+            "${KSEF_XADES_CERT_CRT:-}"
+            "${KSEF_XADES_CERT_CRT_B64:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PEM:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PEM_B64:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PASSWORD:-}"
+          )
+          for value in "${to_mask[@]}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
+      - name: Run lightweight e2e xades auth test
+        run: |
+          npm run build
+          node --test test/e2e/xades-auth.test.js
+
+  e2e-demo-xades:
+    name: DEMO XAdES flow
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+
+    env:
+      KSEF_ENV: DEMO
+      KSEF_CONTEXT_TYPE: ${{ secrets.KSEF_DEMO_CONTEXT_TYPE }}
+      KSEF_CONTEXT_VALUE: ${{ secrets.KSEF_DEMO_CONTEXT_VALUE }}
+      KSEF_XADES_CERT_CRT: ${{ secrets.KSEF_DEMO_XADES_CERT_CRT }}
+      KSEF_XADES_CERT_CRT_B64: ${{ secrets.KSEF_DEMO_XADES_CERT_CRT_B64 }}
+      KSEF_XADES_PRIVATE_KEY_PEM: ${{ secrets.KSEF_DEMO_XADES_PRIVATE_KEY_PEM }}
+      KSEF_XADES_PRIVATE_KEY_PEM_B64: ${{ secrets.KSEF_DEMO_XADES_PRIVATE_KEY_PEM_B64 }}
+      KSEF_XADES_PRIVATE_KEY_PASSWORD: ${{ secrets.KSEF_DEMO_XADES_PRIVATE_KEY_PASSWORD }}
+      KSEF_XADES_SUBJECT_IDENTIFIER_TYPE: certificateSubject
+      KSEF_XADES_ENFORCE_COMPLIANCE: "1"
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate and mask required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_context=(KSEF_CONTEXT_TYPE KSEF_CONTEXT_VALUE)
+          for var_name in "${required_context[@]}"; do
+            value="${!var_name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::Missing required secret for $var_name in DEMO XAdES flow."
+              exit 1
+            fi
+          done
+
+          if [ -z "${KSEF_XADES_CERT_CRT:-}" ] && [ -z "${KSEF_XADES_CERT_CRT_B64:-}" ]; then
+            echo "::error::Missing KSEF_DEMO_XADES_CERT_CRT or KSEF_DEMO_XADES_CERT_CRT_B64."
+            exit 1
+          fi
+
+          if [ -z "${KSEF_XADES_PRIVATE_KEY_PEM:-}" ] && [ -z "${KSEF_XADES_PRIVATE_KEY_PEM_B64:-}" ]; then
+            echo "::error::Missing KSEF_DEMO_XADES_PRIVATE_KEY_PEM or KSEF_DEMO_XADES_PRIVATE_KEY_PEM_B64."
+            exit 1
+          fi
+
+          to_mask=(
+            "${KSEF_CONTEXT_TYPE:-}"
+            "${KSEF_CONTEXT_VALUE:-}"
+            "${KSEF_XADES_CERT_CRT:-}"
+            "${KSEF_XADES_CERT_CRT_B64:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PEM:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PEM_B64:-}"
+            "${KSEF_XADES_PRIVATE_KEY_PASSWORD:-}"
+          )
+          for value in "${to_mask[@]}"; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
+      - name: Run lightweight e2e xades auth test
+        run: |
+          npm run build
+          node --test test/e2e/xades-auth.test.js

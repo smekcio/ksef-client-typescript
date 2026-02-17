@@ -13,6 +13,7 @@ Sa przydatne, gdy potrzebujesz wiekszej kontroli niz gotowe `client.workflows.*`
 - Sessions:
   - `OnlineSessionWorkflow`
   - `BatchSessionWorkflow`
+  - `OfflineInvoiceWorkflow`
 - Export:
   - `InvoiceExportWorkflow`
   - `IncrementalExportWorkflow`
@@ -109,6 +110,21 @@ const qr = new QrCodeService();
 const dataUrl = await qr.generateSvgDataUrl(url);
 
 console.log(url, dataUrl.slice(0, 64));
+```
+
+## Przyklad 5: gotowy flow offline
+
+```ts
+import { OfflineInvoiceWorkflow } from "ksef-client-typescript";
+
+const offlineWorkflow = new OfflineInvoiceWorkflow(client.workflows.sessions.online);
+const result = await offlineWorkflow.sendOfflineInvoice({
+  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
+  invoice: "<Faktura>...</Faktura>",
+  waitForUpo: false,
+});
+
+console.log(result.invoiceReferenceNumber);
 ```
 
 ## Strony szczegolowe

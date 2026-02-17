@@ -23,8 +23,8 @@ Thin client dla `/auth/*`.
 ```ts
 const status = await client.auth.getAuthStatus(referenceNumber, authenticationToken);
 
-console.log(status.authenticationMethodInfo.category);
-console.log(status.authenticationMethodInfo.code);      // np. "ksefToken" / "xades"
+console.log(status.authenticationMethodInfo.category);  // XadesSignature | NationalNode | Token | Other
+console.log(status.authenticationMethodInfo.code);      // np. "ksefToken" / "xades" / "nationalNode"
 console.log(status.authenticationMethodInfo.displayName);
 
 // Deprecated - utrzymane tylko dla kompatybilnosci:
@@ -38,6 +38,7 @@ Przy `authenticateWithXadesSignature(..., ..., true)` SDK dodaje naglowek:
 - `X-KSeF-Feature: enforce-xades-compliance`
 
 To jest wlaczane tylko gdy trzeci argument ma wartosc `true`.
+W API 2.1.1 jest to istotne szczegolnie dla DEMO/PRD.
 
 ## Przyklad 1: pelny flow token KSeF (thin client)
 

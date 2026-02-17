@@ -1,12 +1,15 @@
 import { BaseClient } from "../client/baseClient";
-import { JsonObject } from "../types/common";
+import { AuthenticationListResponse } from "../types/common";
 
 export class ActiveSessionsClient extends BaseClient {
-  async listActiveSessions(pageSize?: number, continuationToken?: string): Promise<JsonObject> {
+  async listActiveSessions(
+    pageSize?: number,
+    continuationToken?: string,
+  ): Promise<AuthenticationListResponse> {
     const token = await this.getAccessToken();
     const headers =
       continuationToken !== undefined ? { "x-continuation-token": continuationToken } : undefined;
-    return this.http.request<JsonObject>({
+    return this.http.request<AuthenticationListResponse>({
       method: "GET",
       path: "/auth/sessions",
       ...(headers ? { headers } : {}),

@@ -9,4 +9,5 @@ export default defineConfig({
   treeshake: true,
   target: "node20",
   platform: "node",
+  external: ["node-forge", "qrcode"],
 });

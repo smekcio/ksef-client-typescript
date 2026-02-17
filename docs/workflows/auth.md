@@ -12,6 +12,7 @@ Workflow auth zwraca `accessToken` i `refreshToken`, a potem mozesz ustawic je p
 
 - `authenticateWithXadesSignature(...)` i `authenticateWithCertificate(...)` obsluguja `enforceXadesCompliance`.
 - Przy pollingu statusu uzywaj `authenticationMethodInfo`; `authenticationMethod` jest deprecated.
+- `authenticationMethodInfo.category` moze byc rowniez `NationalNode` (API 2.1.x).
 - Dla bledow auth status (np. HTTP `460` z zawieszonym certyfikatem) moze zostac rzucony `KsefAuthStatusError`.
 
 ## Wariant A: token KSeF (zalecany start)

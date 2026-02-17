@@ -6,6 +6,7 @@ export * from "./services/onlineSessionWorkflow";
 export * from "./services/batchSessionWorkflow";
 export * from "./services/invoiceExportWorkflow";
 export * from "./services/incrementalExportWorkflow";
+export * from "./services/offlineInvoiceWorkflow";
 export * from "./services/upo";
 export * from "./services/hwmCoordinator";
 export * from "./services/personTokenService";

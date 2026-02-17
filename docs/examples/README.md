@@ -135,6 +135,21 @@ await client.testdata.unblockContext({
 });
 ```
 
+## 8) Tryb offline: wysylka + instrukcje postepowania
+
+```ts
+const result = await client.workflows.offline.sendOfflineInvoice({
+  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
+  invoice: "<Faktura>...</Faktura>",
+  waitForUpo: true,
+  waitForUpoOptions: { pollIntervalMs: 2000, maxAttempts: 60 },
+});
+
+const guide = client.workflows.offline.getProcedureInstructions("offline24");
+console.log(result.invoiceReferenceNumber, guide.sendDeadline);
+console.log(guide.operationalSteps);
+```
+
 ## Dalej
 
 - API reference: [../api/README.md](../api/README.md)

@@ -52,10 +52,41 @@ export interface AuthenticationInitResponse {
   authenticationToken: TokenInfo;
 }
 
+export type AuthenticationMethodCategory = "XadesSignature" | "NationalNode" | "Token" | "Other";
+
+export type AuthenticationMethod =
+  | "Token"
+  | "TrustedProfile"
+  | "InternalCertificate"
+  | "QualifiedSignature"
+  | "QualifiedSeal"
+  | "PersonalSignature"
+  | "PeppolSignature";
+
 export interface AuthenticationMethodInfo {
-  category: string;
+  category: AuthenticationMethodCategory;
   code: string;
   displayName: string;
+}
+
+export interface AuthenticationListItem {
+  startDate: string;
+  /**
+   * @deprecated Use `authenticationMethodInfo` instead.
+   */
+  authenticationMethod: AuthenticationMethod;
+  authenticationMethodInfo: AuthenticationMethodInfo;
+  status: StatusInfo;
+  isTokenRedeemed?: boolean;
+  lastTokenRefreshDate?: string | null;
+  refreshTokenValidUntil?: string | null;
+  referenceNumber: string;
+  isCurrent?: boolean;
+}
+
+export interface AuthenticationListResponse {
+  continuationToken?: string;
+  items: AuthenticationListItem[];
 }
 
 export interface AuthenticationOperationStatusResponse {
@@ -64,8 +95,11 @@ export interface AuthenticationOperationStatusResponse {
   /**
    * @deprecated Use `authenticationMethodInfo` instead.
    */
-  authenticationMethod: string;
+  authenticationMethod: AuthenticationMethod;
   status: StatusInfo;
+  isTokenRedeemed?: boolean;
+  lastTokenRefreshDate?: string | null;
+  refreshTokenValidUntil?: string | null;
 }
 
 export interface EncryptionInfo {

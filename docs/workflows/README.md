@@ -8,6 +8,7 @@ Sa dostepne pod `client.workflows`.
 - [Uwierzytelnianie](auth.md)
 - [Sesja interaktywna](online-session.md)
 - [Sesja wsadowa](batch-session.md)
+- [Tryb offline](offline.md)
 - [Eksport paczek](export.md)
 
 ## Kiedy workflow zamiast thin API
@@ -51,4 +52,16 @@ const result = await client.workflows.exportsIncremental.run({
 });
 
 console.log(result.referenceNumbers, result.continuationPoints);
+```
+
+## Przyklad 3: workflow offline
+
+```ts
+const offline = await client.workflows.offline.sendOfflineInvoice({
+  formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
+  invoice: "<Faktura>...</Faktura>",
+  waitForUpo: true,
+});
+
+console.log(offline.sessionReferenceNumber, offline.invoiceReferenceNumber);
 ```

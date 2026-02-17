@@ -15,6 +15,7 @@ import { AuthCoordinator } from "../services/authCoordinator";
 import { BatchSessionWorkflow } from "../services/batchSessionWorkflow";
 import { IncrementalExportWorkflow } from "../services/incrementalExportWorkflow";
 import { InvoiceExportWorkflow } from "../services/invoiceExportWorkflow";
+import { OfflineInvoiceWorkflow } from "../services/offlineInvoiceWorkflow";
 import { OnlineSessionWorkflow } from "../services/onlineSessionWorkflow";
 import { PersonTokenService } from "../services/personTokenService";
 import { QrCodeService } from "../services/qrCodeService";
@@ -71,6 +72,7 @@ export class KsefClient {
       online: OnlineSessionWorkflow;
       batch: BatchSessionWorkflow;
     };
+    offline: OfflineInvoiceWorkflow;
     exports: InvoiceExportWorkflow;
     exportsIncremental: IncrementalExportWorkflow;
   };
@@ -120,13 +122,21 @@ export class KsefClient {
     this.peppol = new PeppolClient(this.http, tokenProvider);
     this.activeSessions = new ActiveSessionsClient(this.http, tokenProvider);
 
+    const onlineSessionWorkflow = new OnlineSessionWorkflow(
+      this.sessions,
+      this.security,
+      this.http,
+    );
+    const batchSessionWorkflow = new BatchSessionWorkflow(this.sessions, this.security, this.http);
+    const offlineInvoiceWorkflow = new OfflineInvoiceWorkflow(onlineSessionWorkflow);
     const exportsWorkflow = new InvoiceExportWorkflow(this.invoices, this.security, this.http);
     this.workflows = {
       auth: new AuthCoordinator(this.auth, this.security),
       sessions: {
-        online: new OnlineSessionWorkflow(this.sessions, this.security, this.http),
-        batch: new BatchSessionWorkflow(this.sessions, this.security, this.http),
+        online: onlineSessionWorkflow,
+        batch: batchSessionWorkflow,
       },
+      offline: offlineInvoiceWorkflow,
       exports: exportsWorkflow,
       exportsIncremental: new IncrementalExportWorkflow(exportsWorkflow),
     };

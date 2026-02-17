@@ -3,6 +3,10 @@
 Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz gotowe workflowy do auth, sesji i eksportu.
 Kontrakty API i dokumenty procesowe znajduja sie w `ksef-docs/`.
 
+## Kompatybilnosc API KSeF
+
+Aktualna kompatybilnosc: **KSeF API `2.1.1`** (`ksef-docs` commit `0261ff1`, 2026-02-17).
+
 ## Wymagania
 
 - Node.js >= 20
