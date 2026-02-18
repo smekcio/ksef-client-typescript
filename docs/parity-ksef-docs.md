@@ -1,4 +1,4 @@
-# Raport parity: `ksef-client-typescript` vs `ksef-docs` + `ksef-client-python`
+# Raport parity: `ksef-client-typescript` vs `ksef-docs`
 
 Data analizy: **2026-02-17**
 
@@ -6,7 +6,6 @@ Data analizy: **2026-02-17**
 
 - Kontrakt API: `ksef-docs/open-api.json` (`0261ff1`, tag `2.1.1`)
 - Changelog: `ksef-docs/api-changelog.md` (wersje `2.1.0`, `2.1.1`)
-- Wzorzec implementacyjny i dokumentacyjny: `ksef-client-python` (`4eaf3e1`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/utils/*`, `src/xml/*`, `docs/*`, `.github/workflows/*`
 
 ## Wynik ogólny
@@ -44,7 +43,7 @@ Data analizy: **2026-02-17**
 | Security             | 1                     | 1/1              | OK     |
 | Peppol               | 1                     | 1/1              | OK     |
 
-## Parity funkcjonalny (TS vs Python)
+## Parity funkcjonalny (TS vs `ksef-docs`)
 
 1. Uwierzytelnianie:
    - `enforceXadesCompliance` wspierane w thin client i workflow
@@ -59,7 +58,7 @@ Data analizy: **2026-02-17**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została zaktualizowana do spójności z Python SDK i KSeF `2.1.1`:
+Dokumentacja TS została zaktualizowana do spójności z KSeF `2.1.1`:
 
 - jawna deklaracja kompatybilności API (`2.1.1`)
 - opisy i przykłady `authenticationMethodInfo.category` (w tym `NationalNode`)

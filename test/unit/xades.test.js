@@ -1,61 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import crypto from "node:crypto";
-import childProcess from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { DOMParser } from "@xmldom/xmldom";
 import xmlCrypto from "xml-crypto";
 import xpath from "xpath";
 import { buildAuthTokenRequestXml, XadesKeyPair, XadesSignatureService } from "../../dist/index.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fixturesPath = path.join(__dirname, "..", "fixtures", "xades-fixtures.json");
+const fixtures = JSON.parse(fs.readFileSync(fixturesPath, "utf8"));
+
 function generateKeyPairAndCertificate({ keyType }) {
-  const python = `
-import json
-from datetime import datetime, timedelta, timezone
-
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.x509.oid import NameOID
-
-key_type = ${JSON.stringify(keyType)}
-
-if key_type == "rsa":
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-elif key_type == "ec":
-    key = ec.generate_private_key(ec.SECP256R1())
-else:
-    raise SystemExit("unsupported key_type")
-
-subject = issuer = x509.Name([
-    x509.NameAttribute(NameOID.COMMON_NAME, "Test"),
-    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "KSeF"),
-    x509.NameAttribute(NameOID.COUNTRY_NAME, "PL"),
-])
-now = datetime.now(timezone.utc)
-cert = (
-    x509.CertificateBuilder()
-    .subject_name(subject)
-    .issuer_name(issuer)
-    .public_key(key.public_key())
-    .serial_number(x509.random_serial_number())
-    .not_valid_before(now - timedelta(days=1))
-    .not_valid_after(now + timedelta(days=1))
-    .sign(key, hashes.SHA256())
-)
-
-key_pem = key.private_bytes(
-    encoding=serialization.Encoding.PEM,
-    format=serialization.PrivateFormat.PKCS8,
-    encryption_algorithm=serialization.NoEncryption(),
-).decode("ascii")
-
-cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
-
-print(json.dumps({"privateKeyPem": key_pem, "certificatePem": cert_pem}))
-`.trim();
-
-  const out = childProcess.execFileSync("python", ["-c", python], { encoding: "utf8" });
-  return JSON.parse(out);
+  if (keyType === "rsa") {
+    return {
+      privateKeyPem: fixtures.rsaKeyPem,
+      certificatePem: fixtures.rsaCertPem,
+    };
+  }
+  if (keyType === "ec") {
+    return {
+      privateKeyPem: fixtures.ecKeyPem,
+      certificatePem: fixtures.ecCertPem,
+    };
+  }
+  throw new Error(`unsupported keyType: ${keyType}`);
 }
 
 function verifySignedXml(signedXml, certificatePem) {

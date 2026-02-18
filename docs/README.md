@@ -8,7 +8,7 @@ Kompatybilność SDK: **KSeF API `v2.1.1`**.
 
 ## Status parity
 
-Aktualny status zgodności SDK względem `ksef-docs` i `ksef-client-python` znajdziesz w raporcie:
+Aktualny status zgodności SDK względem `ksef-docs` znajdziesz w raporcie:
 [parity-ksef-docs.md](parity-ksef-docs.md).
 
 ## Wymagania
