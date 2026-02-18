@@ -5,7 +5,7 @@
   "include-component-in-tag": false,
   "packages": {
     ".": {
-      "package-name": "ksef-client-typescript",
+      "package-name": "ksef-client",
       "extra-files": [
         "package.json",
         "package-lock.json"
@@ -13,3 +13,4 @@
     }
   }
 }
+

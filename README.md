@@ -21,7 +21,7 @@ Aktualna kompatybilność: **KSeF API `v2.1.1`**.
 ## Instalacja
 
 ```bash
-npm install ksef-client-typescript
+npm install ksef-client
 ```
 
 Opcjonalnie (w zależności od używanych funkcji):
@@ -80,7 +80,7 @@ Minimalny przebieg integracji:
 2. wywołanie endpointu biznesowego.
 
 ```ts
-import { KsefClient } from "ksef-client-typescript";
+import { KsefClient } from "ksef-client";
 
 const client = await KsefClient.connect({
   environment: "DEMO",
@@ -112,7 +112,7 @@ console.log(metadata);
 ### Uwierzytelnianie tokenem KSeF (workflow)
 
 ```ts
-import { KsefClient } from "ksef-client-typescript";
+import { KsefClient } from "ksef-client";
 
 const client = new KsefClient({ environment: "DEMO" });
 
@@ -129,7 +129,7 @@ client.authManager.setTokens(tokens);
 ### Uwierzytelnianie certyfikatem (XAdES)
 
 ```ts
-import { KsefClient, XadesKeyPair } from "ksef-client-typescript";
+import { KsefClient, XadesKeyPair } from "ksef-client";
 
 const client = new KsefClient({ environment: "DEMO" });
 
@@ -168,3 +168,4 @@ console.log(upoXml ? "UPO odebrane" : "Brak UPO w zadanym limicie prób");
 ## Licencja
 
 MIT. Zobacz [`LICENSE`](LICENSE).
+
