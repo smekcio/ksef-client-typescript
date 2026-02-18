@@ -49,13 +49,13 @@ function verifySignedXml(signedXml, certificatePem) {
         getSignature(signedInfo, privateKey) {
           const signer = crypto.createSign("SHA256");
           signer.update(signedInfo);
-          return signer.sign({ key: privateKey, dsaEncoding: "der" }, "base64");
+          return signer.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64");
         }
 
         verifySignature(material, key, signatureValue) {
           const v = crypto.createVerify("SHA256");
           v.update(material);
-          return v.verify(key, signatureValue, "base64");
+          return v.verify({ key, dsaEncoding: "ieee-p1363" }, signatureValue, "base64");
         }
 
         getAlgorithmName() {
