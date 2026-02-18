@@ -17,6 +17,9 @@ const upoInvoicePath = path.join(
   "kontekst-nip",
   "upo-faktura-kontekst-id-nip.xml",
 );
+const skipMissingUpoFixture = fs.existsSync(upoInvoicePath)
+  ? false
+  : `Missing fixture: ${upoInvoicePath}`;
 
 const FORM_CODE = { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" };
 
@@ -65,40 +68,44 @@ test("sendOfflineInvoice sends invoice with offlineMode=true and closes session"
   assert.equal(result.upo, null);
 });
 
-test("sendOfflineTechnicalCorrection passes hash and parses UPO", async () => {
-  const upoXml = fs.readFileSync(upoInvoicePath, "utf8");
-  let sendOptions;
-  let waitOptions;
+test(
+  "sendOfflineTechnicalCorrection passes hash and parses UPO",
+  { skip: skipMissingUpoFixture },
+  async () => {
+    const upoXml = fs.readFileSync(upoInvoicePath, "utf8");
+    let sendOptions;
+    let waitOptions;
 
-  const session = {
-    referenceNumber: "SESSION-REF-2",
-    sendInvoice: async (options) => {
-      sendOptions = options;
-      return { referenceNumber: "INVOICE-REF-2" };
-    },
-    close: async () => {},
-    waitForUpo: async (options) => {
-      waitOptions = options;
-      return upoXml;
-    },
-  };
-  const onlineWorkflow = {
-    open: async () => session,
-  };
-  const workflow = new OfflineInvoiceWorkflow(onlineWorkflow);
+    const session = {
+      referenceNumber: "SESSION-REF-2",
+      sendInvoice: async (options) => {
+        sendOptions = options;
+        return { referenceNumber: "INVOICE-REF-2" };
+      },
+      close: async () => {},
+      waitForUpo: async (options) => {
+        waitOptions = options;
+        return upoXml;
+      },
+    };
+    const onlineWorkflow = {
+      open: async () => session,
+    };
+    const workflow = new OfflineInvoiceWorkflow(onlineWorkflow);
 
-  const result = await workflow.sendOfflineTechnicalCorrection({
-    formCode: FORM_CODE,
-    invoice: "<Faktura>...</Faktura>",
-    hashOfCorrectedInvoice: "BASE64_SHA256_HASH",
-    waitForUpoOptions: { pollIntervalMs: 1000, maxAttempts: 10 },
-  });
+    const result = await workflow.sendOfflineTechnicalCorrection({
+      formCode: FORM_CODE,
+      invoice: "<Faktura>...</Faktura>",
+      hashOfCorrectedInvoice: "BASE64_SHA256_HASH",
+      waitForUpoOptions: { pollIntervalMs: 1000, maxAttempts: 10 },
+    });
 
-  assert.equal(sendOptions.offlineMode, true);
-  assert.equal(sendOptions.hashOfCorrectedInvoice, "BASE64_SHA256_HASH");
-  assert.deepEqual(waitOptions, { pollIntervalMs: 1000, maxAttempts: 10 });
-  assert.equal(result.upo?.kodFormularza, "FA (3)");
-});
+    assert.equal(sendOptions.offlineMode, true);
+    assert.equal(sendOptions.hashOfCorrectedInvoice, "BASE64_SHA256_HASH");
+    assert.deepEqual(waitOptions, { pollIntervalMs: 1000, maxAttempts: 10 });
+    assert.equal(result.upo?.kodFormularza, "FA (3)");
+  },
+);
 
 test("sendOfflineTechnicalCorrection validates hashOfCorrectedInvoice", async () => {
   const onlineWorkflow = {

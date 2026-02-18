@@ -25,6 +25,9 @@ const fa3TemplatePath = path.join(
   "Templates",
   "invoice-template-fa-3.xml",
 );
+const requiredFixtures = [xsdFa2Path, xsdFa3Path, fa2TemplatePath, fa3TemplatePath];
+const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
+const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
@@ -74,7 +77,7 @@ function validateXml(xml, xsdDoc) {
   }
 }
 
-test("FA2 XML builder produces XSD-valid XML", () => {
+test("FA2 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
   const templateXml = loadTemplateXml(fa2TemplatePath);
   const faktura = parseFaktura(templateXml);
   const xml = buildFakturaXml(faktura, { schema: "FA2" });
@@ -82,7 +85,7 @@ test("FA2 XML builder produces XSD-valid XML", () => {
   validateXml(xml, xsd);
 });
 
-test("FA3 XML builder produces XSD-valid XML", () => {
+test("FA3 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
   const templateXml = loadTemplateXml(fa3TemplatePath);
   const faktura = parseFaktura(templateXml);
   const xml = buildFakturaXml(faktura, { schema: "FA3" });

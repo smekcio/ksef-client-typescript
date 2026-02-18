@@ -26,6 +26,9 @@ const fa3TemplatePath = path.join(
   "Templates",
   "invoice-template-fa-3.xml",
 );
+const requiredFixtures = [xsdFa2Path, xsdFa3Path, fa2TemplatePath, fa3TemplatePath];
+const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
+const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -115,9 +118,6 @@ function makeVariant(template, variant) {
 }
 
 function propertyTest(schema, templatePath, xsdPath) {
-  const template = parseFaktura(loadTemplateXml(templatePath));
-  const xsd = loadXsd(xsdPath);
-
   const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
   const rowNameArb = fc
     .stringOf(
@@ -148,16 +148,22 @@ function propertyTest(schema, templatePath, xsdPath) {
     ),
   });
 
-  test(`property: ${schema} builder produces XSD-valid XML for many variants`, async () => {
-    await fc.assert(
-      fc.asyncProperty(variantArb, async (variant) => {
-        const faktura = makeVariant(template, variant);
-        const xml = buildFakturaXml(faktura, { schema });
-        validateXml(xml, xsd);
-      }),
-      { numRuns: 25 },
-    );
-  });
+  test(
+    `property: ${schema} builder produces XSD-valid XML for many variants`,
+    { skip: skipMissingFixture },
+    async () => {
+      const template = parseFaktura(loadTemplateXml(templatePath));
+      const xsd = loadXsd(xsdPath);
+      await fc.assert(
+        fc.asyncProperty(variantArb, async (variant) => {
+          const faktura = makeVariant(template, variant);
+          const xml = buildFakturaXml(faktura, { schema });
+          validateXml(xml, xsd);
+        }),
+        { numRuns: 25 },
+      );
+    },
+  );
 }
 
 propertyTest("FA2", fa2TemplatePath, xsdFa2Path);

@@ -27,6 +27,9 @@ const pefKor3TemplatePath = path.join(
   "Templates",
   "invoice-template-fa-3-pef-correction.xml",
 );
+const requiredFixtures = [pef3XsdPath, pefKor3XsdPath, pef3TemplatePath, pefKor3TemplatePath];
+const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
+const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -87,7 +90,7 @@ function stripRootAttributes(root) {
   return clone;
 }
 
-test("PEF(3) XML builder produces XSD-valid XML", () => {
+test("PEF(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
   const templateXml = loadTemplateXml(pef3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   if (rootKey !== "Invoice") {
@@ -98,7 +101,7 @@ test("PEF(3) XML builder produces XSD-valid XML", () => {
   validateXml(xml, xsd);
 });
 
-test("PEF_KOR(3) XML builder produces XSD-valid XML", () => {
+test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
   const templateXml = loadTemplateXml(pefKor3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   const localRoot = rootKey.includes(":") ? rootKey.split(":").at(-1) : rootKey;

@@ -14,6 +14,7 @@ async function hasNodeForge() {
 }
 
 function generatePkcs12Bundle() {
+  const pkcs12Password = "test-pass-123";
   const python = `
 import base64
 import json
@@ -75,11 +76,12 @@ p12 = serialize_key_and_certificates(
     key=leaf_key,
     cert=leaf_cert,
     cas=[root_cert],
-    encryption_algorithm=serialization.NoEncryption(),
+    encryption_algorithm=serialization.BestAvailableEncryption(b"${pkcs12Password}"),
 )
 
 print(json.dumps({
     "pkcs12Base64": base64.b64encode(p12).decode("ascii"),
+    "pkcs12Password": "${pkcs12Password}",
     "leafPem": leaf_cert.public_bytes(serialization.Encoding.PEM).decode("ascii"),
     "rootPem": root_cert.public_bytes(serialization.Encoding.PEM).decode("ascii"),
 }))
@@ -96,7 +98,10 @@ test(
     const bundle = generatePkcs12Bundle();
     const pkcs12Bytes = Buffer.from(bundle.pkcs12Base64, "base64");
 
-    const pair = await XadesKeyPair.fromPkcs12({ pkcs12Bytes });
+    const pair = await XadesKeyPair.fromPkcs12({
+      pkcs12Bytes,
+      pkcs12Password: bundle.pkcs12Password,
+    });
 
     assert.match(pair.certificatePem, /BEGIN CERTIFICATE/);
     assert.match(new crypto.X509Certificate(pair.certificatePem).subject, /CN=Leaf/);

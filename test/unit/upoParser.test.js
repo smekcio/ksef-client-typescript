@@ -19,8 +19,14 @@ const upoExamplesDir = path.join(
 );
 const upoInvoicePath = path.join(upoExamplesDir, "upo-faktura-kontekst-id-nip.xml");
 const upoSessionPath = path.join(upoExamplesDir, "upo-sesja-kontekst-id-nip.xml");
+const skipMissingInvoiceFixture = fs.existsSync(upoInvoicePath)
+  ? false
+  : `Missing fixture: ${upoInvoicePath}`;
+const skipMissingSessionFixture = fs.existsSync(upoSessionPath)
+  ? false
+  : `Missing fixture: ${upoSessionPath}`;
 
-test("parseUpoXml parses invoice UPO", () => {
+test("parseUpoXml parses invoice UPO", { skip: skipMissingInvoiceFixture }, () => {
   const xml = fs.readFileSync(upoInvoicePath, "utf8");
   const upo = parseUpoXml(xml);
 
@@ -32,12 +38,16 @@ test("parseUpoXml parses invoice UPO", () => {
   assert.ok(upo.dokumenty[0]?.numerKSeFDokumentu.includes("5265877635-"));
 });
 
-test("parseUpoXml parses session UPO with multiple documents", () => {
-  const xml = fs.readFileSync(upoSessionPath, "utf8");
-  const upo = parseUpoXml(xml);
+test(
+  "parseUpoXml parses session UPO with multiple documents",
+  { skip: skipMissingSessionFixture },
+  () => {
+    const xml = fs.readFileSync(upoSessionPath, "utf8");
+    const upo = parseUpoXml(xml);
 
-  assert.equal(upo.dokumenty.length, 2);
-  assert.ok(upo.opisPotwierdzenia);
-  assert.equal(upo.opisPotwierdzenia.strona, 1);
-  assert.equal(upo.opisPotwierdzenia.calkowitaLiczbaDokumentow, 2);
-});
+    assert.equal(upo.dokumenty.length, 2);
+    assert.ok(upo.opisPotwierdzenia);
+    assert.equal(upo.opisPotwierdzenia.strona, 1);
+    assert.equal(upo.opisPotwierdzenia.calkowitaLiczbaDokumentow, 2);
+  },
+);
