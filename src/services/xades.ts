@@ -585,6 +585,19 @@ function readPrivateKey(raw: Buffer, password?: string): crypto.KeyObject {
 async function loadFromPkcs12(
   options: XadesPkcs12KeyPairOptions,
 ): Promise<{ certificatePem: string; privateKeyPem: string; certificateChainPem: string[] }> {
+  type KeyCandidate = {
+    localKeyId: string | null;
+    privateKeyPem: string;
+    publicKeySpkiDerBase64: string;
+  };
+
+  type CertCandidate = {
+    localKeyId: string | null;
+    certificatePem: string;
+    publicKeySpkiDerBase64: string;
+    isSelfSigned: boolean;
+  };
+
   let forge: unknown;
   try {
     forge = await import("node-forge");
@@ -617,56 +630,60 @@ async function loadFromPkcs12(
     throw new Error("PKCS#12 does not contain a certificate.");
   }
 
-  const keyCandidates = keyBags
+  const keyCandidates: KeyCandidate[] = keyBags
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((bag: any) => ({
-      localKeyId: normalizeLocalKeyId(bag?.attributes?.localKeyId),
-      privateKeyPem: forgeAny.pki.privateKeyToPem(bag.key),
-    }));
+    .map((bag: any) => {
+      const privateKeyPem = forgeAny.pki.privateKeyToPem(bag.key);
+      return {
+        localKeyId: normalizeLocalKeyId(bag?.attributes?.localKeyId),
+        privateKeyPem,
+        publicKeySpkiDerBase64: getPublicKeySpkiDerBase64FromPrivateKeyPem(privateKeyPem),
+      };
+    });
 
-  const certCandidates = certBags
+  const certCandidates: CertCandidate[] = certBags
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((bag: any) => ({
-      localKeyId: normalizeLocalKeyId(bag?.attributes?.localKeyId),
-      certificatePem: forgeAny.pki.certificateToPem(bag.cert),
-    }));
+    .map((bag: any) => {
+      const certificatePem = forgeAny.pki.certificateToPem(bag.cert);
+      const x509 = new crypto.X509Certificate(certificatePem);
+      return {
+        localKeyId: normalizeLocalKeyId(bag?.attributes?.localKeyId),
+        certificatePem,
+        publicKeySpkiDerBase64: getPublicKeySpkiDerBase64FromCertificatePem(certificatePem),
+        isSelfSigned: normalizeIssuerDn(x509.issuer) === normalizeIssuerDn(x509.subject),
+      };
+    });
 
-  // Prefer pairing by localKeyId if present in both key and cert bags.
+  const preferredCertCandidates = [...certCandidates].sort(
+    (a, b) => Number(a.isSelfSigned) - Number(b.isSelfSigned),
+  );
+
+  // Prefer pairing by localKeyId, but still verify cert/private-key match.
   let chosen: { privateKeyPem: string; certificatePem: string } | null = null;
-  for (const key of keyCandidates) {
-    if (!key.localKeyId) {
+  for (const cert of preferredCertCandidates) {
+    if (!cert.localKeyId) {
       continue;
     }
-    const hit = certCandidates.find(
-      (c: { localKeyId: string | null; certificatePem: string }) =>
-        c.localKeyId != null && c.localKeyId === key.localKeyId,
+    const key = keyCandidates.find(
+      (k) =>
+        k.localKeyId != null &&
+        k.localKeyId === cert.localKeyId &&
+        k.publicKeySpkiDerBase64 === cert.publicKeySpkiDerBase64,
     );
-    if (hit) {
-      chosen = { privateKeyPem: key.privateKeyPem, certificatePem: hit.certificatePem };
+    if (key != null) {
+      chosen = { privateKeyPem: key.privateKeyPem, certificatePem: cert.certificatePem };
       break;
     }
   }
 
   // Fallback: match by comparing public keys
   if (!chosen) {
-    for (const key of keyCandidates) {
-      const privateKeyObj = crypto.createPrivateKey({ key: key.privateKeyPem, format: "pem" });
-      const pubFromKey = crypto
-        .createPublicKey(privateKeyObj)
-        .export({ type: "spki", format: "der" })
-        .toString("base64");
-
-      for (const cert of certCandidates) {
-        const x509 = new crypto.X509Certificate(cert.certificatePem);
-        const pubFromCert = x509.publicKey
-          .export({ type: "spki", format: "der" })
-          .toString("base64");
-        if (pubFromCert === pubFromKey) {
-          chosen = { privateKeyPem: key.privateKeyPem, certificatePem: cert.certificatePem };
-          break;
-        }
+    for (const cert of preferredCertCandidates) {
+      const key = keyCandidates.find((k) => k.publicKeySpkiDerBase64 === cert.publicKeySpkiDerBase64);
+      if (key) {
+        chosen = { privateKeyPem: key.privateKeyPem, certificatePem: cert.certificatePem };
+        break;
       }
-      if (chosen) break;
     }
   }
 
@@ -695,6 +712,20 @@ function normalizeLocalKeyId(value: unknown): string | null {
     return Buffer.from(first).toString("hex");
   }
   return null;
+}
+
+function getPublicKeySpkiDerBase64FromPrivateKeyPem(privateKeyPem: string): string {
+  const privateKeyObj = crypto.createPrivateKey({ key: privateKeyPem, format: "pem" });
+  return crypto
+    .createPublicKey(privateKeyObj)
+    .export({ type: "spki", format: "der" })
+    .toString("base64");
+}
+
+function getPublicKeySpkiDerBase64FromCertificatePem(certificatePem: string): string {
+  return new crypto.X509Certificate(certificatePem).publicKey
+    .export({ type: "spki", format: "der" })
+    .toString("base64");
 }
 
 function buildCertificateChainPem(leafPem: string, allPem: string[]): string[] {
