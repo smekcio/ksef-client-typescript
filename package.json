@@ -45,8 +45,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run build && node --test test/**/*.test.js",
+    "test:coverage": "npm run build && c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/**/*.test.js",
     "test:unit": "npm run build && node --test test/unit/*.test.js",
-    "test:e2e": "npm run build && node --test test/e2e/*.test.js"
+    "test:e2e": "npm run build && node --test test/e2e/*.test.js",
+    "check:openapi-coverage": "node scripts/check-openapi-coverage.mjs"
   },
   "engines": {
     "node": ">=20"

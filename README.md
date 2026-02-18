@@ -46,6 +46,32 @@ npm install node-forge
 - Utils: [`docs/utils/README.md`](docs/utils/README.md)
 - Przykłady: [`docs/examples/README.md`](docs/examples/README.md)
 
+## CI/CD
+
+Repozytorium zawiera następujace workflow GitHub Actions:
+
+- `CI` (`.github/workflows/ci.yml`) - lint, typecheck, testy i raport coverage.
+- `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - token/XAdES dla `TEST` i `DEMO`, plus dzienny harmonogram i automatyczne issue przy bledzie runa schedulowanego.
+- `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - weryfikacja pokrycia endpointow SDK wzgledem oficjalnego `open-api.json`.
+- `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja PR release i wersjonowania.
+- `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki po `release.published` lub recznie (`workflow_dispatch`).
+
+Wymagane sekrety dla E2E:
+
+- `KSEF_TEST_TOKEN`, `KSEF_TEST_CONTEXT_TYPE`, `KSEF_TEST_CONTEXT_VALUE`
+- `KSEF_DEMO_TOKEN`, `KSEF_DEMO_CONTEXT_TYPE`, `KSEF_DEMO_CONTEXT_VALUE`
+- `KSEF_TEST_XADES_CERT_CRT` lub `KSEF_TEST_XADES_CERT_CRT_B64`
+- `KSEF_TEST_XADES_PRIVATE_KEY_PEM` lub `KSEF_TEST_XADES_PRIVATE_KEY_PEM_B64`
+- `KSEF_TEST_XADES_PRIVATE_KEY_PASSWORD` (opcjonalne, jesli klucz jest szyfrowany)
+- `KSEF_DEMO_XADES_CERT_CRT` lub `KSEF_DEMO_XADES_CERT_CRT_B64`
+- `KSEF_DEMO_XADES_PRIVATE_KEY_PEM` lub `KSEF_DEMO_XADES_PRIVATE_KEY_PEM_B64`
+- `KSEF_DEMO_XADES_PRIVATE_KEY_PASSWORD` (opcjonalne, jesli klucz jest szyfrowany)
+
+Dodatkowe sekrety opcjonalne:
+
+- `RELEASE_PLEASE_TOKEN` - token PAT dla `release-please` (w przeciwnym razie workflow uzyje `GITHUB_TOKEN`).
+- `NPM_TOKEN` - fallback dla publikacji npm, jesli Trusted Publishing (OIDC) nie jest skonfigurowany.
+
 ## Quick start
 
 Minimalny przebieg integracji:

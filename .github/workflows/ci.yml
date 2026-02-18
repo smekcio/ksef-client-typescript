@@ -13,13 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality-and-tests:
-    name: Lint, Typecheck and Test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: .
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -38,8 +35,83 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run typecheck
         run: npm run typecheck
+
+  test:
+    name: Test + Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Run tests with coverage
+        run: npm exec c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/**/*.test.js
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-node-20
+          path: |
+            coverage/
+
+  test-matrix:
+    name: Test (Node ${{ matrix.node-version }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run tests
         run: npm test

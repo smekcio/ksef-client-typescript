@@ -1,0 +1,38 @@
+name: Validate API Compliance
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-openapi-coverage:
+    runs-on: ubuntu-latest
+
+    env:
+      OPENAPI_URL: https://raw.githubusercontent.com/CIRFMF/ksef-docs/main/open-api.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download official open-api.json
+        run: curl -L -o open-api.json "${{ env.OPENAPI_URL }}"
+
+      - name: Check OpenAPI endpoint coverage
+        run: node scripts/check-openapi-coverage.mjs --openapi open-api.json --src src/api
