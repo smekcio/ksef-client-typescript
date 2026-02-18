@@ -459,20 +459,21 @@ function ensureEcdsaSha256Algorithm(sig: SignedXmlLike): void {
       getSignature(signedInfo: string, privateKey: crypto.KeyLike): string {
         const signer = crypto.createSign("SHA256");
         signer.update(signedInfo);
-        return signer.sign(
-          { key: privateKey as any, dsaEncoding: "ieee-p1363" } as any,
-          "base64",
-        );
+        const signingKey: crypto.SignKeyObjectInput | crypto.SignPrivateKeyInput =
+          privateKey instanceof crypto.KeyObject
+            ? { key: privateKey, dsaEncoding: "ieee-p1363" }
+            : { key: privateKey, dsaEncoding: "ieee-p1363" };
+        return signer.sign(signingKey, "base64");
       }
 
       verifySignature(material: string, key: crypto.KeyLike, signatureValue: string): boolean {
         const verifier = crypto.createVerify("SHA256");
         verifier.update(material);
-        return verifier.verify(
-          { key: key as any, dsaEncoding: "ieee-p1363" } as any,
-          signatureValue,
-          "base64",
-        );
+        const verificationKey: crypto.VerifyKeyObjectInput | crypto.VerifyPublicKeyInput =
+          key instanceof crypto.KeyObject
+            ? { key, dsaEncoding: "ieee-p1363" }
+            : { key, dsaEncoding: "ieee-p1363" };
+        return verifier.verify(verificationKey, signatureValue, "base64");
       }
 
       getAlgorithmName(): string {
