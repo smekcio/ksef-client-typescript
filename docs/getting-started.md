@@ -28,11 +28,11 @@ Uwaga: `headers` w konfiguracji klienta są globalne i trafią także do request
 
 ## 2) Dane wejściowe do uwierzytelniania
 
-| Dane wejściowe | Gdzie wymagane | Uwagi |
-| --- | --- | --- |
-| `token` | `KsefClient.connect(...)`, `client.workflows.auth.authenticateWithKsefToken(...)` | Token KSeF używany do inicjalizacji auth tokenowego. |
-| `context` | `KsefClient.connect(...)`, `client.workflows.auth.authenticateWithKsefToken(...)`, `client.workflows.auth.authenticateWithCertificate(...)` | `ContextIdentifier`, np. `{ type: "Nip", value: "5265877635" }`. |
-| `publicCertificateBase64Der` | Opcjonalnie w auth tokenowym (`connect(...)` i `authenticateWithKsefToken(...)`) | Gdy nie podasz, workflow pobierze certyfikat `KsefTokenEncryption`. |
+| Dane wejściowe                      | Gdzie wymagane                                                                                                                              | Uwagi                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `token`                             | `KsefClient.connect(...)`, `client.workflows.auth.authenticateWithKsefToken(...)`                                                           | Token KSeF używany do inicjalizacji auth tokenowego.                      |
+| `context`                           | `KsefClient.connect(...)`, `client.workflows.auth.authenticateWithKsefToken(...)`, `client.workflows.auth.authenticateWithCertificate(...)` | `ContextIdentifier`, np. `{ type: "Nip", value: "5265877635" }`.          |
+| `publicCertificateBase64Der`        | Opcjonalnie w auth tokenowym (`connect(...)` i `authenticateWithKsefToken(...)`)                                                            | Gdy nie podasz, workflow pobierze certyfikat `KsefTokenEncryption`.       |
 | certyfikat i klucz prywatny (XAdES) | `client.workflows.auth.authenticateWithCertificate(...)` lub etap podpisu przed `client.workflows.auth.authenticateWithXadesSignature(...)` | Wymagane tylko dla wariantu podpisowego XAdES, nie dla auth tokenem KSeF. |
 
 ## 3) Kiedy użyć `KsefClient.connect(...)`, a kiedy manualnego flow

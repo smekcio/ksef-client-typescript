@@ -38,14 +38,14 @@ const client = await KsefClient.connect({
 
 ## Szybki wybór workflowu
 
-| Potrzeba | Workflow |
-| --- | --- |
-| Uzyskanie tokenów (`accessToken`, `refreshToken`) | `client.workflows.auth.*` |
-| Wysyłka pojedynczych faktur w sesji online | `client.workflows.sessions.online.*` |
-| Wysyłka paczki faktur jako ZIP | `client.workflows.sessions.batch.openUploadAndClose(...)` |
-| Wysyłka faktury z `offlineMode=true` + instrukcje operacyjne | `client.workflows.offline.*` |
-| Eksport i obróbka paczek faktur | `client.workflows.exports.*` |
-| Eksport przyrostowy z continuation points | `client.workflows.exportsIncremental.run(...)` |
+| Potrzeba                                                     | Workflow                                                  |
+| ------------------------------------------------------------ | --------------------------------------------------------- |
+| Uzyskanie tokenów (`accessToken`, `refreshToken`)            | `client.workflows.auth.*`                                 |
+| Wysyłka pojedynczych faktur w sesji online                   | `client.workflows.sessions.online.*`                      |
+| Wysyłka paczki faktur jako ZIP                               | `client.workflows.sessions.batch.openUploadAndClose(...)` |
+| Wysyłka faktury z `offlineMode=true` + instrukcje operacyjne | `client.workflows.offline.*`                              |
+| Eksport i obróbka paczek faktur                              | `client.workflows.exports.*`                              |
+| Eksport przyrostowy z continuation points                    | `client.workflows.exportsIncremental.run(...)`            |
 
 ## Powiązane dokumenty
 

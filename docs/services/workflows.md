@@ -3,6 +3,7 @@
 Workflowy łączą API KSeF z operacjami lokalnymi (kryptografia, ZIP, parsowanie UPO) w gotowe scenariusze integracyjne.
 
 W `KsefClient` są dostępne pod:
+
 - `client.workflows.auth`
 - `client.workflows.sessions.online`
 - `client.workflows.sessions.batch`
@@ -13,6 +14,7 @@ W `KsefClient` są dostępne pod:
 ## `AuthCoordinator`
 
 Najczęściej używane metody:
+
 - `authenticateWithKsefToken(options)`
 - `authenticateWithXadesSignature(options)`
 - `authenticateWithCertificate(options)`
@@ -33,6 +35,7 @@ client.authManager.setTokens(tokens);
 ## `OnlineSessionWorkflow` i `OnlineSessionHandle`
 
 Przepływ:
+
 1. `open(...)` -> pobranie certyfikatu `SymmetricKeyEncryption`, budowa `EncryptionData`, otwarcie sesji
 2. `sendInvoice(...)` -> szyfrowanie faktury i wysyłka
 3. `close()`
@@ -56,6 +59,7 @@ console.log(Boolean(upoXml));
 ## `BatchSessionWorkflow` i `BatchSessionHandle`
 
 Przepływ:
+
 1. budowa/pobranie ZIP
 2. podział na party (limit 100 MB na część)
 3. szyfrowanie AES
@@ -79,6 +83,7 @@ console.log(batch.referenceNumber, status.status.code);
 ## `InvoiceExportWorkflow`
 
 Najważniejsze metody:
+
 - `startExport({ filters, ... })`
 - `waitForExport(referenceNumber, options?)`
 - `downloadAndProcessPackage(status, encryptionData, { verifyHashes? })`
@@ -113,25 +118,30 @@ interface PackageProcessingResult {
 ```
 
 Znaczenie pól:
+
 - `metadataSummaries`: rekordy z `_metadata.json` (SDK obsługuje zarówno `invoices`, jak i `invoiceList`).
 - `invoiceXmlFiles`: mapa `nazwa_pliku.xml -> XML` po odszyfrowaniu i rozpakowaniu archiwum.
 
 `verifyHashes` (domyślnie `false`) działa na etapie pobierania partów:
+
 - dla każdego partu liczony jest `sha256Base64(data)` i porównywany z `part.encryptedPartHash`,
 - przy niezgodności workflow rzuca błąd i nie przechodzi do odszyfrowania/scalenia.
 
 Kiedy używać `verifyHashes: true`:
+
 - środowiska produkcyjne z wysokim wymaganiem integralności danych,
 - transfer przez infrastrukturę, której nie kontrolujesz end-to-end,
 - procesy audytowe/compliance, gdzie chcesz jawnie potwierdzić zgodność partów.
 
 Kiedy zostawić `verifyHashes: false`:
+
 - kontrolowane środowiska wewnętrzne i duże wolumeny, gdy kluczowa jest wydajność,
 - sytuacje, gdzie dodatkowy koszt hashowania partów jest nieakceptowalny czasowo.
 
 ## `IncrementalExportWorkflow`
 
 `run(options)` wykonuje wielokrotne okna eksportu i automatycznie:
+
 - aktualizuje continuation points (`updateContinuationPoint`)
 - deduplikuje metadane po `ksefNumber`
 
@@ -156,6 +166,7 @@ console.log(result.continuationPoints);
 ## `OfflineInvoiceWorkflow`
 
 Wysyłka faktury offline oparta na sesji interaktywnej:
+
 - `sendOfflineInvoice(options)`
 - `sendOfflineTechnicalCorrection(options)`
 - `getProcedureInstructions(mode)`
@@ -175,6 +186,7 @@ console.log(result.invoiceReferenceNumber, guide.sendDeadline);
 ```
 
 Powiązane strony:
+
 - [Auth (XML i proces uwierzytelnienia)](auth.md)
 - [Batch (podział, szyfrowanie, upload)](batch.md)
 - [Kryptografia i metadane](crypto.md)

@@ -11,6 +11,7 @@ W `KsefClient` usługa jest dostępna jako `client.verificationLinks` i domyśln
 Buduje URL dla „KOD I” (weryfikacja faktury).
 
 Parametry:
+
 - `nip`: NIP sprzedawcy
 - `issueDate`: `Date` albo string (`DD-MM-YYYY`)
 - `invoiceHash`: Base64 lub Base64Url (wynikowy URL używa Base64Url)
@@ -30,6 +31,7 @@ const url = client.verificationLinks.buildInvoiceVerificationUrl(
 Buduje URL dla „KOD II” (offline, podpisany lokalnym kluczem prywatnym).
 
 Najważniejsze pola:
+
 - `sellerNip`
 - `contextIdentifierType`, `contextIdentifierValue`
 - `certificateSerial`

@@ -157,8 +157,8 @@ const opened = await client.sessions.openBatchSession(
 
 for (const part of opened.partUploadRequests) {
   const headers = Object.fromEntries(
-    Object.entries(part.headers ?? {}).filter((entry): entry is [string, string] =>
-      typeof entry[1] === "string" && entry[1].length > 0,
+    Object.entries(part.headers ?? {}).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0,
     ),
   );
 

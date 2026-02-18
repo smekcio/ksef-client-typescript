@@ -71,9 +71,7 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
 
   const subjectType = (filters as Record<string, unknown>).subjectType;
   if (typeof subjectType !== "string" || subjectType.trim().length === 0) {
-    throw new KsefValidationError(
-      "Invoice query filters.subjectType must be a non-empty string.",
-    );
+    throw new KsefValidationError("Invoice query filters.subjectType must be a non-empty string.");
   }
 
   const dateRange = (filters as Record<string, unknown>).dateRange;
@@ -129,10 +127,7 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
   if (toDate.getTime() > maxAllowedToDate.getTime()) {
     throw new KsefValidationError(
       `Invoice query filters.dateRange cannot exceed ${MAX_DATE_RANGE_MONTHS} months.`,
-      [
-        `dateRange.from: ${fromText}`,
-        `dateRange.to: ${toText}`,
-      ],
+      [`dateRange.from: ${fromText}`, `dateRange.to: ${toText}`],
     );
   }
 }

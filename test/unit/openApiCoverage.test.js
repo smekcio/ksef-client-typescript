@@ -100,6 +100,10 @@ test("API clients cover all operations defined in OpenAPI spec", (t) => {
   const missing = [...specOperations].filter((item) => !clientOperations.has(item)).sort();
   const extra = [...clientOperations].filter((item) => !specOperations.has(item)).sort();
 
-  assert.deepEqual(missing, [], `Missing OpenAPI operations in TypeScript clients: ${missing.join(", ")}`);
+  assert.deepEqual(
+    missing,
+    [],
+    `Missing OpenAPI operations in TypeScript clients: ${missing.join(", ")}`,
+  );
   assert.deepEqual(extra, [], `Extra operations not present in OpenAPI spec: ${extra.join(", ")}`);
 });

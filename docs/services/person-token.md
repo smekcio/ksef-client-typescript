@@ -9,6 +9,7 @@ Parser nie weryfikuje podpisu JWT. Używaj go wyłącznie do diagnostyki/prezent
 ## `PersonTokenService.parse(jwtToken) -> PersonToken`
 
 Zwraca ujednoliconą strukturę m.in. z polami:
+
 - `issuer`, `audiences`
 - `issuedAt`, `expiresAt`
 - `roles`, `permissions`, `permissionsExcluded`, `permissionsEffective`

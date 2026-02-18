@@ -51,10 +51,7 @@ export class TestdataClient extends BaseClient {
     return this.post("/testdata/subject/remove", request);
   }
 
-  private async post<TResponse = TestdataResponse>(
-    path: string,
-    body: object,
-  ): Promise<TResponse> {
+  private async post<TResponse = TestdataResponse>(path: string, body: object): Promise<TResponse> {
     const token = await this.getAccessToken();
     return this.http.request<TResponse>({
       method: "POST",

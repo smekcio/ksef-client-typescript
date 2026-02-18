@@ -3,6 +3,7 @@
 `ksef-client-typescript` to biblioteka SDK dla Node.js i TypeScript, przeznaczona do integracji z API KSeF 2.0.
 
 SDK jest rozwijane równolegle z wersjami referencyjnymi dla innych języków i udostępnia:
+
 - cienką warstwę klientów API mapującą metody na endpointy KSeF,
 - gotowe workflow do uwierzytelniania, sesji online/batch oraz eksportu,
 - usługi pomocnicze (XAdES, kryptografia, linki weryfikacyjne, QR, parser tokenów osób).
@@ -48,6 +49,7 @@ npm install node-forge
 ## Quick start
 
 Minimalny przebieg integracji:
+
 1. uwierzytelnienie (np. token KSeF),
 2. wywołanie endpointu biznesowego.
 

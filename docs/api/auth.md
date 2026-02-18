@@ -104,10 +104,7 @@ console.log(status.status.code, status.authenticationMethodInfo.code);
 
 ```ts
 const refreshed = await client.auth.refreshAccessToken(currentRefreshToken);
-client.authManager.setAccessToken(
-  refreshed.accessToken.token,
-  refreshed.accessToken.validUntil,
-);
+client.authManager.setAccessToken(refreshed.accessToken.token, refreshed.accessToken.validUntil);
 ```
 
 ### Obsługa `KsefAuthStatusError` (np. HTTP 460)

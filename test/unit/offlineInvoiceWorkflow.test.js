@@ -3,10 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import {
-  KsefValidationError,
-  OfflineInvoiceWorkflow,
-} from "../../dist/index.js";
+import { KsefValidationError, OfflineInvoiceWorkflow } from "../../dist/index.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");

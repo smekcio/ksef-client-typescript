@@ -36,12 +36,12 @@ XAdES (wariant PKCS#12):
 
 ## Wymagane dane wejściowe (na skróty)
 
-| Scenariusz | Wymagane zmienne |
-| --- | --- |
-| Start tokenowy przez `connect(...)` | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie) |
-| Manualny auth tokenowy | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie) |
-| Auth XAdES (PEM) | `KSEF_XADES_CERT_PEM`, `KSEF_XADES_KEY_PEM`, `KSEF_NIP` (`KSEF_XADES_KEY_PASSWORD`, `KSEF_ENV` opcjonalnie) |
-| Auth XAdES (PKCS#12) | `KSEF_XADES_PKCS12_PATH`, `KSEF_NIP` (`KSEF_XADES_PKCS12_PASSWORD`, `KSEF_ENV` opcjonalnie) |
+| Scenariusz                          | Wymagane zmienne                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Start tokenowy przez `connect(...)` | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie)                                                           |
+| Manualny auth tokenowy              | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie)                                                           |
+| Auth XAdES (PEM)                    | `KSEF_XADES_CERT_PEM`, `KSEF_XADES_KEY_PEM`, `KSEF_NIP` (`KSEF_XADES_KEY_PASSWORD`, `KSEF_ENV` opcjonalnie) |
+| Auth XAdES (PKCS#12)                | `KSEF_XADES_PKCS12_PATH`, `KSEF_NIP` (`KSEF_XADES_PKCS12_PASSWORD`, `KSEF_ENV` opcjonalnie)                 |
 
 Przykłady 5-10 zakładają już ustawione tokeny (`client.authManager.setTokens(...)`) i dotyczą dalszych workflowów biznesowych (sesje, eksport, offline).
 

@@ -15,6 +15,7 @@ npm i qrcode
 - `toDataUrl(value, options?) -> Promise<string>`
 
 `options` (`QrCodeRenderOptions`):
+
 - `errorCorrectionLevel`: `"L" | "M" | "Q" | "H"`
 - `margin`
 - `width`

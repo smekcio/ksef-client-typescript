@@ -63,7 +63,8 @@ const OFFLINE_PROCEDURES: Record<OfflineInvoiceMode, OfflineProcedureInstruction
   awaryjny: {
     mode: "awaryjny",
     responsibility: "system KSeF",
-    sendDeadline: "do 7 dni roboczych od zakonczenia awarii (z resetem licznika przy kolejnej awarii)",
+    sendDeadline:
+      "do 7 dni roboczych od zakonczenia awarii (z resetem licznika przy kolejnej awarii)",
     legalBasis: "art. 106nf ustawy o VAT (od 1 II 2026)",
     operationalSteps: [
       "Wystaw fakture w trybie awaryjnym zgodnie z komunikatem MF/BIP.",

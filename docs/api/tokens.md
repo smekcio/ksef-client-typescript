@@ -31,9 +31,7 @@ const createRequest: KsefTokenRequest = {
 };
 
 const created = await client.tokens.generateToken(createRequest);
-const referenceNumber = String(
-  (created as { referenceNumber?: string }).referenceNumber ?? "",
-);
+const referenceNumber = String((created as { referenceNumber?: string }).referenceNumber ?? "");
 
 const status = await client.tokens.getToken(referenceNumber);
 console.log(status);

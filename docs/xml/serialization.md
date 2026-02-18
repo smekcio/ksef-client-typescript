@@ -30,7 +30,7 @@ Typy pomocnicze:
 ```ts
 import { buildXml, parseXml } from "ksef-client-typescript";
 
-const doc = parseXml("<Root><A>1</A><B test=\"x\">2</B></Root>");
+const doc = parseXml('<Root><A>1</A><B test="x">2</B></Root>');
 const xml = buildXml(doc);
 
 console.log(xml);

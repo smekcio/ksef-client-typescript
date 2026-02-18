@@ -6,12 +6,14 @@ Workflowy (`OnlineSessionWorkflow`, `BatchSessionWorkflow`, `InvoiceExportWorkfl
 ## Typy zwracane
 
 `EncryptionData`:
+
 - `cipherKey: Buffer` (32 bajty, losowy klucz AES)
 - `cipherIv: Buffer` (16 bajtów, losowy IV)
 - `encryptionInfo.encryptedSymmetricKey: string` (Base64)
 - `encryptionInfo.initializationVector: string` (Base64)
 
 `PreparedInvoicePayload`:
+
 - `invoiceHash: string` (SHA-256 Base64 oryginalnego XML)
 - `invoiceSize: number` (liczba bajtów oryginalnego XML)
 - `encryptedInvoiceHash: string` (SHA-256 Base64 zaszyfrowanych bajtów)
@@ -43,14 +45,14 @@ Obie metody używają `aes-256-cbc` (`crypto.createCipheriv` / `createDecipheriv
 
 ### `encryptKsefTokenRsa(token, timestampMs, publicCertificate): Buffer`
 
-- payload wejściowy: ``${token.trim()}|${timestampMs}`` zakodowany jako UTF-8;
+- payload wejściowy: `${token.trim()}|${timestampMs}` zakodowany jako UTF-8;
 - certyfikat przechodzi przez `normalizeCertificatePem(...)`;
 - szyfrowanie: `RSA_PKCS1_OAEP_PADDING` + `oaepHash: "sha256"`.
 
 ### `encryptKsefTokenEc(token, timestampMs, publicCertificate, outputFormat?): Buffer`
 
 - `outputFormat` domyślnie `"java"` (`"java" | "csharp"`);
-- payload wejściowy: ``${token.trim()}|${timestampMs}``;
+- payload wejściowy: `${token.trim()}|${timestampMs}`;
 - tworzony jest efemeryczny klucz EC `prime256v1`;
 - sekret ECDH: `crypto.diffieHellman(...)`;
 - klucz AES to pierwsze 32 bajty sekretu (`sharedSecret.subarray(0, 32)`);
@@ -79,6 +81,7 @@ Obie metody używają `aes-256-cbc` (`crypto.createCipheriv` / `createDecipheriv
 ## `getEncryptionData(publicCertBase64Der)`
 
 Parametr to certyfikat KSeF w Base64 DER. Metoda:
+
 1. generuje `cipherKey` (32B) i `cipherIv` (16B),
 2. konwertuje certyfikat do PEM (`toPemFromBase64Der`),
 3. szyfruje `cipherKey` przez RSA-OAEP SHA-256,

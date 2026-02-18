@@ -11,18 +11,18 @@ Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(.
 
 ## `KsefClientOptions`
 
-| Pole | Typ | Opis | Domyślnie |
-| --- | --- | --- | --- |
-| `baseUrl` | `string` | Pełny adres API, np. `https://api-demo.ksef.mf.gov.pl/v2`. | Brak |
-| `environment` | `"TEST" \| "DEMO" \| "PRD"` | Skrót środowiska zamiast `baseUrl`. | Brak |
-| `timeoutMs` | `number` | Timeout pojedynczego żądania HTTP. | `30000` |
-| `proxy` | `string` | Proxy HTTP(S), np. `http://127.0.0.1:8080`. | `HTTPS_PROXY` lub `HTTP_PROXY` |
-| `noProxy` | `string` | Lista hostów bez proxy (CSV), np. `localhost,mf.gov.pl`. | `NO_PROXY` |
-| `headers` | `Record<string, string>` | Dodatkowe nagłówki domyślne dla wszystkich żądań (także pre-signed URL). | `{}` |
-| `baseQrUrl` | `string` | Baza linków weryfikacyjnych QR. | mapowanie zależne od środowiska |
-| `retryOn429` | `boolean` | Czy ponawiać żądania po `429` dla metod idempotentnych. | `true` |
-| `maxRetryAttempts` | `number` | Maksymalna liczba prób żądania (łącznie z pierwszą). | `3` |
-| `maxRetryDelayMs` | `number` | Górny limit opóźnienia między próbami. | `10000` |
+| Pole               | Typ                         | Opis                                                                     | Domyślnie                       |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------ | ------------------------------- |
+| `baseUrl`          | `string`                    | Pełny adres API, np. `https://api-demo.ksef.mf.gov.pl/v2`.               | Brak                            |
+| `environment`      | `"TEST" \| "DEMO" \| "PRD"` | Skrót środowiska zamiast `baseUrl`.                                      | Brak                            |
+| `timeoutMs`        | `number`                    | Timeout pojedynczego żądania HTTP.                                       | `30000`                         |
+| `proxy`            | `string`                    | Proxy HTTP(S), np. `http://127.0.0.1:8080`.                              | `HTTPS_PROXY` lub `HTTP_PROXY`  |
+| `noProxy`          | `string`                    | Lista hostów bez proxy (CSV), np. `localhost,mf.gov.pl`.                 | `NO_PROXY`                      |
+| `headers`          | `Record<string, string>`    | Dodatkowe nagłówki domyślne dla wszystkich żądań (także pre-signed URL). | `{}`                            |
+| `baseQrUrl`        | `string`                    | Baza linków weryfikacyjnych QR.                                          | mapowanie zależne od środowiska |
+| `retryOn429`       | `boolean`                   | Czy ponawiać żądania po `429` dla metod idempotentnych.                  | `true`                          |
+| `maxRetryAttempts` | `number`                    | Maksymalna liczba prób żądania (łącznie z pierwszą).                     | `3`                             |
+| `maxRetryDelayMs`  | `number`                    | Górny limit opóźnienia między próbami.                                   | `10000`                         |
 
 ## Uwaga bezpieczeństwa: globalne `headers`
 
@@ -78,14 +78,14 @@ Przy własnym `baseUrl` bez `environment` domyślną bazą QR będzie adres dla 
 
 `KsefConnectOptions` zawiera wszystkie pola `KsefClientOptions` oraz:
 
-| Pole | Typ | Opis |
-| --- | --- | --- |
-| `token` | `string` | Token KSeF używany do inicjalizacji uwierzytelnienia. |
-| `context` | `ContextIdentifier` | Kontekst uwierzytelnienia, np. `{ type: "Nip", value: "5265877635" }`. |
-| `authorizationPolicy` | `AuthorizationPolicy` | Opcjonalna polityka IP przekazywana do `/auth/ksef-token`. |
-| `pollIntervalMs` | `number` | Interwał odpytywania statusu uwierzytelnienia. |
-| `maxAttempts` | `number` | Maksymalna liczba odpytań statusu uwierzytelnienia. |
-| `publicCertificateBase64Der` | `string` | Własny certyfikat publiczny KSeF do szyfrowania tokena. |
+| Pole                         | Typ                   | Opis                                                                   |
+| ---------------------------- | --------------------- | ---------------------------------------------------------------------- |
+| `token`                      | `string`              | Token KSeF używany do inicjalizacji uwierzytelnienia.                  |
+| `context`                    | `ContextIdentifier`   | Kontekst uwierzytelnienia, np. `{ type: "Nip", value: "5265877635" }`. |
+| `authorizationPolicy`        | `AuthorizationPolicy` | Opcjonalna polityka IP przekazywana do `/auth/ksef-token`.             |
+| `pollIntervalMs`             | `number`              | Interwał odpytywania statusu uwierzytelnienia.                         |
+| `maxAttempts`                | `number`              | Maksymalna liczba odpytań statusu uwierzytelnienia.                    |
+| `publicCertificateBase64Der` | `string`              | Własny certyfikat publiczny KSeF do szyfrowania tokena.                |
 
 ## Przykład konfiguracji klienta
 

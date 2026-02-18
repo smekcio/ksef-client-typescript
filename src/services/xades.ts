@@ -141,8 +141,7 @@ export class XadesSignatureService {
     const signedPropertiesId = options.signedPropertiesId ?? "SignedProperties";
 
     const signingTime =
-      options.signingTime ??
-      new Date(Date.now() + (options.signingTimeSkewMs ?? -60_000));
+      options.signingTime ?? new Date(Date.now() + (options.signingTimeSkewMs ?? -60_000));
 
     const { certificatePem, privateKey } = options.keyPair;
     const certificate = new crypto.X509Certificate(certificatePem);
@@ -227,8 +226,7 @@ export class XadesSignatureService {
     const objectDataId = `ObjectData-${crypto.randomUUID()}`;
 
     const signingTime =
-      options.signingTime ??
-      new Date(Date.now() + (options.signingTimeSkewMs ?? -60_000));
+      options.signingTime ?? new Date(Date.now() + (options.signingTimeSkewMs ?? -60_000));
 
     const { certificatePem, privateKey } = options.keyPair;
     const certificate = new crypto.X509Certificate(certificatePem);
@@ -413,7 +411,9 @@ function createQualifyingPropertiesNode(options: {
   issuerSerial.appendChild(issuerName);
 
   const serialNumber = options.doc.createElementNS(DS_NS, "ds:X509SerialNumber");
-  serialNumber.appendChild(options.doc.createTextNode(serialNumberDecimal(options.certificate.serialNumber)));
+  serialNumber.appendChild(
+    options.doc.createTextNode(serialNumberDecimal(options.certificate.serialNumber)),
+  );
   issuerSerial.appendChild(serialNumber);
 
   return qualifyingProps;
@@ -441,9 +441,10 @@ function parseIntoDocument(doc: XmlDocument, xml: string): XmlChildNode {
     throw new Error("Failed to parse XML fragment.");
   }
   // xmldom allows moving nodes between documents; clone to be safe.
-  const imported = typeof doc.importNode === "function"
-    ? doc.importNode(parsed.documentElement.firstChild, true)
-    : parsed.documentElement.firstChild.cloneNode(true);
+  const imported =
+    typeof doc.importNode === "function"
+      ? doc.importNode(parsed.documentElement.firstChild, true)
+      : parsed.documentElement.firstChild.cloneNode(true);
   return imported as XmlChildNode;
 }
 
@@ -507,7 +508,10 @@ function patchSignedXmlCreateReferences(sig: SignedXmlLike): void {
         for (const trans of ref.transforms || []) {
           const transform = this.findCanonicalizationAlgorithm(trans);
           res += `<${currentPrefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
-          if (Array.isArray(ref.inclusiveNamespacesPrefixList) && ref.inclusiveNamespacesPrefixList.length) {
+          if (
+            Array.isArray(ref.inclusiveNamespacesPrefixList) &&
+            ref.inclusiveNamespacesPrefixList.length
+          ) {
             res += ">";
             res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
               " ",
@@ -603,7 +607,8 @@ async function loadFromPkcs12(
     p12.getBags({ bagType: forgeAny.pki.oids.keyBag })[forgeAny.pki.oids.keyBag] ??
     [];
 
-  const certBags = p12.getBags({ bagType: forgeAny.pki.oids.certBag })[forgeAny.pki.oids.certBag] ?? [];
+  const certBags =
+    p12.getBags({ bagType: forgeAny.pki.oids.certBag })[forgeAny.pki.oids.certBag] ?? [];
 
   if (!keyBags.length) {
     throw new Error("PKCS#12 does not contain a private key.");
@@ -653,7 +658,9 @@ async function loadFromPkcs12(
 
       for (const cert of certCandidates) {
         const x509 = new crypto.X509Certificate(cert.certificatePem);
-        const pubFromCert = x509.publicKey.export({ type: "spki", format: "der" }).toString("base64");
+        const pubFromCert = x509.publicKey
+          .export({ type: "spki", format: "der" })
+          .toString("base64");
         if (pubFromCert === pubFromKey) {
           chosen = { privateKeyPem: key.privateKeyPem, certificatePem: cert.certificatePem };
           break;
@@ -693,9 +700,7 @@ function normalizeLocalKeyId(value: unknown): string | null {
 function buildCertificateChainPem(leafPem: string, allPem: string[]): string[] {
   const leaf = new crypto.X509Certificate(ensurePemCertificate(leafPem));
 
-  const certs = allPem
-    .map(ensurePemCertificate)
-    .map((pem) => new crypto.X509Certificate(pem));
+  const certs = allPem.map(ensurePemCertificate).map((pem) => new crypto.X509Certificate(pem));
 
   const bySubject = new Map<string, crypto.X509Certificate>();
   for (const c of certs) {

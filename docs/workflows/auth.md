@@ -192,10 +192,7 @@ Manualnie (gdy potrzebujesz):
 // `tokens` pochodzi z udanego auth (np. authenticateWithKsefToken / authenticateWithCertificate)
 const refreshToken = tokens.refreshToken.token;
 const refreshed = await client.auth.refreshAccessToken(refreshToken);
-client.authManager.setAccessToken(
-  refreshed.accessToken.token,
-  refreshed.accessToken.validUntil,
-);
+client.authManager.setAccessToken(refreshed.accessToken.token, refreshed.accessToken.validUntil);
 ```
 
 ## Budowanie XML do podpisu

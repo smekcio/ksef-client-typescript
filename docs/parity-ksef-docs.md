@@ -30,19 +30,19 @@ Data analizy: **2026-02-17**
 
 ## Weryfikacja parity endpointów
 
-| Moduł | OpenAPI | TS SDK | Status |
-| --- | --- | --- | --- |
-| Auth | 9 | 9/9 | OK |
-| Active Sessions | 3 | 3/3 | OK |
-| Sessions | 13 | 13/13 | OK |
-| Invoices | 4 | 4/4 | OK |
-| Permissions | 18 | 18/18 | OK |
-| Certificates | 7 | 7/7 | OK |
-| Tokens | 4 | 4/4 | OK |
-| Limits + rate-limits | 3 (+ testdata limits) | 3/3 (+ testdata) | OK |
-| Testdata | 17 | 17/17 | OK |
-| Security | 1 | 1/1 | OK |
-| Peppol | 1 | 1/1 | OK |
+| Moduł                | OpenAPI               | TS SDK           | Status |
+| -------------------- | --------------------- | ---------------- | ------ |
+| Auth                 | 9                     | 9/9              | OK     |
+| Active Sessions      | 3                     | 3/3              | OK     |
+| Sessions             | 13                    | 13/13            | OK     |
+| Invoices             | 4                     | 4/4              | OK     |
+| Permissions          | 18                    | 18/18            | OK     |
+| Certificates         | 7                     | 7/7              | OK     |
+| Tokens               | 4                     | 4/4              | OK     |
+| Limits + rate-limits | 3 (+ testdata limits) | 3/3 (+ testdata) | OK     |
+| Testdata             | 17                    | 17/17            | OK     |
+| Security             | 1                     | 1/1              | OK     |
+| Peppol               | 1                     | 1/1              | OK     |
 
 ## Parity funkcjonalny (TS vs Python)
 

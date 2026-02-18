@@ -225,9 +225,7 @@ export class HttpClient {
       if (status === 460) {
         const statusDetails = extractStatusDetails(payload);
         if (statusDetails && isSuspendedCertificateStatus(statusDetails)) {
-          const detailsSuffix = statusDetails.length
-            ? ` Details: ${statusDetails.join(", ")}`
-            : "";
+          const detailsSuffix = statusDetails.length ? ` Details: ${statusDetails.join(", ")}` : "";
           throw new KsefAuthStatusError(
             status,
             `Authentication failed with ${status}: certificate is suspended.${detailsSuffix}`,
@@ -273,8 +271,7 @@ function extractStatusDetails(payload: unknown): string[] | undefined {
 function isSuspendedCertificateStatus(details: string[]): boolean {
   return details.some((detail) => {
     const normalized = normalizeForMatch(detail);
-    const hasCertificate =
-      normalized.includes("certyfikat") || normalized.includes("certificate");
+    const hasCertificate = normalized.includes("certyfikat") || normalized.includes("certificate");
     const hasSuspended = normalized.includes("zawiesz") || normalized.includes("suspend");
     return hasCertificate && hasSuspended;
   });

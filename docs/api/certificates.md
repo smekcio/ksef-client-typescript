@@ -41,9 +41,7 @@ const request: CertificateEnrollmentRequest = {
 };
 
 const created = await client.certificates.createEnrollment(request);
-const referenceNumber = String(
-  (created as { referenceNumber?: string }).referenceNumber ?? "",
-);
+const referenceNumber = String((created as { referenceNumber?: string }).referenceNumber ?? "");
 
 let completed = false;
 for (let attempt = 0; attempt < 60; attempt += 1) {

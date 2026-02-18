@@ -61,7 +61,10 @@ export class PermissionsClient extends BaseClient {
     });
   }
 
-  async queryEntitiesRoles(pageOffset?: number, pageSize?: number): Promise<PermissionsListResponse> {
+  async queryEntitiesRoles(
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<PermissionsListResponse> {
     return this.getQuery("/permissions/query/entities/roles", {
       pageOffset,
       pageSize,
@@ -185,7 +188,10 @@ export class PermissionsClient extends BaseClient {
     });
   }
 
-  private async getQuery(path: string, paging?: PermissionsQueryPaging): Promise<PermissionsListResponse> {
+  private async getQuery(
+    path: string,
+    paging?: PermissionsQueryPaging,
+  ): Promise<PermissionsListResponse> {
     const token = await this.getAccessToken();
     const query =
       paging && (paging.pageOffset !== undefined || paging.pageSize !== undefined)

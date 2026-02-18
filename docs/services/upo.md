@@ -34,6 +34,7 @@ Ten typ jest używany przez workflowy sesji do czekania na UPO.
 6. Po przekroczeniu `maxAttempts` zwraca `null` (bez wyjątku).
 
 Uwagi z implementacji:
+
 - pobierana jest tylko pierwsza strona UPO (`pages[0]`);
 - brak backoff/jitter, interwał jest stały;
 - `status.code === 200` bez `pages[0]` nie kończy pętli, tylko czeka dalej.
@@ -47,6 +48,7 @@ Uwagi z implementacji:
 ## Integracja z offline workflow
 
 `OfflineInvoiceWorkflow`:
+
 - domyślnie czeka na UPO (`waitForUpo !== false`);
 - przekazuje `waitForUpoOptions` bez zmian do `session.waitForUpo(...)`;
 - zwraca jednocześnie surowe `upoXml` i sparsowane `upo`.

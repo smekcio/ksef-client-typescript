@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import {
-  KsefApiError,
-  KsefAuthStatusError,
-  KsefClient,
-} from "../../dist/index.js";
+import { KsefApiError, KsefAuthStatusError, KsefClient } from "../../dist/index.js";
 
 function startServer(responseBody) {
   return new Promise((resolve, reject) => {

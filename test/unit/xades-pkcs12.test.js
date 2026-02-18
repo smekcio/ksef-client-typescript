@@ -89,15 +89,19 @@ print(json.dumps({
   return JSON.parse(out);
 }
 
-test("XadesKeyPair.fromPkcs12 selects leaf cert and builds chain", { skip: !(await hasNodeForge()) }, async () => {
-  const bundle = generatePkcs12Bundle();
-  const pkcs12Bytes = Buffer.from(bundle.pkcs12Base64, "base64");
+test(
+  "XadesKeyPair.fromPkcs12 selects leaf cert and builds chain",
+  { skip: !(await hasNodeForge()) },
+  async () => {
+    const bundle = generatePkcs12Bundle();
+    const pkcs12Bytes = Buffer.from(bundle.pkcs12Base64, "base64");
 
-  const pair = await XadesKeyPair.fromPkcs12({ pkcs12Bytes });
+    const pair = await XadesKeyPair.fromPkcs12({ pkcs12Bytes });
 
-  assert.match(pair.certificatePem, /BEGIN CERTIFICATE/);
-  assert.match(new crypto.X509Certificate(pair.certificatePem).subject, /CN=Leaf/);
-  assert.ok(Array.isArray(pair.certificateChainPem));
-  assert.equal(pair.certificateChainPem.length, 1);
-  assert.match(new crypto.X509Certificate(pair.certificateChainPem[0]).subject, /CN=Root/);
-});
+    assert.match(pair.certificatePem, /BEGIN CERTIFICATE/);
+    assert.match(new crypto.X509Certificate(pair.certificatePem).subject, /CN=Leaf/);
+    assert.ok(Array.isArray(pair.certificateChainPem));
+    assert.equal(pair.certificateChainPem.length, 1);
+    assert.match(new crypto.X509Certificate(pair.certificateChainPem[0]).subject, /CN=Root/);
+  },
+);

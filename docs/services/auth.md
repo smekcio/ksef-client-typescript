@@ -7,6 +7,7 @@ W typowych scenariuszach używaj `client.workflows.auth` (klasa `AuthCoordinator
 Buduje XML `AuthTokenRequest` do podpisu XAdES.
 
 Najważniejsze pola:
+
 - `challenge`: z `client.auth.getChallenge()`
 - `contextIdentifierType`: `"Nip" | "InternalId" | "NipVatUe" | "PeppolId"` (funkcja akceptuje też warianty case-insensitive, np. `"nip"`)
 - `contextIdentifierValue`: wartość identyfikatora kontekstu (np. NIP)
@@ -31,6 +32,7 @@ const xml = buildAuthTokenRequestXml({
 Szyfruje payload `"{token}|{timestampMs}"` i zwraca Base64 (standardowe, nie Base64Url).
 
 Parametry:
+
 - `token`: token KSeF
 - `timestampMs`: zwykle z `challenge.timestampMs`
 - `publicCertificate`: certyfikat KSeF `KsefTokenEncryption` (PEM albo Base64 DER)
@@ -40,6 +42,7 @@ Parametry:
 ## `AuthCoordinator.authenticateWithKsefToken(options)`
 
 Scenariusz:
+
 1. `GET /auth/challenge`
 2. szyfrowanie tokena (`token|timestampMs`)
 3. `POST /auth/ksef-token`

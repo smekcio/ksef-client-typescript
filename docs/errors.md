@@ -4,15 +4,15 @@ SDK mapuje błędy HTTP i błędy walidacji na dedykowane klasy wyjątków.
 
 ## Typy błędów
 
-| Klasa | Kiedy występuje | Najważniejsze pola |
-| --- | --- | --- |
-| `KsefError` | Bazowy błąd SDK (np. błędy workflow). | `message` |
-| `KsefHttpError` | Odpowiedź HTTP >= 400 bez JSON. | `statusCode`, `responseBody` |
-| `KsefApiError` | Odpowiedź HTTP >= 400 z JSON. | `statusCode`, `responseBody` |
-| `KsefRateLimitError` | `429 Too Many Requests`. | `statusCode`, `responseBody`, `retryAfter` |
-| `KsefAuthStatusError` | Specjalny przypadek `460` (status auth wskazujący m.in. zawieszony certyfikat). | `statusCode`, `responseBody`, `statusDetails` |
-| `KsefSessionExpiredError` | Brak tokena dostępowego lub nieudane odświeżenie sesji. | `message` |
-| `KsefValidationError` | Błąd lokalnej walidacji danych wejściowych. | `message`, `details` |
+| Klasa                     | Kiedy występuje                                                                 | Najważniejsze pola                            |
+| ------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------- |
+| `KsefError`               | Bazowy błąd SDK (np. błędy workflow).                                           | `message`                                     |
+| `KsefHttpError`           | Odpowiedź HTTP >= 400 bez JSON.                                                 | `statusCode`, `responseBody`                  |
+| `KsefApiError`            | Odpowiedź HTTP >= 400 z JSON.                                                   | `statusCode`, `responseBody`                  |
+| `KsefRateLimitError`      | `429 Too Many Requests`.                                                        | `statusCode`, `responseBody`, `retryAfter`    |
+| `KsefAuthStatusError`     | Specjalny przypadek `460` (status auth wskazujący m.in. zawieszony certyfikat). | `statusCode`, `responseBody`, `statusDetails` |
+| `KsefSessionExpiredError` | Brak tokena dostępowego lub nieudane odświeżenie sesji.                         | `message`                                     |
+| `KsefValidationError`     | Błąd lokalnej walidacji danych wejściowych.                                     | `message`, `details`                          |
 
 ## Przykład obsługi `429` i `Retry-After`
 
@@ -73,6 +73,7 @@ Domyślnie biblioteka ponawia żądania tylko dla metod idempotentnych:
 - `DELETE`
 
 Mechanizm retry:
+
 - respektuje nagłówek `Retry-After` (sekundy lub data HTTP),
 - gdy nagłówek nie występuje, stosuje opóźnienie wykładnicze z jitterem,
 - ogranicza opóźnienie przez `maxRetryDelayMs`.

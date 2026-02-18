@@ -9,7 +9,10 @@ test("QrCodeService renders PNG/SVG/DataURL when qrcode dependency is present", 
   try {
     await import("qrcode");
   } catch {
-    await assert.rejects(() => service.toDataUrl("https://ksef.mf.gov.pl"), /Optional dependency "qrcode"/);
+    await assert.rejects(
+      () => service.toDataUrl("https://ksef.mf.gov.pl"),
+      /Optional dependency "qrcode"/,
+    );
     return;
   }
 

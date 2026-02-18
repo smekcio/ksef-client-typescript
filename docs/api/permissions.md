@@ -42,9 +42,7 @@ const request: PermissionsGrantRequest = {
 };
 
 const operation = await client.permissions.grantPersons(request);
-const referenceNumber = String(
-  (operation as { referenceNumber?: string }).referenceNumber ?? "",
-);
+const referenceNumber = String((operation as { referenceNumber?: string }).referenceNumber ?? "");
 
 let completed = false;
 for (let attempt = 0; attempt < 60; attempt += 1) {

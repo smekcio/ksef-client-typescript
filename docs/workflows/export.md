@@ -26,11 +26,13 @@ W SDK odpowiadają za to:
 ## Full vs incremental
 
 `InvoiceExportWorkflow` (full/manual):
+
 - uruchamiasz pojedynczy eksport dla jednego `filters`,
 - samodzielnie kontrolujesz pętlę, retry i granice okna czasowego,
 - użyteczne, gdy potrzebujesz jednorazowego pobrania paczki albo pełnej kontroli nad przebiegiem.
 
 `IncrementalExportWorkflow`:
+
 - uruchamia wiele kolejnych eksportów w pętli,
 - po każdej paczce aktualizuje `continuationPoints` po `subjectType`,
 - deduplikuje metadane po `ksefNumber`/`KsefNumber`,
@@ -165,12 +167,14 @@ console.log(result.referenceNumbers);
 ```
 
 `filtersFactory(from, to)` dostaje:
+
 - `from`: efektywny start okna (`continuationPoints[subjectType]` albo `windowFrom`),
 - `to`: bieżące `windowTo` przekazane do `run(...)`.
 
 To pozwala dynamicznie budować filtry per iteracja, np. zmieniać `dateType` albo dodatkowe pola filtra bez przepisywania pętli eksportu.
 
 Jeśli `filtersFactory` nie jest podane, workflow używa domyślnego filtra:
+
 - `subjectType` z opcji `run(...)`,
 - `dateRange.dateType = "PermanentStorage"`,
 - `dateRange.from = effectiveFrom`,

@@ -29,21 +29,25 @@ Dostęp: `client.workflows.sessions.online`.
 ## Kiedy używać `upoV43`, `offlineMode`, `hashOfCorrectedInvoice`
 
 `upoV43`:
+
 - ustawiasz tylko przy `open(...)`,
 - SDK doda nagłówek `X-KSeF-Feature: upo-v4-3` do otwarcia sesji,
 - używaj, gdy po stronie integracji chcesz jawnie negocjować wariant UPO v4.3.
 
 `offlineMode`:
+
 - ustawiasz per dokument w `sendInvoice(...)`,
 - używaj dla dokumentów wysyłanych w procedurze offline (np. po okresie niedostępności, zgodnie z procesem biznesowym firmy),
 - w standardowym scenariuszu online zwykle pozostaje `undefined`/`false`.
 
 `hashOfCorrectedInvoice`:
+
 - stosuj przy technicznej korekcie dokumentu wysłanego w trybie offline,
 - wartość to hash (Base64 SHA-256) dokumentu, który korygujesz,
 - praktycznie powinno iść razem z `offlineMode: true`.
 
 Uwagi implementacyjne:
+
 - w `OnlineSessionWorkflow` pole `hashOfCorrectedInvoice` jest dodawane do requestu tylko gdy ma niepustą wartość,
 - jeśli potrzebujesz wymuszonej walidacji tego pola (niepusty hash), użyj dedykowanego [workflow offline](offline.md), który to egzekwuje.
 

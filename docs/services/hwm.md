@@ -1,6 +1,7 @@
 # HWM i deduplikacja (`hwmCoordinator`)
 
 W eksporcie przyrostowym najczęściej pojawiają się trzy tematy:
+
 - continuation points (HWM)
 - paczki obcięte (`isTruncated`)
 - duplikaty między oknami czasowymi
@@ -8,6 +9,7 @@ W eksporcie przyrostowym najczęściej pojawiają się trzy tematy:
 ## `updateContinuationPoint(continuationPoints, subjectType, packageInfo)`
 
 Aktualizuje punkt kontynuacji na podstawie danych paczki:
+
 - jeśli `isTruncated === true` i jest `lastPermanentStorageDate` -> zapisuje `lastPermanentStorageDate`
 - w przeciwnym razie, jeśli jest `permanentStorageHwmDate` -> zapisuje `permanentStorageHwmDate`
 - jeśli brak sensownego punktu -> usuwa wpis dla `subjectType`
@@ -15,6 +17,7 @@ Aktualizuje punkt kontynuacji na podstawie danych paczki:
 ## `getEffectiveStartDate(continuationPoints, subjectType, windowFrom) -> string`
 
 Zwraca:
+
 - `continuationPoints[subjectType]`, jeśli istnieje
 - w przeciwnym razie `windowFrom`
 
