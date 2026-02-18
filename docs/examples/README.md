@@ -14,8 +14,8 @@ Przykłady zakładają uruchamianie z katalogu `ksef-client-typescript`.
 Podstawowe:
 
 - `KSEF_ENV` - `TEST`, `DEMO` albo `PRD` (domyślnie `DEMO`)
-- `KSEF_NIP` - NIP kontekstu (np. `5265877635`)
-- `KSEF_TOKEN` - token KSeF (systemowy)
+- `KSEF_NIP` - NIP kontekstu przekazywanego w `context: { type: "Nip", value: ... }` (np. `5265877635`)
+- `KSEF_TOKEN` - token KSeF (systemowy), wymagany dla logowania tokenowego (`connect(...)` i manualny auth tokenowy)
 
 XAdES (wariant PEM):
 
@@ -27,6 +27,23 @@ XAdES (wariant PKCS#12):
 
 - `KSEF_XADES_PKCS12_PATH` - ścieżka do `.p12` / `.pfx`
 - `KSEF_XADES_PKCS12_PASSWORD` - hasło do kontenera (opcjonalnie)
+
+## Kiedy `connect(...)`, a kiedy manualny workflow auth
+
+- Użyj `KsefClient.connect(...)`, gdy chcesz najszybszy start z tokenem KSeF: jedna operacja wykonuje tokenowy workflow auth i od razu zapisuje tokeny w `authManager`.
+- Użyj manualnego workflow (`new KsefClient(...)` + `client.workflows.auth.*`), gdy potrzebujesz pełnej kontroli nad sposobem logowania (np. XAdES/certyfikat), cyklem życia tokenów albo własną orkiestracją kroków.
+- `connect(...)` dotyczy ścieżki tokenowej. Dla XAdES/certyfikatu wybieraj manualny workflow auth.
+
+## Wymagane dane wejściowe (na skróty)
+
+| Scenariusz | Wymagane zmienne |
+| --- | --- |
+| Start tokenowy przez `connect(...)` | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie) |
+| Manualny auth tokenowy | `KSEF_TOKEN`, `KSEF_NIP` (`KSEF_ENV` opcjonalnie) |
+| Auth XAdES (PEM) | `KSEF_XADES_CERT_PEM`, `KSEF_XADES_KEY_PEM`, `KSEF_NIP` (`KSEF_XADES_KEY_PASSWORD`, `KSEF_ENV` opcjonalnie) |
+| Auth XAdES (PKCS#12) | `KSEF_XADES_PKCS12_PATH`, `KSEF_NIP` (`KSEF_XADES_PKCS12_PASSWORD`, `KSEF_ENV` opcjonalnie) |
+
+Przykłady 5-10 zakładają już ustawione tokeny (`client.authManager.setTokens(...)`) i dotyczą dalszych workflowów biznesowych (sesje, eksport, offline).
 
 ## Szkielet startowy
 
@@ -126,7 +143,7 @@ Uwaga: wariant PKCS#12 wymaga opcjonalnej zależności `node-forge`.
 
 Poniższe przykłady (5-10) zakładają, że masz już uwierzytelniony obiekt `client`.
 
-## 5) Sesja online: open -> send -> close -> UPO
+## 5) Sesja interaktywna (online): open -> send -> close -> UPO
 
 ```ts
 const session = await client.workflows.sessions.online.open({
@@ -140,7 +157,7 @@ const upoXml = await session.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 
 console.log(send.referenceNumber, Boolean(upoXml));
 ```
 
-## 6) Sesja batch: `openUploadAndClose(...)` + UPO
+## 6) Sesja wsadowa (batch): `openUploadAndClose(...)` + UPO
 
 ```ts
 const batch = await client.workflows.sessions.batch.openUploadAndClose({
@@ -225,6 +242,6 @@ await client.testdata.unblockContext({
 
 ## Dalsza dokumentacja
 
-- Workflowy: [../workflows/README.md](../workflows/README.md)
+- Workflowy i scenariusze: [../workflows/README.md](../workflows/README.md)
 - API reference: [../api/README.md](../api/README.md)
 - Błędy i retry: [../errors.md](../errors.md)

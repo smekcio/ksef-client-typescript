@@ -14,6 +14,7 @@ Niskopoziomowy klient dla endpointów `/invoices/*`.
 - `getInvoice(...)` zwraca XML faktury jako `string`.
 - `exportInvoices(...)` obsługuje opcjonalne `includeMetadata`. Gdy ustawisz `includeMetadata: true`, SDK dodaje nagłówek `X-KSeF-Feature: include-metadata` (potwierdzone testami jednostkowymi).
 - `queryInvoiceMetadata(...)` i `exportInvoices(...)` wykonują lokalną walidację `filters` przed wywołaniem HTTP.
+- Ten klient nie ma osobnej metody pobrania partów eksportu. Dane potrzebne do pobrania (`package.parts[]`, w tym `url` i `method`) pochodzą z `getInvoiceExportStatus(referenceNumber)`.
 
 ## Walidacja `dateRange` (lokalna, przed HTTP)
 
@@ -130,5 +131,12 @@ await client.invoices.queryInvoiceMetadata({
 });
 ```
 
-Pełny scenariusz eksportu (pobranie części, deszyfrowanie, rozpakowanie) opisuje:
-[../workflows/export.md](../workflows/export.md).
+## Pobieranie partów eksportu
+
+Po uzyskaniu statusu zakończonego eksportu (`status.code = 200`) części paczki pobiera się po URL-ach zwróconych
+w `status.package.parts[]` (pre-signed URL, bez dodatkowego endpointu w `client.invoices`).
+
+Jeżeli chcesz użyć gotowego scenariusza zamiast ręcznej obsługi URL-i, skorzystaj z workflow:
+
+- [../workflows/export.md](../workflows/export.md) (`client.workflows.exports.*`, `client.workflows.exportsIncremental.run(...)`)
+- [../services/workflows.md](../services/workflows.md) (opis usług workflow dostępnych w `client.workflows`)

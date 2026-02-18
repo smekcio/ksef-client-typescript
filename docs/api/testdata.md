@@ -22,6 +22,18 @@ Endpointy testdata są przeznaczone dla środowisk testowych (`TEST` i `DEMO`) d
 - Wszystkie metody tego klienta używają `accessToken`.
 - `blockContext(...)` i `unblockContext(...)` przyjmują `contextIdentifier`.
 - Dozwolone typy `contextIdentifier.type` to: `Nip`, `InternalId`, `NipVatUe`, `PeppolId`.
+- Operacje na endpointach `/testdata/limits/*` oraz `/testdata/rate-limits*` nie są realizowane przez `client.testdata`; obsługuje je `client.limits`.
+
+## Operacje limit/rate-limit (klient `limits`)
+
+W scenariuszach testowych, w których trzeba zmienić limity lub rate-limity, użyj metod klienta `limits`:
+
+- `client.limits.changeContextSessionLimits(request)` / `client.limits.restoreContextSessionLimits()`
+- `client.limits.changeSubjectCertificateLimits(request)` / `client.limits.restoreSubjectCertificateLimits()`
+- `client.limits.changeRateLimits(request)` / `client.limits.restoreRateLimits()`
+- `client.limits.setRateLimitsProduction(request)`
+
+Szczegóły i przykłady: [limits.md](limits.md).
 
 ## Przykłady TypeScript
 

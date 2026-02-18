@@ -23,6 +23,21 @@ W SDK odpowiadają za to:
 
 - `run(options)`
 
+## Full vs incremental
+
+`InvoiceExportWorkflow` (full/manual):
+- uruchamiasz pojedynczy eksport dla jednego `filters`,
+- samodzielnie kontrolujesz pętlę, retry i granice okna czasowego,
+- użyteczne, gdy potrzebujesz jednorazowego pobrania paczki albo pełnej kontroli nad przebiegiem.
+
+`IncrementalExportWorkflow`:
+- uruchamia wiele kolejnych eksportów w pętli,
+- po każdej paczce aktualizuje `continuationPoints` po `subjectType`,
+- deduplikuje metadane po `ksefNumber`/`KsefNumber`,
+- kończy, gdy kolejne `effectiveFrom` nie przesuwa się dalej albo osiągnie `maxIterations`.
+
+W praktyce: full to "pojedyncza paczka", incremental to "ciągłe domykanie okna" przy dużych zbiorach i sytuacjach `isTruncated=true`.
+
 ## `startExport(options)` - opcje
 
 - `filters` (wymagane)
@@ -36,11 +51,17 @@ Gdy nie podasz `encryptionData` ani `publicCertificateBase64Der`, workflow sam p
 
 Walidacja uruchamia się lokalnie przed requestem.
 
+- `filters` musi być obiektem.
 - `subjectType` musi być niepustym stringiem.
-- `dateRange.from` i `dateRange.to` muszą być poprawnym ISO date/date-time.
-- `to` może być puste (`undefined`/`null`) - wtedy SDK przyjmuje aktualny czas UTC.
+- `dateRange` jest wymaganym obiektem.
+- `dateRange.dateType` musi być niepustym stringiem.
+- `dateRange.from` musi być poprawnym ISO `YYYY-MM-DD` albo ISO date-time.
+- `dateRange.to` może być `undefined`/`null`; jeśli nie podasz, SDK przyjmie bieżący czas UTC.
+- jeśli `dateRange.to` jest podane, też musi być poprawnym ISO date/date-time.
 - `to` nie może być mniejsze od `from`.
-- zakres nie może przekraczać 3 miesięcy.
+- maksymalny zakres to 3 miesiące (liczone kalendarzowo, z clampem dni miesiąca).
+
+Szczegół praktyczny: dla `YYYY-MM-DD` SDK parsuje datę jako UTC `00:00:00`, więc porównania zakresu są deterministyczne między strefami czasowymi.
 
 ## Przykład 1: pełny eksport paczki
 
@@ -142,6 +163,20 @@ const result = await client.workflows.exportsIncremental.run({
 
 console.log(result.referenceNumbers);
 ```
+
+`filtersFactory(from, to)` dostaje:
+- `from`: efektywny start okna (`continuationPoints[subjectType]` albo `windowFrom`),
+- `to`: bieżące `windowTo` przekazane do `run(...)`.
+
+To pozwala dynamicznie budować filtry per iteracja, np. zmieniać `dateType` albo dodatkowe pola filtra bez przepisywania pętli eksportu.
+
+Jeśli `filtersFactory` nie jest podane, workflow używa domyślnego filtra:
+- `subjectType` z opcji `run(...)`,
+- `dateRange.dateType = "PermanentStorage"`,
+- `dateRange.from = effectiveFrom`,
+- `dateRange.to = windowTo`.
+
+Wymaganie: obiekt zwrócony z `filtersFactory` musi przejść tę samą walidację co w `startExport(...)` (`validateInvoiceQueryFilters`).
 
 ## Przykład 5: obsługa błędu walidacji `dateRange`
 

@@ -103,6 +103,32 @@ const processed = await client.workflows.exports.downloadAndProcessPackage(
 console.log(processed.metadataSummaries.length, Object.keys(processed.invoiceXmlFiles).length);
 ```
 
+Wynik `downloadAndProcessPackage(...)` ma strukturę:
+
+```ts
+interface PackageProcessingResult {
+  metadataSummaries: Array<Record<string, unknown>>;
+  invoiceXmlFiles: Record<string, string>;
+}
+```
+
+Znaczenie pól:
+- `metadataSummaries`: rekordy z `_metadata.json` (SDK obsługuje zarówno `invoices`, jak i `invoiceList`).
+- `invoiceXmlFiles`: mapa `nazwa_pliku.xml -> XML` po odszyfrowaniu i rozpakowaniu archiwum.
+
+`verifyHashes` (domyślnie `false`) działa na etapie pobierania partów:
+- dla każdego partu liczony jest `sha256Base64(data)` i porównywany z `part.encryptedPartHash`,
+- przy niezgodności workflow rzuca błąd i nie przechodzi do odszyfrowania/scalenia.
+
+Kiedy używać `verifyHashes: true`:
+- środowiska produkcyjne z wysokim wymaganiem integralności danych,
+- transfer przez infrastrukturę, której nie kontrolujesz end-to-end,
+- procesy audytowe/compliance, gdzie chcesz jawnie potwierdzić zgodność partów.
+
+Kiedy zostawić `verifyHashes: false`:
+- kontrolowane środowiska wewnętrzne i duże wolumeny, gdy kluczowa jest wydajność,
+- sytuacje, gdzie dodatkowy koszt hashowania partów jest nieakceptowalny czasowo.
+
 ## `IncrementalExportWorkflow`
 
 `run(options)` wykonuje wielokrotne okna eksportu i automatycznie:

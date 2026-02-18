@@ -16,6 +16,7 @@ Spis stron:
 - [Workflows i scenariusze](workflows.md)
 - [Auth (XML i proces uwierzytelnienia)](auth.md)
 - [Kryptografia i metadane](crypto.md)
+- [UPO i polling](upo.md)
 - [Batch (podział, szyfrowanie, upload)](batch.md)
 - [XAdES](xades.md)
 - [CSR](csr.md)

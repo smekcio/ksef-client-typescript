@@ -20,6 +20,20 @@ Niskopoziomowy klient dla `/limits/*`, `/rate-limits` oraz testowych endpointów
 - `getContextLimits`, `getSubjectLimits` i `getRateLimits` służą do odczytu aktualnych limitów.
 - Metody `change*` / `restore*` operują na endpointach testdata i są przeznaczone głównie do scenariuszy testowych.
 - Po zakończeniu testów warto przywrócić limity metodami `restore*`.
+- `getRateLimits()` odczytuje bieżące limity z `/rate-limits`.
+- `changeRateLimits(request)` i `restoreRateLimits()` modyfikują/przywracają limity testowe przez `/testdata/rate-limits`.
+- `setRateLimitsProduction(request)` ustawia wartości przez `/testdata/rate-limits/production`.
+
+## Rate-limits w scenariuszach testdata
+
+Scenariusze przygotowania danych testowych mogą łączyć `client.testdata.*` z czasową zmianą limitów przez `client.limits.*`.
+Przykładowa sekwencja:
+
+1. ustawienie limitów testowych (`changeRateLimits(...)`),
+2. wykonanie operacji testdata (`createSubject(...)`, `createPerson(...)`, `grantPermissions(...)`),
+3. przywrócenie limitów (`restoreRateLimits()`).
+
+Powiązane operacje testdata: [testdata.md](testdata.md).
 
 ## Przykłady TypeScript
 

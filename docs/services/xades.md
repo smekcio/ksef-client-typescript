@@ -2,6 +2,13 @@
 
 Usługi XAdES służą do podpisywania `AuthTokenRequest` zgodnie z wymaganiami KSeF.
 
+## Wymagania środowiskowe i zależności
+
+- runtime: Node.js (w pakiecie ustawione `engines.node: >=20`);
+- używane biblioteki: `@xmldom/xmldom`, `xml-crypto`, `xpath`;
+- dla `.p12`/`.pfx` wymagane jest opcjonalne `node-forge` (tylko metody `fromPkcs12*`);
+- wykorzystywane są natywne moduły `node:crypto` i `node:fs`.
+
 ## `XadesKeyPair`
 
 Klasa porządkuje pracę z certyfikatem i kluczem prywatnym.
@@ -79,6 +86,48 @@ const keyPair = XadesKeyPair.fromPem({
 const signedXml = new XadesSignatureService().signXadesEnveloped({ xml, keyPair });
 console.log(signedXml.length);
 ```
+
+## Ważne zachowania z implementacji
+
+- Algorytm podpisu jest dobierany z klucza publicznego certyfikatu:
+  - RSA -> `...#rsa-sha256`
+  - EC -> `...#ecdsa-sha256`
+- Domyślny `signingTime` to `now + signingTimeSkewMs`, gdzie `signingTimeSkewMs` domyślnie wynosi `-60000` ms.
+- W `signXadesEnveloped` referencja do danych podpisywanych celuje w `/*[local-name()='AuthTokenRequest']`.
+- Kod patchuje runtime `SignedXml.createReferences`, aby emitować `Reference/@Type` dla `SignedProperties` (wymaganie XAdES).
+- Dla ECDSA dodawana jest implementacja `ecdsa-sha256` jeśli biblioteka bazowa jej nie udostępnia.
+
+## Typowe tryby błędów i diagnostyka
+
+`Unsupported key type for XAdES: ...`
+- Skąd: certyfikat nie ma klucza `rsa` ani `ec`.
+- Sprawdź: typ klucza w certyfikacie i zgodność z `privateKey`.
+
+`Invalid XML: missing document element.`
+- Skąd: przekazany XML nie parsuje się do dokumentu z rootem.
+- Sprawdź: czy wejście to pełny dokument XML, nie fragment.
+
+`the following xpath cannot be signed because it was not found: ...`
+- Skąd: brak węzła pasującego do XPath referencji.
+- Sprawdź: czy XML zawiera `AuthTokenRequest`; przy customowym `signedPropertiesId` sprawdź spójność identyfikatora.
+
+`Failed to create SignedInfo node.` / `Failed to parse XML fragment.`
+- Skąd: problem z budową/parsowaniem fragmentów XML podpisu.
+- Sprawdź: poprawność wejściowego XML i namespace.
+
+`Unable to load private key (unsupported format or wrong password).`
+- Skąd: nie udało się zdekodować klucza prywatnego (PEM/DER, typ, hasło).
+- Sprawdź: format pliku klucza i hasło przekazywane do `fromPemFiles`.
+
+`PKCS#12 (.p12/.pfx) support requires optional dependency 'node-forge'.`
+- Skąd: użyto `fromPkcs12` / `fromPkcs12File` bez `node-forge`.
+- Sprawdź: instalację zależności (`npm i node-forge`).
+
+`PKCS#12 does not contain a private key.`
+`PKCS#12 does not contain a certificate.`
+`PKCS#12 does not contain a matching private key and certificate.`
+- Skąd: niepoprawna zawartość kontenera PKCS#12.
+- Sprawdź: czy kontener zawiera parę klucz+certyfikat oraz poprawne hasło.
 
 ## Integracja z workflow auth
 

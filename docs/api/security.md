@@ -9,9 +9,12 @@ Niskopoziomowy klient dla endpointu `/security/public-key-certificates`.
 ## Najważniejsze informacje
 
 - Endpoint nie wymaga `accessToken`.
+- SDK nie udostępnia metody `getPublicKeyPem()`; w `client.security` dostępne jest tylko `getPublicKeyCertificates()`.
 - Certyfikaty zwracają pole `usage`.
+- Pole `certificate` jest używane w SDK jako `publicCertificateBase64Der`.
 - `KsefTokenEncryption` służy do szyfrowania tokena KSeF.
 - `SymmetricKeyEncryption` służy do szyfrowania danych sesji online/batch i eksportu.
+- Jeśli potrzebujesz PEM, wykonaj konwersję lokalnie (np. `CryptographyService.toPemFromBase64Der(...)`).
 
 ## Przykłady TypeScript
 

@@ -1,10 +1,15 @@
 # KSeF TypeScript SDK – dokumentacja
 
-Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz gotowe scenariusze (workflow) dla najczęstszych procesów: uwierzytelniania, sesji wysyłkowych i eksportu faktur.
+Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz gotowe workflowy dla najczęstszych procesów: uwierzytelniania, sesji wysyłkowych i eksportu faktur.
 
 Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w `ksef-docs/`.
 
 Kompatybilność SDK: **KSeF API `v2.1.1`**.
+
+## Status parity
+
+Aktualny status zgodności SDK względem `ksef-docs` i `ksef-client-python` znajdziesz w raporcie:
+[parity-ksef-docs.md](parity-ksef-docs.md).
 
 ## Wymagania
 
@@ -31,7 +36,7 @@ npm run build
 Biblioteka udostępnia dwa poziomy użycia:
 
 1. **Klienci API (cienka warstwa)** – `KsefClient` i podklienci (`client.auth`, `client.sessions`, `client.invoices`, ...). Metody odpowiadają endpointom KSeF i zwracają odpowiedzi typowane.
-2. **Workflow i usługi** – `client.workflows.*` oraz usługi pomocnicze (`client.verificationLinks`, `client.qr`, `client.personToken`). Ta warstwa łączy wiele wywołań API z operacjami lokalnymi (szyfrowanie, podpis, ZIP).
+2. **Workflowy i usługi** – `client.workflows.*` oraz usługi pomocnicze (`client.verificationLinks`, `client.qr`, `client.personToken`). Ta warstwa łączy wiele wywołań API z operacjami lokalnymi (szyfrowanie, podpis, ZIP).
 
 ## Nawigacja
 
@@ -49,7 +54,7 @@ Biblioteka udostępnia dwa poziomy użycia:
 - [`client.permissions`](api/permissions.md)
 - [`client.certificates`](api/certificates.md)
 - [`client.tokens`](api/tokens.md)
-- [`client.limits`](api/limits.md)
+- [`client.limits` (limits + rate limits)](api/limits.md)
 - [`client.security`](api/security.md)
 - [`client.testdata`](api/testdata.md)
 - [`client.peppol`](api/peppol.md)

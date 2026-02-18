@@ -1,6 +1,7 @@
 # Aktywne sesje (`activeSessions`)
 
 Niskopoziomowy klient dla endpointów `/auth/sessions`.
+Dotyczy sesji uwierzytelnienia; nie dotyczy sesji fakturowych z [`sessions.md`](sessions.md).
 
 ## Dostępne metody
 
@@ -10,9 +11,13 @@ Niskopoziomowy klient dla endpointów `/auth/sessions`.
 
 ## Najważniejsze informacje
 
-- Wszystkie metody wymagają aktywnego `accessToken`.
+- Wszystkie metody wymagają aktywnego `accessToken` (np. po `auth.redeemToken(...)` i `client.authManager.setTokens(...)`).
+- Ten klient jest rozszerzeniem cyklu uwierzytelniania z [`auth.md`](auth.md): służy do przeglądu i unieważniania sesji po udanym logowaniu.
+- `listActiveSessions(...)` zwraca `AuthenticationListResponse`.
+- `revokeCurrentSession()` unieważnia bieżącą sesję uwierzytelnienia powiązaną z użytym tokenem.
+- `revokeSession(referenceNumber)` unieważnia wskazaną sesję z listy aktywnych sesji.
+- `refreshAccessToken(...)` z `client.auth` utrzymuje dostęp do tych endpointów, ale nie zastępuje operacji `revoke*`.
 - Stronicowanie działa przez nagłówek `x-continuation-token`.
-- `listActiveSessions` zwraca `AuthenticationListResponse`.
 - Pole `authenticationMethod` jest oznaczone jako przestarzałe; używaj `authenticationMethodInfo`.
 
 ## Przykłady TypeScript
