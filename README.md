@@ -1,24 +1,26 @@
 # KSeF Client (TypeScript)
 
-`ksef-client-typescript` to biblioteka SDK dla Node.js i TypeScript, przeznaczona do integracji z API KSeF 2.0.
+`ksef-client-typescript` jest repozytorium biblioteki (SDK) publikowanej na npm jako **`ksef-client`**.
 
-SDK jest rozwijane równolegle z wersjami referencyjnymi dla innych języków i udostępnia:
+## ✅ Funkcjonalności
+
+Biblioteka udostępnia:
 
 - cienką warstwę klientów API mapującą metody na endpointy KSeF,
 - gotowe workflow do uwierzytelniania, sesji online/batch oraz eksportu,
 - usługi pomocnicze (XAdES, kryptografia, linki weryfikacyjne, QR, parser tokenów osób).
 
-## Kompatybilność API KSeF
+## 🔄 Kompatybilność API KSeF
 
 Aktualna kompatybilność: **KSeF API `v2.1.1`**.
 
-## Wymagania
+## ⚙️ Wymagania
 
 - Node.js `>= 20`
 - dostęp do środowiska KSeF (`TEST`, `DEMO`, `PRD`)
 - dane uwierzytelniające (token KSeF lub certyfikat/XAdES)
 
-## Instalacja
+## 📦 Instalacja
 
 ```bash
 npm install ksef-client
@@ -34,7 +36,7 @@ npm install node-forge
 - `qrcode` jest wymagane przez `QrCodeService` (`client.qr`),
 - `node-forge` jest wymagane przez obsługę PKCS#12 w `XadesKeyPair.fromPkcs12*`.
 
-## Dokumentacja
+## 📚 Dokumentacja
 
 - Indeks: [`docs/README.md`](docs/README.md)
 - Start: [`docs/getting-started.md`](docs/getting-started.md)
@@ -46,33 +48,50 @@ npm install node-forge
 - Utils: [`docs/utils/README.md`](docs/utils/README.md)
 - Przykłady: [`docs/examples/README.md`](docs/examples/README.md)
 
-## CI/CD
+## 🧪 CI/CD
 
-Repozytorium zawiera następujace workflow GitHub Actions:
+[![CI](https://github.com/smekcio/ksef-client-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/smekcio/ksef-client-typescript/actions/workflows/ci.yml)
+[![TypeScript E2E TEST token](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml/badge.svg)](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml?query=job%3A%22TEST+token+flow%22)
+[![TypeScript E2E TEST cert](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml/badge.svg)](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml?query=job%3A%22TEST+XAdES+flow%22)
+[![TypeScript E2E DEMO token](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml/badge.svg)](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml?query=job%3A%22DEMO+token+flow%22)
+[![TypeScript E2E DEMO cert](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml/badge.svg)](https://github.com/smekcio/ksef-client-typescript/actions/workflows/e2e-token.yml?query=job%3A%22DEMO+XAdES+flow%22)
 
-- `CI` (`.github/workflows/ci.yml`) - lint, typecheck, testy i raport coverage.
-- `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - token/XAdES dla `TEST` i `DEMO`, plus dzienny harmonogram i automatyczne issue przy bledzie runa schedulowanego.
-- `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - weryfikacja pokrycia endpointow SDK wzgledem oficjalnego `open-api.json`.
-- `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja PR release i wersjonowania.
-- `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki po `release.published` lub recznie (`workflow_dispatch`).
+Testy uruchamiane są lokalnie przez Node.js test runner (`node --test`) oraz w GitHub Actions.
 
-Wymagane sekrety dla E2E:
+Instalacja zależności testowych:
 
-- `KSEF_TEST_TOKEN`, `KSEF_TEST_CONTEXT_TYPE`, `KSEF_TEST_CONTEXT_VALUE`
-- `KSEF_DEMO_TOKEN`, `KSEF_DEMO_CONTEXT_TYPE`, `KSEF_DEMO_CONTEXT_VALUE`
-- `KSEF_TEST_XADES_CERT_CRT` lub `KSEF_TEST_XADES_CERT_CRT_B64`
-- `KSEF_TEST_XADES_PRIVATE_KEY_PEM` lub `KSEF_TEST_XADES_PRIVATE_KEY_PEM_B64`
-- `KSEF_TEST_XADES_PRIVATE_KEY_PASSWORD` (opcjonalne, jesli klucz jest szyfrowany)
-- `KSEF_DEMO_XADES_CERT_CRT` lub `KSEF_DEMO_XADES_CERT_CRT_B64`
-- `KSEF_DEMO_XADES_PRIVATE_KEY_PEM` lub `KSEF_DEMO_XADES_PRIVATE_KEY_PEM_B64`
-- `KSEF_DEMO_XADES_PRIVATE_KEY_PASSWORD` (opcjonalne, jesli klucz jest szyfrowany)
+```bash
+npm ci
+```
 
-Dodatkowe sekrety opcjonalne:
+Uruchomienie testów:
 
-- `RELEASE_PLEASE_TOKEN` - token PAT dla `release-please` (w przeciwnym razie workflow uzyje `GITHUB_TOKEN`).
-- `NPM_TOKEN` - fallback dla publikacji npm, jesli Trusted Publishing (OIDC) nie jest skonfigurowany.
+```bash
+npm test
+```
 
-## Quick start
+Uruchomienie testów z kontrolą pokrycia:
+
+```bash
+npm run test:coverage
+```
+
+Lokalna kontrola jakości (jak w CI):
+
+```bash
+npm run lint
+npm run typecheck
+```
+
+Podstawowe workflow:
+
+- `CI` (`.github/workflows/ci.yml`) - lint, typecheck i testy.
+- `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - scenariusze token/XAdES dla `TEST` i `DEMO`.
+- `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - kontrola pokrycia endpointów.
+- `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja wersjonowania.
+- `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki.
+
+## 🚀 Quick start
 
 Minimalny przebieg integracji:
 
@@ -107,7 +126,7 @@ const metadata = await client.invoices.queryInvoiceMetadata(
 console.log(metadata);
 ```
 
-## Najważniejsze snippety
+## 🧩 Najważniejsze snippety
 
 ### Uwierzytelnianie tokenem KSeF (workflow)
 
@@ -165,7 +184,7 @@ const upoXml = await session.waitForUpo({ pollIntervalMs: 2000, maxAttempts: 60 
 console.log(upoXml ? "UPO odebrane" : "Brak UPO w zadanym limicie prób");
 ```
 
-## Licencja
+## 📄 Licencja
 
 MIT. Zobacz [`LICENSE`](LICENSE).
 
