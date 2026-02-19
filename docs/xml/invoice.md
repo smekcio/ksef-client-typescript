@@ -19,6 +19,8 @@ Narzędzia z tej sekcji służą do przygotowania dokumentów XML przekazywanych
 - `FakturaInput` (obiekt FA2/FA3),
 - `PefUblDocumentInput` (`{ Invoice: ... }` albo `{ CreditNote: ... }`).
 
+Dokumenty RR nie mają dedykowanego buildera w SDK. Dla RR użyj gotowego XML (`string`/`Buffer`) i przekaż go dalej do sesji/workflow.
+
 ## `buildFakturaXml`: opcje
 
 ```ts
@@ -111,3 +113,4 @@ const fromObject = serializeInvoiceXml({
 - Dla wejścia typu `Buffer` dane są zwracane bez modyfikacji.
 - Dla nieobsługiwanego typu wejścia rzucany jest `KsefValidationError("Unsupported invoice input type.")`.
 - `buildPefXml(...)` rzuca `KsefValidationError`, gdy jawnie podane `schema` nie zgadza się z rootem (`Invoice`/`CreditNote`).
+- `buildFakturaXml(...)` obsługuje tylko FA (`FA2`/`FA3`), nie generuje RR XML.

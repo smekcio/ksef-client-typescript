@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { KsefValidationError, validateInvoiceQueryFilters } from "../../dist/index.js";
+import {
+  KsefValidationError,
+  normalizeInvoiceQueryFilters,
+  validateInvoiceQueryFilters,
+} from "../../dist/index.js";
 
 test("validateInvoiceQueryFilters accepts date range up to 3 months", () => {
   assert.doesNotThrow(() => {
@@ -56,4 +60,18 @@ test("validateInvoiceQueryFilters accepts missing dateRange.to by using current 
       },
     });
   });
+});
+
+test("normalizeInvoiceQueryFilters adds Europe/Warsaw offset for datetime without offset", () => {
+  const normalized = normalizeInvoiceQueryFilters({
+    subjectType: "Subject1",
+    dateRange: {
+      dateType: "Issue",
+      from: "2025-01-02T10:15:00",
+      to: "2025-07-02T11:15:00",
+    },
+  });
+
+  assert.equal(normalized.dateRange.from, "2025-01-02T10:15:00+01:00");
+  assert.equal(normalized.dateRange.to, "2025-07-02T11:15:00+02:00");
 });

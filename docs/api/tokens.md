@@ -17,6 +17,9 @@ Token KSeF możesz wykorzystać np. w autoryzacji przez `authenticateWithKsefTok
 - `listTokens(...)` obsługuje filtry: `status`, `description`, `authorIdentifier`, `authorIdentifierType`, `pageSize`.
 - Dostępne wartości `status`: `"Pending"`, `"Active"`, `"Revoking"`, `"Revoked"`, `"Failed"`.
 - Dostępne wartości `authorIdentifierType`: `"Nip"`, `"Pesel"`, `"Fingerprint"`.
+- Typ `TokenPermissionType` (używany m.in. w `GenerateTokenRequest.permissions`) obejmuje:
+  `"InvoiceRead"`, `"InvoiceWrite"`, `"CredentialsRead"`, `"CredentialsManage"`, `"SubunitManage"`,
+  `"EnforcementOperations"`, `"Introspection"`.
 - Stronicowanie listy tokenów działa przez nagłówek `x-continuation-token` (potwierdzone testami jednostkowymi).
 
 ## Przykłady TypeScript
@@ -24,17 +27,18 @@ Token KSeF możesz wykorzystać np. w autoryzacji przez `authenticateWithKsefTok
 ### Generowanie tokena i odczyt statusu
 
 ```ts
-import { KsefTokenRequest } from "ksef-client-typescript";
+import { GenerateTokenRequest } from "ksef-client-typescript";
 
-const createRequest: KsefTokenRequest = {
-  // Uzupełnij zgodnie z kontraktem OpenAPI dla POST /tokens.
+const createRequest: GenerateTokenRequest = {
+  description: "Token operatora do odczytu i introspekcji",
+  permissions: ["InvoiceRead", "Introspection"],
 };
 
 const created = await client.tokens.generateToken(createRequest);
-const referenceNumber = String((created as { referenceNumber?: string }).referenceNumber ?? "");
+const referenceNumber = created.referenceNumber;
 
 const status = await client.tokens.getToken(referenceNumber);
-console.log(status);
+console.log(status.status, status.requestedPermissions);
 ```
 
 ### Listowanie tokenów z continuation token
@@ -48,18 +52,13 @@ const firstPage = await client.tokens.listTokens({
   authorIdentifierType: "Nip",
 });
 
-const continuation =
-  typeof firstPage === "object" && firstPage !== null
-    ? (firstPage.continuationToken as string | undefined)
-    : undefined;
-
-if (continuation) {
+if (firstPage.continuationToken) {
   const nextPage = await client.tokens.listTokens(
     {
       pageSize: 25,
       status: ["Active"],
     },
-    continuation,
+    firstPage.continuationToken,
   );
   console.log(nextPage);
 }

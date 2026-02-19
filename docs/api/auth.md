@@ -16,6 +16,8 @@ Niskopoziomowy klient dla endpointów `/auth/*`.
 - `getAuthStatus(...)` przyjmuje `authenticationToken` z odpowiedzi inicjalizującej, a nie `accessToken`.
 - `refreshAccessToken(...)` wysyła `refreshToken` jako token autoryzacji.
 - Odpowiedź statusowa zawiera `authenticationMethodInfo`; pole `authenticationMethod` jest przestarzałe.
+- SDK normalizuje `authenticationMethodInfo` dla odpowiedzi w starym kształcie: gdy pola są niepełne,
+  uzupełnia je fallbackiem wyliczonym z `authenticationMethod`.
 - Dla `authenticateWithXadesSignature(..., ..., true)` SDK ustawia nagłówek `X-KSeF-Feature: enforce-xades-compliance` (potwierdzone testami jednostkowymi).
 - Operacje na aktywnych sesjach uwierzytelnienia (listowanie i wycofywanie sesji) są opisane w [`active-sessions.md`](active-sessions.md): `listActiveSessions(...)`, `revokeCurrentSession()`, `revokeSession(referenceNumber)`.
 

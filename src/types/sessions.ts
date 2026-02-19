@@ -1,7 +1,13 @@
-import { EncryptionInfo, FormCode, JsonObject, StatusInfo } from "./common";
+import {
+  BatchSessionFormCode,
+  EncryptionInfo,
+  JsonObject,
+  OnlineSessionFormCode,
+  StatusInfo,
+} from "./common";
 
 export interface OpenOnlineSessionRequest {
-  formCode: FormCode;
+  formCode: OnlineSessionFormCode;
   encryption: EncryptionInfo;
 }
 
@@ -25,7 +31,7 @@ export interface SendInvoiceResponse {
 }
 
 export interface OpenBatchSessionRequest {
-  formCode: FormCode;
+  formCode: BatchSessionFormCode;
   batchFile: {
     fileSize: number;
     fileHash: string;

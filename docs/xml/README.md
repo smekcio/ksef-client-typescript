@@ -8,6 +8,8 @@ Moduł `xml` udostępnia:
 - builder UBL dla PEF/PEF_KOR (`buildPefXml`),
 - parser UPO (`parseUpoXml`).
 
+Uwaga: SDK nie zawiera dedykowanego buildera RR; dla RR przekazuj gotowy XML (`string`/`Buffer`) do `serializeInvoiceXml`/workflowów.
+
 ## Strony
 
 - [Serializacja i parser XML](serialization.md)

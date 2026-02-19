@@ -1,12 +1,12 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-docs`
 
-Data analizy: **2026-02-17**
+Data analizy: **2026-02-19**
 
 ## Zakres i źródła
 
-- Kontrakt API: `ksef-docs/open-api.json` (`0261ff1`, tag `2.1.1`)
-- Changelog: `ksef-docs/api-changelog.md` (wersje `2.1.0`, `2.1.1`)
-- Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/utils/*`, `src/xml/*`, `docs/*`, `.github/workflows/*`
+- Kontrakt API: `ksef-docs/open-api.json` (`d9be9d7`, `2.1.2`)
+- Changelog: `ksef-docs/api-changelog.md` (wersje `2.1.0`, `2.1.1`, `2.1.2`)
+- Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/xml/*`, `docs/*`
 
 ## Wynik ogólny
 
@@ -14,18 +14,30 @@ Data analizy: **2026-02-17**
 - Braki endpointowe: **0**
 - Nadmiarowe endpointy po stronie TS: **0**
 
-## Zmiany po stronie `ksef-docs` (2.1.x)
+## Zmiany uwzględnione po stronie SDK (2.1.2)
 
-1. Dodane endpointy testowe kontekstu:
-   - `POST /testdata/context/block`
-   - `POST /testdata/context/unblock`
-2. Rozszerzenie modeli auth:
-   - nowe pole `authenticationMethodInfo` (`category`, `code`, `displayName`)
-   - oznaczenie `authenticationMethodInfo` jako wymagane m.in. dla:
-     - `GET /auth/{referenceNumber}`
-     - `GET /auth/sessions`
-3. XAdES:
-   - wsparcie nagłówka `X-KSeF-Feature: enforce-xades-compliance` (DEMO/PRD)
+1. Tokeny KSeF (`/tokens`)
+   - modele `GenerateTokenRequest`, `GenerateTokenResponse`, `QueryTokensResponse`,
+     `TokenStatusResponse` są jawnie typowane;
+   - `TokenPermissionType` obejmuje aktualny katalog uprawnień:
+     `InvoiceRead`, `InvoiceWrite`, `CredentialsRead`, `CredentialsManage`,
+     `SubunitManage`, `EnforcementOperations`, `Introspection`;
+   - zachowano aliasy kompatybilności (`KsefTokenRequest`, `KsefTokenResponse`,
+     `KsefTokensListResponse`).
+
+2. Uwierzytelnianie (`authenticationMethodInfo`)
+   - odpowiedzi `auth.getAuthStatus(...)` i `activeSessions.listActiveSessions(...)`
+     są normalizowane defensywnie;
+   - jeśli API zwróci starszy kształt odpowiedzi (brak lub niepełny
+     `authenticationMethodInfo`), SDK uzupełnia pola na podstawie
+     `authenticationMethod`.
+
+3. Schemy RR/FA/PEF dla sesji
+   - `formCode` dla sesji jest jawnie typowany:
+     - online: `FA (2)`, `FA (3)`, `PEF (3)`, `PEF_KOR (3)`, `FA_RR (1)`,
+     - batch: `FA (2)`, `FA (3)`, `FA_RR (1)`;
+   - ograniczenie jawnie udokumentowane: `buildFakturaXml` generuje wyłącznie FA2/FA3;
+     dla RR należy przekazać gotowy XML (`string`/`Buffer`).
 
 ## Weryfikacja parity endpointów
 
@@ -43,31 +55,11 @@ Data analizy: **2026-02-17**
 | Security             | 1                     | 1/1              | OK     |
 | Peppol               | 1                     | 1/1              | OK     |
 
-## Parity funkcjonalny (TS vs `ksef-docs`)
-
-1. Uwierzytelnianie:
-   - `enforceXadesCompliance` wspierane w thin client i workflow
-   - `authenticationMethodInfo` obsługiwane jako podstawowa część modelu statusu
-2. Testdata:
-   - `blockContext` i `unblockContext` zaimplementowane oraz udokumentowane
-3. Typowanie:
-   - dopięte typy odpowiedzi aktywnych sesji (`AuthenticationListResponse`)
-4. CI/E2E:
-   - flow tokenowy: TEST + DEMO
-   - flow XAdES: TEST + DEMO (sekrety cert/key jako RAW lub Base64, guard dla fork PR)
-
 ## Parity dokumentacji
 
-Dokumentacja TS została zaktualizowana do spójności z KSeF `2.1.1`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.1.2`:
 
-- jawna deklaracja kompatybilności API (`2.1.1`)
-- opisy i przykłady `authenticationMethodInfo.category` (w tym `NationalNode`)
-- doprecyzowanie `activeSessions` na odpowiedzi typowane zamiast surowego `JsonObject`
-- utrzymane scenariusze i przykłady dla tokenów oraz XAdES
-- uzupełnione opisy modułów `utils` i `xml` zgodnie z aktualnym API TS
-
-## Dalszy rozwój
-
-1. Zwiększenie precyzji typów dla pozostałych obszarów `JsonObject` (`tokens`, `permissions`, `certificates`)
-2. Automatyczna walidacja kontraktu OpenAPI w CI (detekcja dryfu przed release)
-3. Rozszerzenie executable examples o scenariusze certyfikatów i uprawnień
+- deklaracje kompatybilności API (`v2.1.2`) w README i docs,
+- opis aktualnych `TokenPermissionType` wraz z przykładami tokenów,
+- doprecyzowanie normalizacji `authenticationMethodInfo`,
+- aktualizacja informacji o schematach RR/FA/PEF i ograniczeniach buildera XML.

@@ -5,6 +5,7 @@ import {
   InvoiceExportStatusResponse,
   InvoiceMetadataResponse,
   InvoiceQueryFilters,
+  normalizeInvoiceQueryFilters,
   validateInvoiceQueryFilters,
 } from "../types/invoices";
 
@@ -28,7 +29,8 @@ export class InvoicesClient extends BaseClient {
     pageSize?: number,
     sortOrder?: "Asc" | "Desc",
   ): Promise<InvoiceMetadataResponse> {
-    validateInvoiceQueryFilters(filters);
+    const normalizedFilters = normalizeInvoiceQueryFilters(filters);
+    validateInvoiceQueryFilters(normalizedFilters);
     const token = await this.getAccessToken();
     return this.http.request<InvoiceMetadataResponse>({
       method: "POST",
@@ -38,20 +40,24 @@ export class InvoicesClient extends BaseClient {
         pageSize,
         sortOrder,
       },
-      body: filters,
+      body: normalizedFilters,
       authToken: token,
     });
   }
 
   async exportInvoices(request: InvoiceExportRequest): Promise<InvoiceExportInitResponse> {
     const { includeMetadata, ...body } = request;
-    validateInvoiceQueryFilters(body.filters);
+    const normalizedFilters = normalizeInvoiceQueryFilters(body.filters);
+    validateInvoiceQueryFilters(normalizedFilters);
     const token = await this.getAccessToken();
     return this.http.request<InvoiceExportInitResponse>({
       method: "POST",
       path: "/invoices/exports",
       ...(includeMetadata ? { headers: { "X-KSeF-Feature": "include-metadata" } } : {}),
-      body,
+      body: {
+        ...body,
+        filters: normalizedFilters,
+      },
       authToken: token,
     });
   }

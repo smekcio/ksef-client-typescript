@@ -22,10 +22,22 @@ Niskopoziomowy klient dla sesji online i batch oraz dokumentów UPO.
 
 - W `getSessions(...)` parametr `query.sessionType` jest wymagany i przyjmuje `"Online"` albo `"Batch"`.
 - Filtry `getSessions(...)` obejmują m.in. `referenceNumber`, zakresy dat, `statuses` i `pageSize`.
+- `openOnlineSession(...)` obsługuje `formCode`:
+  - `FA (2)` / `1-0E` / `FA`
+  - `FA (3)` / `1-0E` / `FA`
+  - `PEF (3)` / `2-1` / `PEF`
+  - `PEF_KOR (3)` / `2-1` / `PEF`
+  - `FA_RR (1)` / `1-0E` / `RR`
+- `openBatchSession(...)` obsługuje `formCode`:
+  - `FA (2)` / `1-0E` / `FA`
+  - `FA (3)` / `1-0E` / `FA`
+  - `FA_RR (1)` / `1-0E` / `RR`
 - Dla `openOnlineSession(..., true)` oraz `openBatchSession(..., true)` SDK ustawia nagłówek `X-KSeF-Feature: upo-v4-3`.
 - `sendOnlineInvoice(...)` wymaga zaszyfrowanego ładunku `SendInvoiceRequest` (`invoiceHash`, `encryptedInvoiceContent` itd.).
 - Metody `getSessionInvoiceUpoByReferenceNumber`, `getSessionInvoiceUpoByKsefNumber` i `getSessionUpo` zwracają XML jako `string`.
 - W sesji batch upload części odbywa się po `partUploadRequests` na pre-signed URL i nie korzysta z Bearer tokena.
+- Dla faktur RR przekazuj gotowy XML (`string`/`Buffer`) do `sendOnlineInvoice(...)` lub workflowów;
+  builder `buildFakturaXml` generuje wyłącznie schematy FA (`FA2`/`FA3`).
 
 ## Przykłady TypeScript
 

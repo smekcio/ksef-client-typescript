@@ -3,14 +3,14 @@ import { SecurityClient } from "../api/securityClient";
 import { HttpClient } from "../client/httpClient";
 import { CryptographyService, EncryptionData } from "../crypto/cryptographyService";
 import { KsefError, KsefValidationError } from "../errors/errors";
-import { FormCode, StatusInfo } from "../types/common";
+import { OnlineSessionFormCode, StatusInfo } from "../types/common";
 import { SendInvoiceResponse, SessionStatusResponse } from "../types/sessions";
 import { serializeInvoiceXml, InvoiceXmlInput } from "../xml/invoice";
 import { parseUpoXml, UpoPotwierdzenie } from "../xml/upo";
 import { WaitForUpoOptions } from "./upo";
 
 export interface OnlineSessionOpenOptions {
-  formCode: FormCode;
+  formCode: OnlineSessionFormCode;
   publicCertificateBase64Der?: string;
   upoV43?: boolean;
 }

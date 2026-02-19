@@ -1,16 +1,17 @@
 import { BaseClient } from "../client/baseClient";
 import {
-  KsefTokenRequest,
-  KsefTokenResponse,
+  GenerateTokenRequest,
+  GenerateTokenResponse,
   KsefTokensListQueryParams,
-  KsefTokensListResponse,
+  QueryTokensResponse,
+  TokenStatusResponse,
 } from "../types/tokens";
 
 export class TokensClient extends BaseClient {
   async listTokens(
     params?: KsefTokensListQueryParams,
     continuationToken?: string,
-  ): Promise<KsefTokensListResponse> {
+  ): Promise<QueryTokensResponse> {
     const token = await this.getAccessToken();
     const headers =
       continuationToken !== undefined ? { "x-continuation-token": continuationToken } : undefined;
@@ -23,7 +24,7 @@ export class TokensClient extends BaseClient {
           pageSize: params.pageSize,
         }
       : undefined;
-    return this.http.request<KsefTokensListResponse>({
+    return this.http.request<QueryTokensResponse>({
       method: "GET",
       path: "/tokens",
       ...(headers ? { headers } : {}),
@@ -32,9 +33,9 @@ export class TokensClient extends BaseClient {
     });
   }
 
-  async generateToken(request: KsefTokenRequest): Promise<KsefTokenResponse> {
+  async generateToken(request: GenerateTokenRequest): Promise<GenerateTokenResponse> {
     const token = await this.getAccessToken();
-    return this.http.request<KsefTokenResponse>({
+    return this.http.request<GenerateTokenResponse>({
       method: "POST",
       path: "/tokens",
       body: request,
@@ -42,9 +43,9 @@ export class TokensClient extends BaseClient {
     });
   }
 
-  async getToken(referenceNumber: string): Promise<KsefTokenResponse> {
+  async getToken(referenceNumber: string): Promise<TokenStatusResponse> {
     const token = await this.getAccessToken();
-    return this.http.request<KsefTokenResponse>({
+    return this.http.request<TokenStatusResponse>({
       method: "GET",
       path: `/tokens/${encodeURIComponent(referenceNumber)}`,
       authToken: token,

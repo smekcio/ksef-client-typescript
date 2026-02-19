@@ -118,6 +118,45 @@ export interface FormCode {
   value: string;
 }
 
+export interface Fa2FormCode extends FormCode {
+  systemCode: "FA (2)";
+  schemaVersion: "1-0E";
+  value: "FA";
+}
+
+export interface Fa3FormCode extends FormCode {
+  systemCode: "FA (3)";
+  schemaVersion: "1-0E";
+  value: "FA";
+}
+
+export interface Pef3FormCode extends FormCode {
+  systemCode: "PEF (3)";
+  schemaVersion: "2-1";
+  value: "PEF";
+}
+
+export interface PefKor3FormCode extends FormCode {
+  systemCode: "PEF_KOR (3)";
+  schemaVersion: "2-1";
+  value: "PEF";
+}
+
+export interface FaRr1FormCode extends FormCode {
+  systemCode: "FA_RR (1)";
+  schemaVersion: "1-0E";
+  value: "RR";
+}
+
+export type OnlineSessionFormCode =
+  | Fa2FormCode
+  | Fa3FormCode
+  | Pef3FormCode
+  | PefKor3FormCode
+  | FaRr1FormCode;
+
+export type BatchSessionFormCode = Fa2FormCode | Fa3FormCode | FaRr1FormCode;
+
 export interface AuthorizationPolicy {
   allowedIps?: {
     ip4Addresses?: string[];
