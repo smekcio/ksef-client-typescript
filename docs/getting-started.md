@@ -3,7 +3,7 @@
 Ten przewodnik opisuje minimalny przebieg pierwszej integracji:
 `konfiguracja -> uwierzytelnianie -> pierwsze wywołanie API -> workflow -> obsługa błędów`.
 
-Kompatybilność SDK: **KSeF API `v2.1.1`**.
+Kompatybilność SDK: **KSeF API `v2.1.2`**.
 
 ## 1) Inicjalizacja klienta
 

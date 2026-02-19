@@ -17,6 +17,11 @@ Dostęp: `client.workflows.sessions.online`.
 ## Opcje `open(options)`
 
 - `formCode` (wymagane)
+  - `FA (2)` / `1-0E` / `FA`
+  - `FA (3)` / `1-0E` / `FA`
+  - `PEF (3)` / `2-1` / `PEF`
+  - `PEF_KOR (3)` / `2-1` / `PEF`
+  - `FA_RR (1)` / `1-0E` / `RR`
 - `publicCertificateBase64Der` (opcjonalnie, domyślnie certyfikat `SymmetricKeyEncryption`)
 - `upoV43` (opcjonalnie, dodaje nagłówek `X-KSeF-Feature: upo-v4-3`)
 
@@ -25,6 +30,11 @@ Dostęp: `client.workflows.sessions.online`.
 - `invoice` (wymagane; `string`, `Buffer`, obiekt XML, `FakturaInput`, `PEF UBL`)
 - `offlineMode` (opcjonalnie)
 - `hashOfCorrectedInvoice` (opcjonalnie; używane przy korekcie technicznej offline)
+
+Uwaga:
+
+- dla RR przekaż gotowy XML (`string`/`Buffer`);
+- `buildFakturaXml` wspiera tylko schematy FA (`FA2`/`FA3`), a `buildPefXml` tylko PEF/PEF_KOR.
 
 ## Kiedy używać `upoV43`, `offlineMode`, `hashOfCorrectedInvoice`
 

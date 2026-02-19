@@ -62,7 +62,35 @@ export type InvoiceMetadataResponse = JsonObject;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATE_TIME_PATTERN =
   /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?$/;
+const ISO_DATE_TIME_WITHOUT_OFFSET_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?$/;
+const ISO_DATE_TIME_CAPTURE_PATTERN =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d)(?::(?<second>[0-5]\d)(?:\.(?<fraction>\d{1,9}))?)?$/;
 const MAX_DATE_RANGE_MONTHS = 3;
+const WARSAW_TIME_ZONE = "Europe/Warsaw";
+
+export function normalizeInvoiceQueryFilters(filters: InvoiceQueryFilters): InvoiceQueryFilters {
+  if (!isPlainObject(filters)) {
+    return filters;
+  }
+  const dateRange = (filters as Record<string, unknown>).dateRange;
+  if (!isPlainObject(dateRange)) {
+    return filters;
+  }
+
+  const normalizedDateRange: Record<string, unknown> = { ...dateRange };
+  if (typeof normalizedDateRange.from === "string") {
+    normalizedDateRange.from = normalizeDateTimeWithoutOffset(normalizedDateRange.from);
+  }
+  if (typeof normalizedDateRange.to === "string") {
+    normalizedDateRange.to = normalizeDateTimeWithoutOffset(normalizedDateRange.to);
+  }
+
+  return {
+    ...(filters as Record<string, unknown>),
+    dateRange: normalizedDateRange,
+  } as InvoiceQueryFilters;
+}
 
 export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void {
   if (!isPlainObject(filters)) {
@@ -107,14 +135,19 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
   }
 
   const fromText = fromValue.trim();
-  const fromDate = parseIsoDateInput(fromText, "dateRange.from");
+  const normalizedFromText = normalizeDateTimeWithoutOffset(fromText);
+  const fromDate = parseIsoDateInput(normalizedFromText, "dateRange.from");
   const toText =
     typeof toValue === "string" && toValue.trim().length > 0
       ? toValue.trim()
       : new Date().toISOString();
+  const normalizedToText =
+    typeof toValue === "string" && toValue.trim().length > 0
+      ? normalizeDateTimeWithoutOffset(toText)
+      : toText;
   const toDate =
     typeof toValue === "string" && toValue.trim().length > 0
-      ? parseIsoDateInput(toText, "dateRange.to")
+      ? parseIsoDateInput(normalizedToText, "dateRange.to")
       : new Date(toText);
 
   if (toDate.getTime() < fromDate.getTime()) {
@@ -127,9 +160,36 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
   if (toDate.getTime() > maxAllowedToDate.getTime()) {
     throw new KsefValidationError(
       `Invoice query filters.dateRange cannot exceed ${MAX_DATE_RANGE_MONTHS} months.`,
-      [`dateRange.from: ${fromText}`, `dateRange.to: ${toText}`],
+      [`dateRange.from: ${normalizedFromText}`, `dateRange.to: ${normalizedToText}`],
     );
   }
+}
+
+function normalizeDateTimeWithoutOffset(value: string): string {
+  const text = value.trim();
+  if (!ISO_DATE_TIME_WITHOUT_OFFSET_PATTERN.test(text)) {
+    return text;
+  }
+  const match = ISO_DATE_TIME_CAPTURE_PATTERN.exec(text);
+  if (!match?.groups) {
+    return text;
+  }
+  const year = Number(match.groups.year);
+  const month = Number(match.groups.month);
+  const day = Number(match.groups.day);
+  const hour = Number(match.groups.hour);
+  const minute = Number(match.groups.minute);
+  const second = Number(match.groups.second ?? "0");
+  const fraction = match.groups.fraction ?? "";
+  const millisecond = Number((fraction + "000").slice(0, 3));
+
+  if (!isValidCalendarDate(year, month, day)) {
+    return text;
+  }
+
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  const offsetMinutes = resolveWarsawOffsetMinutes(utcGuess);
+  return `${text}${formatOffset(offsetMinutes)}`;
 }
 
 function parseIsoDateInput(value: string, fieldPath: string): Date {
@@ -198,6 +258,45 @@ function isValidCalendarDate(year: number, month: number, day: number): boolean 
   }
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return day <= daysInMonth;
+}
+
+function resolveWarsawOffsetMinutes(utcGuessMs: number): number {
+  let offset = getOffsetMinutesForTimezone(new Date(utcGuessMs), WARSAW_TIME_ZONE);
+  let adjustedUtcMs = utcGuessMs - offset * 60_000;
+  const recalculated = getOffsetMinutesForTimezone(new Date(adjustedUtcMs), WARSAW_TIME_ZONE);
+  if (recalculated !== offset) {
+    offset = recalculated;
+  }
+  return offset;
+}
+
+function getOffsetMinutesForTimezone(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const zonePart = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
+  const match = /^GMT(?<sign>[+-])(?<hours>\d{1,2})(?::?(?<minutes>\d{2}))?$/.exec(zonePart);
+  if (!match?.groups) {
+    throw new KsefValidationError(`Unsupported timezone offset format for ${timeZone}: ${zonePart}`);
+  }
+  const sign = match.groups.sign === "-" ? -1 : 1;
+  const hours = Number(match.groups.hours);
+  const minutes = Number(match.groups.minutes ?? "0");
+  return sign * (hours * 60 + minutes);
+}
+
+function formatOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMinutes);
+  const hours = Math.floor(abs / 60)
+    .toString()
+    .padStart(2, "0");
+  const minutes = (abs % 60).toString().padStart(2, "0");
+  return `${sign}${hours}:${minutes}`;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

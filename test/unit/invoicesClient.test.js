@@ -21,8 +21,8 @@ test("exportInvoices sets include-metadata feature header when includeMetadata i
       subjectType: "Subject1",
       dateRange: {
         dateType: "Issue",
-        from: "2025-01-01",
-        to: "2025-03-31",
+        from: "2025-01-01T00:00:00",
+        to: "2025-03-31T23:59:59",
       },
     },
     includeMetadata: true,
@@ -31,4 +31,30 @@ test("exportInvoices sets include-metadata feature header when includeMetadata i
   assert.equal(capturedOptions.path, "/invoices/exports");
   assert.equal(capturedOptions.headers["X-KSeF-Feature"], "include-metadata");
   assert.equal(capturedOptions.body.includeMetadata, undefined);
+  assert.equal(capturedOptions.body.filters.dateRange.from, "2025-01-01T00:00:00+01:00");
+  assert.equal(capturedOptions.body.filters.dateRange.to, "2025-03-31T23:59:59+02:00");
+});
+
+test("queryInvoiceMetadata normalizes datetime without offset to Europe/Warsaw offset", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return {};
+    },
+  };
+  const client = new InvoicesClient(http, async () => "access-token");
+
+  await client.queryInvoiceMetadata({
+    subjectType: "Subject1",
+    dateRange: {
+      dateType: "Issue",
+      from: "2025-03-29T10:15:00",
+      to: "2025-03-30T11:15:00",
+    },
+  });
+
+  assert.equal(capturedOptions.path, "/invoices/query/metadata");
+  assert.equal(capturedOptions.body.dateRange.from, "2025-03-29T10:15:00+01:00");
+  assert.equal(capturedOptions.body.dateRange.to, "2025-03-30T11:15:00+02:00");
 });

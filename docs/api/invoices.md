@@ -24,6 +24,8 @@ SDK waliduje `filters.dateRange` według poniższych zasad:
 - `from` musi być poprawną datą ISO (`YYYY-MM-DD` lub ISO date-time),
 - `to` (jeżeli podane) musi być poprawną datą ISO i nie może być wcześniejsze niż `from`,
 - jeżeli `to` nie jest podane, SDK używa bieżącego czasu UTC,
+- jeśli `from`/`to` jest ISO date-time bez offsetu (`YYYY-MM-DDTHH:MM[:SS]`), SDK normalizuje je
+  do `Europe/Warsaw` i wysyła z jawnie dodanym offsetem (`+01:00`/`+02:00`),
 - zakres `from` -> `to` nie może przekroczyć 3 miesięcy.
 
 W przypadku naruszenia warunków rzucany jest `KsefValidationError`.

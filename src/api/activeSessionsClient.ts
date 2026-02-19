@@ -1,5 +1,6 @@
 import { BaseClient } from "../client/baseClient";
 import { AuthenticationListResponse } from "../types/common";
+import { normalizeAuthenticationListResponse } from "../utils/authenticationMethodInfo";
 
 export class ActiveSessionsClient extends BaseClient {
   async listActiveSessions(
@@ -9,7 +10,7 @@ export class ActiveSessionsClient extends BaseClient {
     const token = await this.getAccessToken();
     const headers =
       continuationToken !== undefined ? { "x-continuation-token": continuationToken } : undefined;
-    return this.http.request<AuthenticationListResponse>({
+    const response = await this.http.request<AuthenticationListResponse>({
       method: "GET",
       path: "/auth/sessions",
       ...(headers ? { headers } : {}),
@@ -18,6 +19,7 @@ export class ActiveSessionsClient extends BaseClient {
       },
       authToken: token,
     });
+    return normalizeAuthenticationListResponse(response);
   }
 
   async revokeCurrentSession(): Promise<void> {

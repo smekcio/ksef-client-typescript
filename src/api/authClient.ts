@@ -6,6 +6,7 @@ import {
   RefreshTokenResponse,
 } from "../types/auth";
 import { AuthenticationInitResponse, AuthenticationOperationStatusResponse } from "../types/common";
+import { normalizeAuthenticationOperationStatusResponse } from "../utils/authenticationMethodInfo";
 
 export class AuthClient extends BaseClient {
   async getChallenge(): Promise<AuthChallengeResponse> {
@@ -51,11 +52,12 @@ export class AuthClient extends BaseClient {
     referenceNumber: string,
     authenticationToken: string,
   ): Promise<AuthenticationOperationStatusResponse> {
-    return this.http.request<AuthenticationOperationStatusResponse>({
+    const response = await this.http.request<AuthenticationOperationStatusResponse>({
       method: "GET",
       path: `/auth/${encodeURIComponent(referenceNumber)}`,
       authToken: authenticationToken,
     });
+    return normalizeAuthenticationOperationStatusResponse(response);
   }
 
   async redeemToken(authenticationToken: string): Promise<AuthTokenRedeemResponse> {

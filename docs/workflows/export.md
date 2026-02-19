@@ -60,6 +60,8 @@ Walidacja uruchamia się lokalnie przed requestem.
 - `dateRange.from` musi być poprawnym ISO `YYYY-MM-DD` albo ISO date-time.
 - `dateRange.to` może być `undefined`/`null`; jeśli nie podasz, SDK przyjmie bieżący czas UTC.
 - jeśli `dateRange.to` jest podane, też musi być poprawnym ISO date/date-time.
+- jeśli `dateRange.from`/`dateRange.to` jest ISO date-time bez offsetu, SDK normalizuje go
+  do strefy `Europe/Warsaw` i wysyła z offsetem (`+01:00`/`+02:00`).
 - `to` nie może być mniejsze od `from`.
 - maksymalny zakres to 3 miesiące (liczone kalendarzowo, z clampem dni miesiąca).
 

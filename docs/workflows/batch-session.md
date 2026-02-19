@@ -18,12 +18,20 @@ Workflow zwraca `BatchSessionHandle` z metodami:
 ## Opcje `openUploadAndClose(options)`
 
 - `formCode` (wymagane)
+  - `FA (2)` / `1-0E` / `FA`
+  - `FA (3)` / `1-0E` / `FA`
+  - `FA_RR (1)` / `1-0E` / `RR`
 - `invoices` albo `zipBytes` (wymagane jedno z dwóch)
 - `publicCertificateBase64Der` (opcjonalnie; domyślnie certyfikat `SymmetricKeyEncryption`)
 - `offlineMode` (opcjonalnie)
 - `upoV43` (opcjonalnie)
 - `parallelism` (opcjonalnie; domyślnie `1`)
 - `maxPartSizeBytes` (opcjonalnie; domyślnie `100 * 1024 * 1024`)
+
+Uwaga:
+
+- dla RR w `invoices[*].invoice` przekazuj gotowy XML (`string`/`Buffer`);
+- `buildFakturaXml` obsługuje tylko FA (`FA2`/`FA3`), więc dla RR generowanie XML jest poza zakresem SDK.
 
 ## Przykład 1: batch z listy faktur
 

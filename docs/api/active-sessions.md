@@ -19,6 +19,8 @@ Dotyczy sesji uwierzytelnienia; nie dotyczy sesji fakturowych z [`sessions.md`](
 - `refreshAccessToken(...)` z `client.auth` utrzymuje dostęp do tych endpointów, ale nie zastępuje operacji `revoke*`.
 - Stronicowanie działa przez nagłówek `x-continuation-token`.
 - Pole `authenticationMethod` jest oznaczone jako przestarzałe; używaj `authenticationMethodInfo`.
+- SDK normalizuje `authenticationMethodInfo` dla starszych odpowiedzi, gdy API zwróci tylko
+  `authenticationMethod` albo niepełny obiekt `authenticationMethodInfo`.
 
 ## Przykłady TypeScript
 
