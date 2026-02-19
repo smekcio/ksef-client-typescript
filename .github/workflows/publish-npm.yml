@@ -2,15 +2,6 @@ name: Publish to npm
 
 on:
   workflow_dispatch:
-    inputs:
-      publish_mode:
-        description: Authentication mode for npm publish
-        required: true
-        default: trusted
-        type: choice
-        options:
-          - trusted
-          - token
 
 permissions:
   contents: read
@@ -49,16 +40,4 @@ jobs:
         run: npm pack --dry-run
 
       - name: Publish with Trusted Publishing
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_mode == 'trusted' }}
         run: npm publish --access public --provenance
-
-      - name: Publish with NPM token
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish_mode == 'token' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            echo "NPM_TOKEN secret is not configured."
-            exit 1
-          fi
-          npm publish --access public --provenance
