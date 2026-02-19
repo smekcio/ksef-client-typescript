@@ -48,8 +48,17 @@ jobs:
       - name: Pack
         run: npm pack --dry-run
 
+      - name: Prepare auth for Trusted Publishing
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_mode == 'trusted' }}
+        env:
+          NODE_AUTH_TOKEN: ""
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken || true
+
       - name: Publish with Trusted Publishing
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish_mode == 'trusted' }}
+        env:
+          NODE_AUTH_TOKEN: ""
         run: npm publish --access public --provenance
 
       - name: Publish with NPM token
