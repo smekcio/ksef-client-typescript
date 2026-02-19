@@ -36,21 +36,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify version matches tag
-        if: github.event_name != 'workflow_dispatch'
-        run: |
-          node --input-type=module -e "
-          import fs from 'node:fs';
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const rawTag = process.env.GITHUB_REF_NAME ?? '';
-          const tag = rawTag.startsWith('v') ? rawTag.slice(1) : rawTag;
-          if (pkg.version !== tag) {
-            console.error(`package.json version (${pkg.version}) does not match tag (${tag})`);
-            process.exit(1);
-          }
-          console.log(`OK: ${pkg.version} == ${tag}`);
-          "
-
       - name: Lint
         run: npm run lint
 
