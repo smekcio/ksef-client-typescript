@@ -76,13 +76,5 @@ jobs:
       - name: Pack
         run: npm pack --dry-run
 
-      - name: Prepare auth for Trusted Publishing
-        env:
-          NODE_AUTH_TOKEN: ""
-        run: |
-          npm config delete //registry.npmjs.org/:_authToken || true
-
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ""
         run: npm publish --access public --provenance
