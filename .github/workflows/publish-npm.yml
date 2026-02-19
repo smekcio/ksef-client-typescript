@@ -40,4 +40,4 @@ jobs:
         run: npm pack --dry-run
 
       - name: Publish with Trusted Publishing
-        run: npm publish --access public --provenance
+        run: npm publish --access public
