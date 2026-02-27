@@ -28,7 +28,7 @@ Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(.
 | `retryOnTimeout`                   | `boolean`                            | Czy ponawiać timeouty (`AbortError`, `ETIMEDOUT`, itp.) dla metod idempotentnych. | `true`                        |
 | `maxRetryAttempts`                 | `number`                             | Maksymalna liczba prób żądania (łącznie z pierwszą).                            | `3`                             |
 | `maxRetryDelayMs`                  | `number`                             | Górny limit opóźnienia między próbami.                                          | `10000`                         |
-| `strictPresignedUrlValidation`     | `boolean`                            | Dla `skipAuth` wymusza HTTPS i pełną walidację hosta/IP URL pre-signed.         | `true`                          |
+| `strictPresignedUrlValidation`     | `boolean`                            | Dla `skipAuth` wymusza HTTPS dla URL pre-signed.                                 | `true`                          |
 | `allowedPresignedHosts`            | `string[]`                           | Allowlista hostów dla URL pre-signed (z `skipAuth`).                            | Brak                            |
 | `allowPrivateNetworkPresignedUrls` | `boolean`                            | Czy dopuszczać prywatne/link-local/rezerwowe adresy IP dla URL pre-signed.      | `false`                         |
 | `requireExportPartHash`            | `boolean`                            | Domyślna polityka integralności eksportu (`encryptedPartHash`) w workflow eksportu. | `true`                       |
@@ -94,6 +94,7 @@ Domyslnie SDK blokuje niebezpieczne hosty/protokoly:
 - mozna zawezic do allowlisty `allowedPresignedHosts`.
 
 Te opcje sa globalne i dotycza wszystkich requestow z `skipAuth`.
+Walidacja hosta/IP i allowlista dzialaja niezaleznie od `strictPresignedUrlValidation`.
 
 ### `requireExportPartHash`
 
