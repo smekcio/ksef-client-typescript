@@ -129,3 +129,277 @@ test("lighthouse returns usage error for invalid --lighthouse-env", async () => 
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test("runCli supports short -h help flag", async () => {
+  const capture = createCaptureIo();
+  const exitCode = await runCli(["-h"], {
+    io: capture.io,
+    env: process.env,
+    cwd: process.cwd(),
+  });
+
+  assert.equal(exitCode, 0);
+  assert.ok(capture.stdout[0].includes("Usage:"));
+  assert.equal(capture.stderr.length, 0);
+});
+
+test("init with env token policy does not print plaintext warning", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    const capture = createCaptureIo();
+    const exitCode = await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--context-type",
+        "Nip",
+        "--context-value",
+        "1111111111",
+      ],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    assert.equal(exitCode, 0);
+    assert.equal(capture.stderr.length, 0);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth logout returns cleared=false for env token policy", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    const capture = createCaptureIo();
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--context-type",
+        "Nip",
+        "--context-value",
+        "1111111111",
+      ],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const logoutCapture = createCaptureIo();
+    const exitCode = await runCli(["--json", "auth", "logout", "--profile", "env-profile"], {
+      io: logoutCapture.io,
+      env: { KSEF_CLI_HOME: tempDir },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 0);
+    const payload = JSON.parse(logoutCapture.stdout[0]);
+    assert.equal(payload.tokenStorePolicy, "env");
+    assert.equal(payload.cleared, false);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth login fails with EXIT_AUTH when KSeF token is missing", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--context-type",
+        "Nip",
+        "--context-value",
+        "1111111111",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(["--json", "auth", "login", "--profile", "env-profile"], {
+      io: capture.io,
+      env: {
+        KSEF_CLI_HOME: tempDir,
+      },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 4);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.match(payload.error.message, /Missing KSeF token/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth refresh with token in env reaches remote flow and returns EXIT_REMOTE", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--access-token-env",
+        "MY_ACCESS",
+        "--refresh-token-env",
+        "MY_REFRESH",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(["--json", "auth", "refresh", "--profile", "env-profile"], {
+      io: capture.io,
+      env: {
+        KSEF_CLI_HOME: tempDir,
+        MY_ACCESS: "existing-access",
+        MY_REFRESH: "existing-refresh",
+      },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 5);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.exitCode, 5);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth refresh fails with EXIT_AUTH when refresh token is unavailable", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--access-token-env",
+        "MY_ACCESS",
+        "--refresh-token-env",
+        "MY_REFRESH",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(["--json", "auth", "refresh", "--profile", "env-profile"], {
+      io: capture.io,
+      env: {
+        KSEF_CLI_HOME: tempDir,
+        MY_ACCESS: "existing-access",
+      },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 4);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.match(payload.error.message, /Refresh token not available/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("profile use returns EXIT_CONFIG for missing profile", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    const capture = createCaptureIo();
+    const exitCode = await runCli(["--json", "profile", "use", "missing-profile"], {
+      io: capture.io,
+      env: { KSEF_CLI_HOME: tempDir },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 3);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.exitCode, 3);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("upo get validates that exactly one selector is provided", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--access-token-env",
+        "MY_ACCESS",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(
+      [
+        "--json",
+        "upo",
+        "get",
+        "SESSION-REF",
+        "--profile",
+        "env-profile",
+        "--invoice-ref",
+        "INV-REF",
+        "--ksef-number",
+        "KSEF-NUMBER",
+      ],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir, MY_ACCESS: "access-token-from-env" },
+        cwd: tempDir,
+      },
+    );
+
+    assert.equal(exitCode, 2);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.match(payload.error.message, /requires exactly one selector/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
