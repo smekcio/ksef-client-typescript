@@ -1,6 +1,6 @@
 # KSeF Client (TypeScript)
 
-`ksef-client-typescript` jest repozytorium biblioteki (SDK) publikowanej na npm jako **`ksef-client`**.
+`ksef-client-typescript` jest repozytorium biblioteki (SDK) publikowanej na npm jako **[`ksef-client`](https://www.npmjs.com/package/ksef-client)**.
 
 ## ✅ Funkcjonalności
 
@@ -43,10 +43,13 @@ npm install node-forge
 - Konfiguracja: [`docs/configuration.md`](docs/configuration.md)
 - Błędy i retry: [`docs/errors.md`](docs/errors.md)
 - API (endpointy): [`docs/api/README.md`](docs/api/README.md)
+- API Lighthouse: [`docs/api/lighthouse.md`](docs/api/lighthouse.md)
 - Workflows: [`docs/workflows/README.md`](docs/workflows/README.md)
 - Usługi: [`docs/services/README.md`](docs/services/README.md)
 - Utils: [`docs/utils/README.md`](docs/utils/README.md)
 - Przykłady: [`docs/examples/README.md`](docs/examples/README.md)
+- CLI i narzędzia: [`docs/cli/README.md`](docs/cli/README.md)
+- Zmiany niekompatybilne: [`docs/migration/ts-breaking-changes.md`](docs/migration/ts-breaking-changes.md)
 
 ## 🧪 CI/CD
 
@@ -83,13 +86,35 @@ npm run lint
 npm run typecheck
 ```
 
+Kontrola modeli OpenAPI:
+
+```bash
+npm run generate:openapi-models -- --openapi ../ksef-docs/open-api.json --output src/types/openapi.generated.ts
+node scripts/check-openapi-coverage.mjs --openapi ../ksef-docs/open-api.json --src src/api
+```
+
+Kontrola bezpieczeństwa zależności:
+
+```bash
+npm audit --omit=dev
+npm audit signatures
+```
+
 Podstawowe workflow:
 
 - `CI` (`.github/workflows/ci.yml`) - lint, typecheck i testy.
 - `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - scenariusze token/XAdES dla `TEST` i `DEMO`.
 - `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - kontrola pokrycia endpointów.
+- `Validate OpenAPI Models` (`.github/workflows/validate-models.yml`) - pobranie `open-api.json`, regeneracja modeli, diff i kontrola pokrycia endpointów.
+- `Release Published` (`.github/workflows/release-published.yml`) - walidacja release tagu i paczki po publikacji release.
 - `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja wersjonowania.
 - `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki.
+
+Notatki bezpieczeństwa:
+
+- nie loguj wartości tokenów i kluczy prywatnych (CI maskuje sekrety, ale lokalne logi nie),
+- traktuj `KSEF_*` jako dane wrażliwe i przekazuj je przez zmienne środowiskowe/secrets,
+- nie commituj plików certyfikatów i kluczy (`.pem`, `.p12`, `.pfx`) do repozytorium.
 
 ## 🚀 Quick start
 

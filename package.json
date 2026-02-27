@@ -23,11 +23,18 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "ksef-ts": "./dist/cli/index.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./cli": {
+      "import": "./dist/cli/index.js",
+      "require": "./dist/cli/index.cjs"
     }
   },
   "files": [
@@ -48,6 +55,7 @@
     "test:coverage": "npm run build && c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/**/*.test.js",
     "test:unit": "npm run build && node --test test/unit/*.test.js",
     "test:e2e": "npm run build && node --test test/e2e/*.test.js",
+    "generate:openapi-models": "node scripts/generate-openapi-models.mjs",
     "check:openapi-coverage": "node scripts/check-openapi-coverage.mjs"
   },
   "engines": {

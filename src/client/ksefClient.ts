@@ -3,6 +3,7 @@ import {
   AuthClient,
   CertificatesClient,
   InvoicesClient,
+  LighthouseClient,
   LimitsClient,
   PeppolClient,
   PermissionsClient,
@@ -26,7 +27,10 @@ import {
   AuthorizationPolicy,
   ContextIdentifier,
   KsefEnvironment,
+  KsefLighthouseEnvironment,
+  KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV,
   KSEF_ENV_URLS,
+  KSEF_LIGHTHOUSE_URLS,
   KSEF_QR_URLS,
 } from "../types/common";
 
@@ -34,13 +38,22 @@ export interface KsefClientOptions {
   baseUrl?: string;
   environment?: KsefEnvironment;
   timeoutMs?: number;
+  appendV2?: boolean;
   proxy?: string;
   noProxy?: string;
   headers?: Record<string, string>;
   baseQrUrl?: string;
+  baseLighthouseUrl?: string;
+  lighthouseEnvironment?: KsefLighthouseEnvironment;
   retryOn429?: boolean;
+  retryOn5xx?: boolean;
+  retryOnTimeout?: boolean;
   maxRetryAttempts?: number;
   maxRetryDelayMs?: number;
+  strictPresignedUrlValidation?: boolean;
+  allowedPresignedHosts?: string[];
+  allowPrivateNetworkPresignedUrls?: boolean;
+  requireExportPartHash?: boolean;
 }
 
 export interface KsefConnectOptions extends KsefClientOptions {
@@ -63,6 +76,7 @@ export class KsefClient {
   readonly limits: LimitsClient;
   readonly testdata: TestdataClient;
   readonly peppol: PeppolClient;
+  readonly lighthouse: LighthouseClient;
   readonly activeSessions: ActiveSessionsClient;
   readonly authManager: AuthManager;
   readonly baseQrUrl: string;
@@ -91,18 +105,31 @@ export class KsefClient {
     this.baseQrUrl =
       options.baseQrUrl ??
       (options.environment ? KSEF_QR_URLS[options.environment] : KSEF_QR_URLS.TEST);
+    const baseLighthouseUrl = resolveLighthouseBaseUrl(baseUrl, options);
     const httpOptions = {
       baseUrl,
+      ...(options.appendV2 !== undefined && { appendV2: options.appendV2 }),
       ...(options.timeoutMs !== undefined && { timeoutMs: options.timeoutMs }),
       ...(options.headers && { defaultHeaders: options.headers }),
       ...(options.proxy && { proxy: options.proxy }),
       ...(options.noProxy && { noProxy: options.noProxy }),
       ...(options.retryOn429 !== undefined && { retryOn429: options.retryOn429 }),
+      ...(options.retryOn5xx !== undefined && { retryOn5xx: options.retryOn5xx }),
+      ...(options.retryOnTimeout !== undefined && { retryOnTimeout: options.retryOnTimeout }),
       ...(options.maxRetryAttempts !== undefined && {
         maxRetryAttempts: options.maxRetryAttempts,
       }),
       ...(options.maxRetryDelayMs !== undefined && {
         maxRetryDelayMs: options.maxRetryDelayMs,
+      }),
+      ...(options.strictPresignedUrlValidation !== undefined && {
+        strictPresignedUrlValidation: options.strictPresignedUrlValidation,
+      }),
+      ...(options.allowedPresignedHosts && {
+        allowedPresignedHosts: options.allowedPresignedHosts,
+      }),
+      ...(options.allowPrivateNetworkPresignedUrls !== undefined && {
+        allowPrivateNetworkPresignedUrls: options.allowPrivateNetworkPresignedUrls,
       }),
     };
     this.http = new HttpClient(httpOptions);
@@ -120,6 +147,7 @@ export class KsefClient {
     this.limits = new LimitsClient(this.http, tokenProvider);
     this.testdata = new TestdataClient(this.http, tokenProvider);
     this.peppol = new PeppolClient(this.http, tokenProvider);
+    this.lighthouse = new LighthouseClient(this.http, baseLighthouseUrl);
     this.activeSessions = new ActiveSessionsClient(this.http, tokenProvider);
 
     const onlineSessionWorkflow = new OnlineSessionWorkflow(
@@ -129,7 +157,11 @@ export class KsefClient {
     );
     const batchSessionWorkflow = new BatchSessionWorkflow(this.sessions, this.security, this.http);
     const offlineInvoiceWorkflow = new OfflineInvoiceWorkflow(onlineSessionWorkflow);
-    const exportsWorkflow = new InvoiceExportWorkflow(this.invoices, this.security, this.http);
+    const exportsWorkflow = new InvoiceExportWorkflow(this.invoices, this.security, this.http, {
+      ...(options.requireExportPartHash !== undefined && {
+        requireExportPartHash: options.requireExportPartHash,
+      }),
+    });
     this.workflows = {
       auth: new AuthCoordinator(this.auth, this.security),
       sessions: {
@@ -170,4 +202,40 @@ export class KsefClient {
     client.authManager.setTokens(tokens);
     return client;
   }
+}
+
+function resolveLighthouseBaseUrl(baseUrl: string, options: KsefClientOptions): string {
+  if (options.baseLighthouseUrl) {
+    return trimTrailingSlash(options.baseLighthouseUrl);
+  }
+
+  if (options.lighthouseEnvironment) {
+    return KSEF_LIGHTHOUSE_URLS[options.lighthouseEnvironment];
+  }
+
+  if (options.environment) {
+    return KSEF_LIGHTHOUSE_URLS[KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV[options.environment]];
+  }
+
+  const normalizedBaseUrl = trimTrailingSlash(baseUrl);
+  for (const [environment, apiBaseUrl] of Object.entries(KSEF_ENV_URLS) as Array<
+    [KsefEnvironment, string]
+  >) {
+    const normalizedApiBaseUrl = trimTrailingSlash(apiBaseUrl);
+    const apiBaseWithoutV2 = normalizedApiBaseUrl.endsWith("/v2")
+      ? normalizedApiBaseUrl.slice(0, -3)
+      : normalizedApiBaseUrl;
+    if (
+      normalizedBaseUrl.startsWith(normalizedApiBaseUrl) ||
+      normalizedBaseUrl.startsWith(apiBaseWithoutV2)
+    ) {
+      const lighthouseEnvironment = KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV[environment];
+      return KSEF_LIGHTHOUSE_URLS[lighthouseEnvironment];
+    }
+  }
+  return KSEF_LIGHTHOUSE_URLS.TEST;
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
 }

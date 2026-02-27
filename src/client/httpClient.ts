@@ -1,26 +1,36 @@
 import { fetch, ProxyAgent, Headers } from "undici";
 import type { BodyInit, Dispatcher, RequestInit, Response } from "undici";
 import { HttpMethod, JsonObject } from "../types/common";
+import { validatePresignedUrlSecurity } from "./presignedUrlPolicy";
 import {
   KsefApiError,
   KsefAuthStatusError,
   KsefHttpError,
   KsefRateLimitError,
+  KsefValidationError,
 } from "../errors/errors";
 
 export interface HttpClientOptions {
   baseUrl: string;
+  appendV2?: boolean;
   timeoutMs?: number;
   defaultHeaders?: Record<string, string>;
   proxy?: string;
   noProxy?: string;
   retryOn429?: boolean;
+  retryOn5xx?: boolean;
+  retryOnTimeout?: boolean;
   maxRetryAttempts?: number;
   maxRetryDelayMs?: number;
+  strictPresignedUrlValidation?: boolean;
+  allowedPresignedHosts?: string[];
+  allowPrivateNetworkPresignedUrls?: boolean;
 }
 
 export interface RetryOptions {
   retryOn429?: boolean;
+  retryOn5xx?: boolean;
+  retryOnTimeout?: boolean;
   maxAttempts?: number;
 }
 
@@ -35,12 +45,16 @@ export interface HttpRequestOptions {
   body?: JsonObject | Record<string, unknown> | object | string | Buffer | Uint8Array;
   responseType?: "json" | "text" | "buffer";
   authToken?: string;
+  skipAuth?: boolean;
   retry?: RetryOptions;
 }
 
-function normalizeBaseUrl(baseUrl: string): string {
+function normalizeBaseUrl(baseUrl: string, appendV2: boolean): string {
   if (baseUrl.endsWith("/")) {
     baseUrl = baseUrl.slice(0, -1);
+  }
+  if (!appendV2) {
+    return baseUrl;
   }
   return baseUrl.endsWith("/v2") ? baseUrl : `${baseUrl}/v2`;
 }
@@ -66,22 +80,34 @@ export class HttpClient {
   private readonly proxy: string | undefined;
   private readonly noProxy: string | undefined;
   private readonly retryOn429: boolean;
+  private readonly retryOn5xx: boolean;
+  private readonly retryOnTimeout: boolean;
   private readonly maxRetryAttempts: number;
   private readonly maxRetryDelayMs: number;
+  private readonly strictPresignedUrlValidation: boolean;
+  private readonly allowedPresignedHosts: string[] | undefined;
+  private readonly allowPrivateNetworkPresignedUrls: boolean;
 
   constructor(options: HttpClientOptions) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl);
+    this.baseUrl = normalizeBaseUrl(options.baseUrl, options.appendV2 ?? true);
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.defaultHeaders = options.defaultHeaders ?? {};
     this.proxy = options.proxy ?? process.env.HTTPS_PROXY ?? process.env.HTTP_PROXY;
     this.noProxy = options.noProxy ?? process.env.NO_PROXY;
     this.retryOn429 = options.retryOn429 ?? true;
+    this.retryOn5xx = options.retryOn5xx ?? true;
+    this.retryOnTimeout = options.retryOnTimeout ?? true;
     this.maxRetryAttempts = options.maxRetryAttempts ?? 3;
     this.maxRetryDelayMs = options.maxRetryDelayMs ?? 10_000;
+    this.strictPresignedUrlValidation = options.strictPresignedUrlValidation ?? true;
+    this.allowedPresignedHosts = options.allowedPresignedHosts;
+    this.allowPrivateNetworkPresignedUrls = options.allowPrivateNetworkPresignedUrls ?? false;
   }
 
   async request<T>(options: HttpRequestOptions): Promise<T> {
     const url = this.buildUrl(options.path, options.query);
+    this.validateSkipAuthOptions(options, url);
+
     const headers = new Headers(this.defaultHeaders);
     if (options.authToken) {
       headers.set("Authorization", `Bearer ${options.authToken}`);
@@ -108,11 +134,11 @@ export class HttpClient {
 
     const dispatcher = this.getDispatcher(url);
 
-    const retryOn429 = options.retry?.retryOn429 ?? this.retryOn429;
+    const retryPolicy = this.resolveRetryPolicy(options.retry);
     const maxAttempts = Math.max(1, options.retry?.maxAttempts ?? this.maxRetryAttempts);
-    const canRetry = retryOn429 && isIdempotentMethod(options.method);
+    const canRetryMethod = isIdempotentMethod(options.method);
 
-    let last429: Response | null = null;
+    let lastError: unknown = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -129,24 +155,63 @@ export class HttpClient {
           init.body = body;
         }
         const response = await fetch(url, init);
-        if (response.status === 429 && canRetry && attempt < maxAttempts) {
-          last429 = response;
+        if (shouldRetryResponse(response.status, retryPolicy) && canRetryMethod && attempt < maxAttempts) {
+          await response.arrayBuffer().catch(() => undefined);
           const retryAfter = response.headers.get("retry-after") ?? undefined;
           const delayMs = computeRetryDelayMs(retryAfter, attempt, this.maxRetryDelayMs);
           await sleep(delayMs);
           continue;
         }
         return await this.handleResponse<T>(response, options.responseType);
+      } catch (error) {
+        lastError = error;
+        if (
+          shouldRetryTimeout(error, retryPolicy) &&
+          canRetryMethod &&
+          attempt < maxAttempts
+        ) {
+          const delayMs = computeRetryDelayMs(undefined, attempt, this.maxRetryDelayMs);
+          await sleep(delayMs);
+          continue;
+        }
+        throw error;
       } finally {
         clearTimeout(timeout);
       }
     }
 
-    if (last429) {
-      const contentType = last429.headers.get("content-type") ?? "";
-      await this.throwForError(last429, contentType);
+    if (lastError) {
+      throw lastError;
     }
-    throw new KsefHttpError(429, "Rate limit exceeded", undefined);
+    throw new KsefHttpError(500, "HTTP request retry loop exited unexpectedly.", undefined);
+  }
+
+  private resolveRetryPolicy(retryOptions?: RetryOptions): RetryPolicy {
+    return {
+      retryOn429: retryOptions?.retryOn429 ?? this.retryOn429,
+      retryOn5xx: retryOptions?.retryOn5xx ?? this.retryOn5xx,
+      retryOnTimeout: retryOptions?.retryOnTimeout ?? this.retryOnTimeout,
+    };
+  }
+
+  private validateSkipAuthOptions(options: HttpRequestOptions, url: string): void {
+    if (!options.skipAuth) {
+      return;
+    }
+    if (options.authToken) {
+      throw new KsefValidationError("skipAuth and authToken cannot be used together.");
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      return;
+    }
+    validatePresignedUrlSecurity(
+      {
+        strictPresignedUrlValidation: this.strictPresignedUrlValidation,
+        allowPrivateNetworkPresignedUrls: this.allowPrivateNetworkPresignedUrls,
+        ...(this.allowedPresignedHosts ? { allowedPresignedHosts: this.allowedPresignedHosts } : {}),
+      },
+      url,
+    );
   }
 
   private buildUrl(path: string, query?: HttpRequestOptions["query"]): string {
@@ -245,8 +310,50 @@ export class HttpClient {
   }
 }
 
+interface RetryPolicy {
+  retryOn429: boolean;
+  retryOn5xx: boolean;
+  retryOnTimeout: boolean;
+}
+
 function isIdempotentMethod(method: HttpMethod): boolean {
   return method === "GET" || method === "PUT" || method === "DELETE";
+}
+
+function shouldRetryResponse(statusCode: number, retryPolicy: RetryPolicy): boolean {
+  return (
+    (retryPolicy.retryOn429 && statusCode === 429) ||
+    (retryPolicy.retryOn5xx && statusCode >= 500 && statusCode <= 599)
+  );
+}
+
+function shouldRetryTimeout(error: unknown, retryPolicy: RetryPolicy): boolean {
+  return retryPolicy.retryOnTimeout && isTimeoutError(error);
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if (error.name === "AbortError" || error.name === "TimeoutError") {
+    return true;
+  }
+  if (hasTimeoutCode(error)) {
+    return true;
+  }
+  const cause = (error as { cause?: unknown }).cause;
+  return cause instanceof Error && hasTimeoutCode(cause);
+}
+
+function hasTimeoutCode(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return (
+    code === "ETIMEDOUT" ||
+    code === "ESOCKETTIMEDOUT" ||
+    code === "UND_ERR_CONNECT_TIMEOUT" ||
+    code === "UND_ERR_HEADERS_TIMEOUT" ||
+    code === "UND_ERR_BODY_TIMEOUT"
+  );
 }
 
 function extractStatusDetails(payload: unknown): string[] | undefined {

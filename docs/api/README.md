@@ -10,6 +10,7 @@ Dla scenariuszy wieloetapowych (uwierzytelnianie, sesje, eksport) używaj warstw
 
 - [`KsefClient`](client.md)
 - [`client.auth`](auth.md)
+- [`API Lighthouse (status systemu)`](lighthouse.md)
 - [`client.activeSessions`](active-sessions.md)
 - [`client.sessions`](sessions.md)
 - [`client.invoices`](invoices.md)
@@ -20,3 +21,4 @@ Dla scenariuszy wieloetapowych (uwierzytelnianie, sesje, eksport) używaj warstw
 - [`client.security`](security.md)
 - [`client.testdata`](testdata.md)
 - [`client.peppol`](peppol.md)
+- [`Modele OpenAPI (plik generowany)`](../../src/types/openapi.generated.ts)

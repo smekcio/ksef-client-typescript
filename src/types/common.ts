@@ -11,12 +11,26 @@ export type JsonObject = { [key: string]: JsonValue };
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type KsefEnvironment = "TEST" | "DEMO" | "PRD";
+export type KsefLighthouseEnvironment = "TEST" | "PROD" | "PRD";
 
 export const KSEF_ENV_URLS: Record<KsefEnvironment, string> = {
   TEST: "https://api-test.ksef.mf.gov.pl/v2",
   DEMO: "https://api-demo.ksef.mf.gov.pl/v2",
   PRD: "https://api.ksef.mf.gov.pl/v2",
 };
+
+export const KSEF_LIGHTHOUSE_URLS: Record<KsefLighthouseEnvironment, string> = {
+  TEST: "https://api-latarnia-test.ksef.mf.gov.pl",
+  PROD: "https://api-latarnia.ksef.mf.gov.pl",
+  PRD: "https://api-latarnia.ksef.mf.gov.pl",
+};
+
+export const KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV: Record<KsefEnvironment, KsefLighthouseEnvironment> =
+  {
+    TEST: "TEST",
+    DEMO: "TEST",
+    PRD: "PRD",
+  };
 
 export const KSEF_QR_URLS: Record<KsefEnvironment, string> = {
   TEST: "https://qr-test.ksef.mf.gov.pl",

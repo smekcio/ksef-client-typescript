@@ -35,18 +35,33 @@ export interface WaitForExportOptions {
 }
 
 export interface DownloadPackageOptions {
+  /**
+   * @deprecated Use requireExportPartHash instead.
+   */
   verifyHashes?: boolean;
+  requireExportPartHash?: boolean;
+}
+
+export interface InvoiceExportWorkflowOptions {
+  requireExportPartHash?: boolean;
 }
 
 export class InvoiceExportWorkflow {
   private readonly invoicesClient: InvoicesClient;
   private readonly securityClient: SecurityClient;
   private readonly http: HttpClient;
+  private readonly requireExportPartHash: boolean;
 
-  constructor(invoicesClient: InvoicesClient, securityClient: SecurityClient, http: HttpClient) {
+  constructor(
+    invoicesClient: InvoicesClient,
+    securityClient: SecurityClient,
+    http: HttpClient,
+    options: InvoiceExportWorkflowOptions = {},
+  ) {
     this.invoicesClient = invoicesClient;
     this.securityClient = securityClient;
     this.http = http;
+    this.requireExportPartHash = options.requireExportPartHash ?? true;
   }
 
   async startExport(options: ExportStartOptions): Promise<ExportResult> {
@@ -96,7 +111,8 @@ export class InvoiceExportWorkflow {
     options: DownloadPackageOptions = {},
   ): Promise<PackageProcessingResult> {
     const parts = status.package?.parts ?? [];
-    const encryptedParts = await this.downloadParts(parts, options.verifyHashes);
+    const verifyHashes = resolveRequireExportPartHash(options, this.requireExportPartHash);
+    const encryptedParts = await this.downloadParts(parts, verifyHashes);
     const decryptedParts = encryptedParts.map((part) =>
       CryptographyService.decryptAes256Cbc(part, encryptionData.cipherKey, encryptionData.cipherIv),
     );
@@ -123,7 +139,7 @@ export class InvoiceExportWorkflow {
 
   private async downloadParts(
     parts: InvoicePackagePart[],
-    verifyHashes = false,
+    verifyHashes = this.requireExportPartHash,
   ): Promise<Buffer[]> {
     const results: Buffer[] = [];
     for (const part of parts) {
@@ -131,12 +147,17 @@ export class InvoiceExportWorkflow {
         method: part.method as "GET",
         path: part.url,
         responseType: "buffer",
+        skipAuth: true,
       });
       if (verifyHashes) {
+        const expectedHash = typeof part.encryptedPartHash === "string" ? part.encryptedPartHash : "";
+        if (!expectedHash.trim()) {
+          throw new KsefError(`Missing encrypted part hash for ${part.partName}.`);
+        }
         const hash = CryptographyService.sha256Base64(data);
-        if (hash !== part.encryptedPartHash) {
+        if (hash !== expectedHash) {
           throw new KsefError(
-            `Encrypted part hash mismatch for ${part.partName}: expected ${part.encryptedPartHash}, got ${hash}.`,
+            `Encrypted part hash mismatch for ${part.partName}: expected ${expectedHash}, got ${hash}.`,
           );
         }
       }
@@ -163,4 +184,17 @@ export class InvoiceExportWorkflow {
     }
     return cert.certificate;
   }
+}
+
+function resolveRequireExportPartHash(
+  options: DownloadPackageOptions,
+  defaultValue: boolean,
+): boolean {
+  if (options.verifyHashes !== undefined) {
+    return options.verifyHashes;
+  }
+  if (options.requireExportPartHash !== undefined) {
+    return options.requireExportPartHash;
+  }
+  return defaultValue;
 }

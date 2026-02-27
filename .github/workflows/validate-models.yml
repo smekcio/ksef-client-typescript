@@ -1,0 +1,45 @@
+name: Validate OpenAPI Models
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      OPENAPI_URL: https://raw.githubusercontent.com/CIRFMF/ksef-docs/main/open-api.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download official open-api.json
+        run: curl -L -o open-api.json "${{ env.OPENAPI_URL }}"
+
+      - name: Regenerate OpenAPI models
+        run: npm run generate:openapi-models -- --openapi open-api.json --output src/types/openapi.generated.ts
+
+      - name: Verify generated models are up to date
+        run: git diff --exit-code -- src/types/openapi.generated.ts
+
+      - name: Check OpenAPI endpoint coverage
+        run: node scripts/check-openapi-coverage.mjs --openapi open-api.json --src src/api
