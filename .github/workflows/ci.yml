@@ -80,7 +80,7 @@ jobs:
         run: npm run build
 
       - name: Run tests with coverage
-        run: npm exec -- c8 --reporter=text-summary --reporter=lcov --reporter=html node --test "test/unit/*.test.js" "test/e2e/*.test.js"
+        run: npm exec -- c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/unit/*.test.js test/e2e/*.test.js
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
