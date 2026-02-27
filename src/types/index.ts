@@ -2,6 +2,7 @@ export * from "./auth";
 export * from "./certificates";
 export * from "./common";
 export * from "./invoices";
+export * from "./lighthouse";
 export * from "./limits";
 export * from "./permissions";
 export * from "./security";

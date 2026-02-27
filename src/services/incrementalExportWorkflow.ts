@@ -13,7 +13,11 @@ export interface IncrementalExportOptions {
   windowTo: string;
   continuationPoints: ContinuationPoints;
   maxIterations?: number;
+  /**
+   * @deprecated Use requireExportPartHash instead.
+   */
   verifyHashes?: boolean;
+  requireExportPartHash?: boolean;
   pollIntervalMs?: number;
   maxAttempts?: number;
   filtersFactory?: (from: string, to: string) => InvoiceQueryFilters;
@@ -70,14 +74,20 @@ export class IncrementalExportWorkflow {
       };
       const status = await this.exports.waitForExport(started.referenceNumber, waitOptions);
 
+      const downloadOptions: {
+        verifyHashes?: boolean;
+        requireExportPartHash?: boolean;
+      } = {};
+      if (options.requireExportPartHash !== undefined) {
+        downloadOptions.requireExportPartHash = options.requireExportPartHash;
+      } else if (options.verifyHashes !== undefined) {
+        downloadOptions.verifyHashes = options.verifyHashes;
+      }
+
       const processed = await this.exports.downloadAndProcessPackage(
         status,
         started.encryptionData,
-        {
-          ...(options.verifyHashes !== undefined && {
-            verifyHashes: options.verifyHashes,
-          }),
-        },
+        downloadOptions,
       );
 
       combinedMetadata.push(...processed.metadataSummaries);

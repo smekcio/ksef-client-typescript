@@ -17,6 +17,7 @@ Podklienci domenowi:
 - `client.security`
 - `client.testdata`
 - `client.peppol`
+- `client.lighthouse`
 
 Warstwa workflow:
 

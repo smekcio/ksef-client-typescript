@@ -92,12 +92,19 @@ jobs:
   test-matrix:
     name: Test (Node ${{ matrix.node-version }})
     if: github.event_name != 'pull_request'
+    continue-on-error: ${{ matrix.experimental }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22]
+        include:
+          - node-version: 20
+            experimental: false
+          - node-version: 22
+            experimental: false
+          - node-version: 24
+            experimental: true
 
     steps:
       - name: Checkout repository
