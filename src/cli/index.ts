@@ -811,10 +811,18 @@ function resolveLighthouseEnvironment(
   profile: ProfileConfig,
   options: Record<string, string | boolean>,
 ): KsefLighthouseEnvironment {
-  const value = getStringOption(options, "env")?.toUpperCase();
-  if (value === "TEST" || value === "PROD" || value === "PRD") {
-    return value;
+  const explicitLighthouseEnvironment = parseLighthouseEnvironment(
+    getStringOption(options, "lighthouse-env"),
+  );
+  if (explicitLighthouseEnvironment) {
+    return explicitLighthouseEnvironment;
   }
+
+  const inferredFromEnv = parseLighthouseEnvironment(getStringOption(options, "env"));
+  if (inferredFromEnv) {
+    return inferredFromEnv;
+  }
+
   if (profile.lighthouseEnvironment) {
     return profile.lighthouseEnvironment;
   }
@@ -822,6 +830,23 @@ function resolveLighthouseEnvironment(
     return "PRD";
   }
   return "TEST";
+}
+
+function parseLighthouseEnvironment(value?: string): KsefLighthouseEnvironment | undefined {
+  const normalized = value?.trim().toUpperCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized === "DEMO") {
+    return "TEST";
+  }
+
+  if (normalized === "TEST" || normalized === "PROD" || normalized === "PRD") {
+    return normalized;
+  }
+
+  return undefined;
 }
 
 function parseSortOrder(value?: string): "Asc" | "Desc" | undefined {
