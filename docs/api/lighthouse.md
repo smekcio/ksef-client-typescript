@@ -2,13 +2,18 @@
 
 Latarnia KSeF udostepnia status dostepnosci API i komunikaty utrzymaniowe.
 
-W SDK dostepne sa typy dla odpowiedzi latarni:
+W SDK dostepny jest dedykowany klient `client.lighthouse` (klasa `LighthouseClient`) oraz typy:
 
 - `LighthouseStatusResponse`
 - `LighthouseMessage`
 - `LighthouseStatusCode`
 
 Plik z typami: `src/types/lighthouse.ts`.
+
+Endpointy Latarni:
+
+- `GET /status`
+- `GET /messages`
 
 Adresy bazowe latarni:
 
@@ -17,24 +22,23 @@ Adresy bazowe latarni:
 
 Mapowanie znajduje sie w `KSEF_LIGHTHOUSE_URLS` (`src/types/common.ts`).
 
-## Przykladowe zapytania
-
-```bash
-curl -sS https://api-latarnia-test.ksef.mf.gov.pl/api/status
-curl -sS https://api-latarnia.ksef.mf.gov.pl/api/status
-```
-
-## Uzycie typow
+## Uzycie przez SDK
 
 ```ts
-import type { LighthouseStatusResponse } from "ksef-client";
+import { KsefClient } from "ksef-client";
 
-function isAvailable(status: LighthouseStatusResponse): boolean {
-  return status.status === "AVAILABLE";
-}
+const client = new KsefClient({ environment: "TEST" });
+const status = await client.lighthouse.getStatus();
+const messages = await client.lighthouse.getMessages();
+
+console.log(status.status);
+console.log(messages.length);
 ```
 
-## Uwagi
+## Przykladowe zapytania HTTP
 
-- W tym repozytorium nie ma dedykowanego klienta HTTP dla latarni.
-- Do sprawdzenia statusu mozna uzyc `fetch`/`undici` lub zewnetrznego monitora.
+```bash
+curl -sS https://api-latarnia-test.ksef.mf.gov.pl/status
+curl -sS https://api-latarnia.ksef.mf.gov.pl/status
+curl -sS https://api-latarnia-test.ksef.mf.gov.pl/messages
+```

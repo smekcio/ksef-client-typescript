@@ -90,7 +90,7 @@ const status = await client.workflows.exports.waitForExport(started.referenceNum
 const processed = await client.workflows.exports.downloadAndProcessPackage(
   status,
   started.encryptionData,
-  { verifyHashes: true },
+  { requireExportPartHash: true },
 );
 
 console.log(processed.metadataSummaries.length);
@@ -133,7 +133,7 @@ const result = await client.workflows.exportsIncremental.run({
   windowFrom: "2025-01-01",
   windowTo: "2025-01-31",
   continuationPoints,
-  verifyHashes: true,
+  requireExportPartHash: true,
   pollIntervalMs: 2000,
   maxAttempts: 120,
   maxIterations: 10,
@@ -211,6 +211,6 @@ try {
 - Domyślny polling eksportu: `pollIntervalMs=2000`, `maxAttempts=60`.
 - Download partów eksportu odbywa się z pre-signed URL (bez Bearer tokena).
 - URL-e partów mogą wygasać, dlatego paczkę warto pobrać bez zbędnej zwłoki.
-- `verifyHashes: true` zwiększa bezpieczeństwo, ale dokłada koszt hashowania.
+- `requireExportPartHash` jest domyślnie `true`; aby wyłączyć kontrolę hashy, ustaw `requireExportPartHash: false` (alias legacy: `verifyHashes`).
 - `metadataSummaries` pochodzi z `_metadata.json`, a `invoiceXmlFiles` jest mapą `nazwa.xml -> treść XML`.
 - W `exportsIncremental.run(...)` wynikowe `metadataSummaries` są deduplikowane po `ksefNumber`/`KsefNumber`.

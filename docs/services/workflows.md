@@ -86,7 +86,7 @@ Najważniejsze metody:
 
 - `startExport({ filters, ... })`
 - `waitForExport(referenceNumber, options?)`
-- `downloadAndProcessPackage(status, encryptionData, { verifyHashes? })`
+- `downloadAndProcessPackage(status, encryptionData, { requireExportPartHash? })`
 
 Przykład:
 
@@ -102,7 +102,7 @@ const status = await client.workflows.exports.waitForExport(started.referenceNum
 const processed = await client.workflows.exports.downloadAndProcessPackage(
   status,
   started.encryptionData,
-  { verifyHashes: true },
+  { requireExportPartHash: true },
 );
 
 console.log(processed.metadataSummaries.length, Object.keys(processed.invoiceXmlFiles).length);
@@ -122,18 +122,20 @@ Znaczenie pól:
 - `metadataSummaries`: rekordy z `_metadata.json` (SDK obsługuje zarówno `invoices`, jak i `invoiceList`).
 - `invoiceXmlFiles`: mapa `nazwa_pliku.xml -> XML` po odszyfrowaniu i rozpakowaniu archiwum.
 
-`verifyHashes` (domyślnie `false`) działa na etapie pobierania partów:
+`requireExportPartHash` (domyślnie `true`) działa na etapie pobierania partów:
 
 - dla każdego partu liczony jest `sha256Base64(data)` i porównywany z `part.encryptedPartHash`,
 - przy niezgodności workflow rzuca błąd i nie przechodzi do odszyfrowania/scalenia.
 
-Kiedy używać `verifyHashes: true`:
+`verifyHashes` pozostaje wspierane jako zgodny wstecznie alias (preferowane jest `requireExportPartHash`).
+
+Kiedy używać `requireExportPartHash: true`:
 
 - środowiska produkcyjne z wysokim wymaganiem integralności danych,
 - transfer przez infrastrukturę, której nie kontrolujesz end-to-end,
 - procesy audytowe/compliance, gdzie chcesz jawnie potwierdzić zgodność partów.
 
-Kiedy zostawić `verifyHashes: false`:
+Kiedy ustawić `requireExportPartHash: false`:
 
 - kontrolowane środowiska wewnętrzne i duże wolumeny, gdy kluczowa jest wydajność,
 - sytuacje, gdzie dodatkowy koszt hashowania partów jest nieakceptowalny czasowo.
@@ -156,7 +158,7 @@ const result = await client.workflows.exportsIncremental.run({
   windowTo: "2025-01-31",
   continuationPoints,
   maxIterations: 20,
-  verifyHashes: false,
+  requireExportPartHash: false,
 });
 
 console.log(result.referenceNumbers);

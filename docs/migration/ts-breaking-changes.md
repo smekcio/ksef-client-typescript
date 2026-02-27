@@ -11,12 +11,18 @@ Ten dokument opisuje zmiany procesowe po rozszerzeniu SDK i automatyzacji modeli
    - regeneruje modele,
    - sprawdza `git diff`,
    - uruchamia kontrole pokrycia endpointow.
+4. Domyslna polityka integralnosci eksportu zostala zaostrzona:
+   - `requireExportPartHash` domyslnie jest `true`,
+   - opcja `verifyHashes` pozostaje wspierana jako alias legacy.
+5. Dodano dedykowanego klienta `client.lighthouse` i wsparcie CLI dla `--lighthouse-env`.
 
 ## Wplyw na developerow
 
 - Zmiany w `open-api.json` moga wymagac aktualizacji `openapi.generated.ts`.
 - Pull request nie przejdzie `validate-models.yml`, jesli plik generowany nie jest aktualny.
 - `openapi.generated.ts` traktuj jako artefakt build, nie jako recznie utrzymywany kod.
+- Eksporty, ktore nie zwracaja `encryptedPartHash`, beda teraz domyslnie odrzucane przez workflow.
+- Integracje monitorujace Latarnie moga przejsc z recznego `fetch` na `client.lighthouse`.
 
 ## Zalecana sekwencja aktualizacji
 
@@ -26,6 +32,24 @@ npm run generate:openapi-models -- --openapi ../ksef-docs/open-api.json --output
 node scripts/check-openapi-coverage.mjs --openapi ../ksef-docs/open-api.json --src src/api
 npm run lint
 npm run typecheck
+```
+
+## Zmiana hash policy w eksporcie
+
+Przed zmiana:
+
+```ts
+await client.workflows.exports.downloadAndProcessPackage(status, encryptionData, {
+  verifyHashes: false,
+});
+```
+
+Po zmianie (jawne wylaczenie walidacji):
+
+```ts
+await client.workflows.exports.downloadAndProcessPackage(status, encryptionData, {
+  requireExportPartHash: false,
+});
 ```
 
 ## Typowe symptomy niezgodnosci modeli

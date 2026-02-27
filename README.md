@@ -106,7 +106,7 @@ Podstawowe workflow:
 - `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - scenariusze token/XAdES dla `TEST` i `DEMO`.
 - `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - kontrola pokrycia endpointów.
 - `Validate OpenAPI Models` (`.github/workflows/validate-models.yml`) - pobranie `open-api.json`, regeneracja modeli, diff i kontrola pokrycia endpointów.
-- `Release Published` (`.github/workflows/release-published.yml`) - walidacja release tagu i paczki po publikacji release.
+- `Release Published Validation` (`.github/workflows/release-published.yml`) - walidacja tagu/paczki po publikacji release (bez publikowania do rejestrow).
 - `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja wersjonowania.
 - `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki.
 
