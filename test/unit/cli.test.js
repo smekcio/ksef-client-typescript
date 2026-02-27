@@ -104,3 +104,28 @@ test("lighthouse prefers --lighthouse-env over --env", async () => {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test("lighthouse returns usage error for invalid --lighthouse-env", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    const capture = createCaptureIo();
+    const exitCode = await runCli(
+      ["--json", "lighthouse", "--lighthouse-env", "invalid"],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    assert.equal(exitCode, 2);
+    assert.equal(capture.stdout.length, 0);
+    assert.equal(capture.stderr.length, 1);
+
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.match(payload.error.message, /Unsupported --lighthouse-env/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});

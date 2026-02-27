@@ -811,16 +811,27 @@ function resolveLighthouseEnvironment(
   profile: ProfileConfig,
   options: Record<string, string | boolean>,
 ): KsefLighthouseEnvironment {
-  const explicitLighthouseEnvironment = parseLighthouseEnvironment(
-    getStringOption(options, "lighthouse-env"),
-  );
-  if (explicitLighthouseEnvironment) {
-    return explicitLighthouseEnvironment;
+  const explicitLighthouseEnvironmentValue = getStringOption(options, "lighthouse-env");
+  if (explicitLighthouseEnvironmentValue !== undefined) {
+    const explicitLighthouseEnvironment = parseLighthouseEnvironment(
+      explicitLighthouseEnvironmentValue,
+    );
+    if (explicitLighthouseEnvironment) {
+      return explicitLighthouseEnvironment;
+    }
+    throw new CliError(
+      `Unsupported --lighthouse-env "${explicitLighthouseEnvironmentValue}". Use TEST, PROD or PRD.`,
+      EXIT_USAGE,
+    );
   }
 
-  const inferredFromEnv = parseLighthouseEnvironment(getStringOption(options, "env"));
-  if (inferredFromEnv) {
-    return inferredFromEnv;
+  const envValue = getStringOption(options, "env");
+  if (envValue !== undefined) {
+    const inferredFromEnv = parseLighthouseEnvironment(envValue);
+    if (inferredFromEnv) {
+      return inferredFromEnv;
+    }
+    throw new CliError(`Unsupported --env "${envValue}". Use TEST, DEMO or PRD.`, EXIT_USAGE);
   }
 
   if (profile.lighthouseEnvironment) {
