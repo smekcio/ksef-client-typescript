@@ -12,7 +12,7 @@ Biblioteka udostępnia:
 
 ## 🔄 Kompatybilność API KSeF
 
-Aktualna kompatybilność: **KSeF API `v2.1.2`**.
+Aktualna kompatybilność: **KSeF API `v2.2.0`**.
 
 ## ⚙️ Wymagania
 

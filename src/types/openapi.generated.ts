@@ -2,7 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
-export const OPENAPI_SCHEMA_COUNT = 275 as const;
+export const OPENAPI_SCHEMA_COUNT = 283 as const;
 
 export type AllowedIps = {
   ip4Addresses?: Array<string> | null;
@@ -44,6 +44,7 @@ export type AttachmentPermissionRevokeRequest = {
 
 export type AuthenticationChallengeResponse = {
   challenge: Challenge;
+  clientIp: string;
   timestamp: string;
   timestampMs: number;
 };
@@ -338,11 +339,33 @@ export type EntityPermission = {
   type: EntityPermissionType;
 };
 
+export type EntityPermissionItem = {
+  canDelegate: boolean;
+  contextIdentifier: EntityPermissionsContextIdentifier;
+  description: string;
+  id: PermissionId;
+  permissionScope: EntityPermissionItemScope;
+  startDate: string;
+};
+
+export type EntityPermissionItemScope = "InvoiceRead" | "InvoiceWrite";
+
+export type EntityPermissionsContextIdentifier = {
+  type: EntityPermissionsContextIdentifierType;
+  value: string;
+};
+
+export type EntityPermissionsContextIdentifierType = "InternalId" | "Nip";
+
 export type EntityPermissionsGrantRequest = {
   description: string;
   permissions: Array<EntityPermission>;
   subjectDetails: EntityDetails;
   subjectIdentifier: EntityPermissionsSubjectIdentifier;
+};
+
+export type EntityPermissionsQueryRequest = {
+  contextIdentifier?: EntityPermissionsContextIdentifier | null;
 };
 
 export type EntityPermissionsSubjectIdentifier = {
@@ -486,6 +509,16 @@ export type ExceptionResponse = {
 
 export type ExportInvoicesResponse = {
   referenceNumber: ReferenceNumber;
+};
+
+export type ForbiddenProblemDetails = {
+  detail: string;
+  instance?: string | null;
+  reasonCode: string;
+  security?: Record<string, unknown | null> | null;
+  status: number;
+  title: string;
+  traceId?: string | null;
 };
 
 export type FormCode = {
@@ -680,7 +713,7 @@ export type InvoiceStatusInfo = {
   code: number;
   description: string;
   details?: Array<string> | null;
-  extensions?: Record<string, never> | null;
+  extensions?: Record<string, string | null> | null;
 };
 
 export type InvoiceType = "Kor" | "KorPef" | "KorRoz" | "KorVatRr" | "KorZal" | "Roz" | "Upr" | "Vat" | "VatPef" | "VatPefSp" | "VatRr" | "Zal";
@@ -730,7 +763,7 @@ export type OpenOnlineSessionResponse = {
 };
 
 export type PartUploadRequest = {
-  headers: Record<string, never>;
+  headers: Record<string, string | null>;
   method: string;
   ordinalNumber: number;
   url: string;
@@ -993,6 +1026,11 @@ export type QueryCertificatesResponse = {
 export type QueryEntityAuthorizationPermissionsResponse = {
   authorizationGrants: Array<EntityAuthorizationGrant>;
   hasMore: boolean;
+};
+
+export type QueryEntityPermissionsResponse = {
+  hasMore: boolean;
+  permissions: Array<EntityPermissionItem>;
 };
 
 export type QueryEntityRolesResponse = {
@@ -1350,6 +1388,14 @@ export type TooManyRequestsResponse = {
   };
 };
 
+export type UnauthorizedProblemDetails = {
+  detail: string;
+  instance?: string | null;
+  status: number;
+  title: string;
+  traceId?: string | null;
+};
+
 export type UnblockContextAuthenticationRequest = {
   contextIdentifier?: TestDataAuthenticationContextIdentifier | null;
 };
@@ -1430,7 +1476,12 @@ export interface OpenApiGeneratedSchemaMap {
   EntityByFingerprintDetails: EntityByFingerprintDetails;
   EntityDetails: EntityDetails;
   EntityPermission: EntityPermission;
+  EntityPermissionItem: EntityPermissionItem;
+  EntityPermissionItemScope: EntityPermissionItemScope;
+  EntityPermissionsContextIdentifier: EntityPermissionsContextIdentifier;
+  EntityPermissionsContextIdentifierType: EntityPermissionsContextIdentifierType;
   EntityPermissionsGrantRequest: EntityPermissionsGrantRequest;
+  EntityPermissionsQueryRequest: EntityPermissionsQueryRequest;
   EntityPermissionsSubjectIdentifier: EntityPermissionsSubjectIdentifier;
   EntityPermissionsSubjectIdentifierType: EntityPermissionsSubjectIdentifierType;
   EntityPermissionsSubordinateEntityIdentifier: EntityPermissionsSubordinateEntityIdentifier;
@@ -1464,6 +1515,7 @@ export interface OpenApiGeneratedSchemaMap {
   ExceptionInfo: ExceptionInfo;
   ExceptionResponse: ExceptionResponse;
   ExportInvoicesResponse: ExportInvoicesResponse;
+  ForbiddenProblemDetails: ForbiddenProblemDetails;
   FormCode: FormCode;
   GenerateTokenRequest: GenerateTokenRequest;
   GenerateTokenResponse: GenerateTokenResponse;
@@ -1564,6 +1616,7 @@ export interface OpenApiGeneratedSchemaMap {
   QueryCertificatesRequest: QueryCertificatesRequest;
   QueryCertificatesResponse: QueryCertificatesResponse;
   QueryEntityAuthorizationPermissionsResponse: QueryEntityAuthorizationPermissionsResponse;
+  QueryEntityPermissionsResponse: QueryEntityPermissionsResponse;
   QueryEntityRolesResponse: QueryEntityRolesResponse;
   QueryEuEntityPermissionsResponse: QueryEuEntityPermissionsResponse;
   QueryInvoicesMetadataResponse: QueryInvoicesMetadataResponse;
@@ -1637,6 +1690,7 @@ export interface OpenApiGeneratedSchemaMap {
   TokenPermissionType: TokenPermissionType;
   TokenStatusResponse: TokenStatusResponse;
   TooManyRequestsResponse: TooManyRequestsResponse;
+  UnauthorizedProblemDetails: UnauthorizedProblemDetails;
   UnblockContextAuthenticationRequest: UnblockContextAuthenticationRequest;
   UpoPageResponse: UpoPageResponse;
   UpoResponse: UpoResponse;

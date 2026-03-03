@@ -4,7 +4,7 @@ Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz goto
 
 Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w `ksef-docs/`.
 
-Kompatybilność SDK: **KSeF API `v2.1.2`**.
+Kompatybilność SDK: **KSeF API `v2.2.0`**.
 
 ## Status parity
 
