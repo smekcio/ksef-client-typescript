@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.2.0...v0.3.0) (2026-03-03)
+
+
+### Features
+
+* **api:** align TypeScript SDK with KSeF API 2.2.0 ([#16](https://github.com/smekcio/ksef-client-typescript/issues/16)) ([0968f9c](https://github.com/smekcio/ksef-client-typescript/commit/0968f9c1edb4976bff50d763576663a4a95bd49b))
+* **ts:** lighthouse API, CLI i wzmocnienie HTTP/export oraz CI ([#14](https://github.com/smekcio/ksef-client-typescript/issues/14)) ([e86d1ca](https://github.com/smekcio/ksef-client-typescript/commit/e86d1ca60b06371b66019397b9be3b2246b8b490))
+
 ## [0.2.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.1.0...v0.2.0) (2026-02-19)
 
 
