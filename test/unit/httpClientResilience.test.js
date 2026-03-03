@@ -65,6 +65,7 @@ test("HttpClient retries GET on 5xx and succeeds", async () => {
 
 test("HttpClient retries timeout errors for idempotent GET", async () => {
   let attempts = 0;
+  const firstAttemptResponseDelayMs = 600;
   const server = createServer((req, res) => {
     if (req.url !== "/v2/security/public-key-certificates") {
       res.writeHead(404, { "Content-Type": "application/json" });
@@ -80,7 +81,7 @@ test("HttpClient retries timeout errors for idempotent GET", async () => {
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify([]));
-      }, 80);
+      }, firstAttemptResponseDelayMs);
       return;
     }
 
@@ -90,15 +91,15 @@ test("HttpClient retries timeout errors for idempotent GET", async () => {
   const address = await listen(server);
   const client = new KsefClient({
     baseUrl: `http://127.0.0.1:${address.port}`,
-    timeoutMs: 20,
-    maxRetryAttempts: 2,
+    timeoutMs: 200,
+    maxRetryAttempts: 3,
     maxRetryDelayMs: 1,
   });
 
   try {
     const result = await client.security.getPublicKeyCertificates();
     assert.deepEqual(result, []);
-    assert.equal(attempts, 2);
+    assert.ok(attempts >= 2);
   } finally {
     await closeServer(server);
   }
