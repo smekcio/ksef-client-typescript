@@ -2,8 +2,9 @@ import { AuthorizationPolicy, ContextIdentifier, JsonObject, TokenInfo } from ".
 
 export interface AuthChallengeResponse {
   challenge: string;
+  clientIp: string;
   timestamp: string;
-  timestampMs?: number;
+  timestampMs: number;
 }
 
 export interface InitTokenAuthenticationRequest {
