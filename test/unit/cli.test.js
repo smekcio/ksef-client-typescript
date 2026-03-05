@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { test } from "node:test";
 import { runCli } from "../../dist/cli/index.js";
 
@@ -399,6 +399,182 @@ test("upo get validates that exactly one selector is provided", async () => {
     const payload = JSON.parse(capture.stderr[0]);
     assert.equal(payload.ok, false);
     assert.match(payload.error.message, /requires exactly one selector/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("argv parsing handles sparse input, -- separator and string boolean normalization", async () => {
+  const sparse = [];
+  sparse.length = 1;
+
+  const sparseCapture = createCaptureIo();
+  const sparseExitCode = await runCli(sparse, {
+    io: sparseCapture.io,
+    env: process.env,
+    cwd: process.cwd(),
+  });
+  assert.equal(sparseExitCode, 0);
+  assert.ok(sparseCapture.stdout[0].includes("Usage:"));
+
+  const separatorCapture = createCaptureIo();
+  const separatorExitCode = await runCli(["--", "does-not-exist"], {
+    io: separatorCapture.io,
+    env: process.env,
+    cwd: process.cwd(),
+  });
+  assert.equal(separatorExitCode, 2);
+  assert.match(separatorCapture.stderr[0], /Unknown command/);
+
+  const jsonFalseCapture = createCaptureIo();
+  const jsonFalseExitCode = await runCli(["--json=false", "--help"], {
+    io: jsonFalseCapture.io,
+    env: process.env,
+    cwd: process.cwd(),
+  });
+  assert.equal(jsonFalseExitCode, 0);
+  assert.ok(jsonFalseCapture.stdout[0].includes("Usage:"));
+
+  const jsonStringCapture = createCaptureIo();
+  const jsonStringExitCode = await runCli(["--json=yes", "does-not-exist"], {
+    io: jsonStringCapture.io,
+    env: process.env,
+    cwd: process.cwd(),
+  });
+  assert.equal(jsonStringExitCode, 2);
+  const jsonPayload = JSON.parse(jsonStringCapture.stderr[0]);
+  assert.equal(jsonPayload.ok, false);
+  assert.equal(jsonPayload.error.exitCode, 2);
+});
+
+test("auth logout handles malformed plaintext token stores", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "file-profile",
+        "--token-store-policy",
+        "plaintext",
+        "--context-type",
+        "Nip",
+        "--context-value",
+        "1111111111",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const tokenFile = path.join(tempDir, "tokens.json");
+
+    await writeFile(tokenFile, "1", "utf8");
+    const primitiveCapture = createCaptureIo();
+    const primitiveExitCode = await runCli(["--json", "auth", "logout", "--profile", "file-profile"], {
+      io: primitiveCapture.io,
+      env: { KSEF_CLI_HOME: tempDir },
+      cwd: tempDir,
+    });
+    assert.equal(primitiveExitCode, 0);
+    const primitivePayload = JSON.parse(primitiveCapture.stdout[0]);
+    assert.equal(primitivePayload.ok, true);
+    assert.equal(primitivePayload.cleared, true);
+
+    await writeFile(tokenFile, "{broken", "utf8");
+    const brokenCapture = createCaptureIo();
+    const brokenExitCode = await runCli(["--json", "auth", "logout", "--profile", "file-profile"], {
+      io: brokenCapture.io,
+      env: { KSEF_CLI_HOME: tempDir },
+      cwd: tempDir,
+    });
+    assert.equal(brokenExitCode, 1);
+    const brokenPayload = JSON.parse(brokenCapture.stderr[0]);
+    assert.equal(brokenPayload.ok, false);
+    assert.equal(brokenPayload.error.exitCode, 1);
+    assert.match(brokenPayload.error.message, /Unexpected token|JSON/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth status parses non-numeric --page-size as undefined and returns remote error", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "env-profile",
+        "--token-store-policy",
+        "env",
+        "--access-token-env",
+        "MY_ACCESS",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(
+      ["--json", "auth", "status", "--profile", "env-profile", "--page-size=abc"],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir, MY_ACCESS: "access-token-from-env" },
+        cwd: tempDir,
+      },
+    );
+
+    assert.equal(exitCode, 5);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.exitCode, 5);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("auth status handles malformed plaintext token file profiles shape", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-"));
+  try {
+    await runCli(
+      [
+        "init",
+        "--profile",
+        "file-profile",
+        "--token-store-policy",
+        "plaintext",
+        "--context-type",
+        "Nip",
+        "--context-value",
+        "1111111111",
+      ],
+      {
+        io: createCaptureIo().io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+
+    await writeFile(path.join(tempDir, "tokens.json"), '{"version":1,"profiles":"broken"}', "utf8");
+
+    const capture = createCaptureIo();
+    const exitCode = await runCli(["--json", "auth", "status", "--profile", "file-profile"], {
+      io: capture.io,
+      env: { KSEF_CLI_HOME: tempDir },
+      cwd: tempDir,
+    });
+
+    assert.equal(exitCode, 4);
+    const payload = JSON.parse(capture.stderr[0]);
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error.exitCode, 4);
+    assert.match(payload.error.message, /No access token found/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
