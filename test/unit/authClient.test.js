@@ -72,6 +72,24 @@ test("getAuthStatus uses generic fallback for unknown authentication method", as
   });
 });
 
+test("getChallenge returns challenge with required clientIp and timestampMs", async () => {
+  const http = {
+    request: async () => ({
+      challenge: "challenge-value",
+      timestamp: "2026-03-03T12:00:00+01:00",
+      timestampMs: 1741009200000,
+      clientIp: "203.0.113.10",
+    }),
+  };
+  const client = new AuthClient(http);
+
+  const challenge = await client.getChallenge();
+
+  assert.equal(challenge.challenge, "challenge-value");
+  assert.equal(challenge.timestampMs, 1741009200000);
+  assert.equal(challenge.clientIp, "203.0.113.10");
+});
+
 test("authenticateWithXadesSignature omits verifyCertificateChain query when not provided", async () => {
   let capturedOptions;
   const http = {

@@ -73,6 +73,11 @@ function shouldBypassProxy(hostname: string, noProxy?: string): boolean {
   return list.some((entry) => hostname === entry || hostname.endsWith(`.${entry}`));
 }
 
+function isJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return mediaType === "application/json" || mediaType.endsWith("+json");
+}
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -272,7 +277,7 @@ export class HttpClient {
       return text as T;
     }
 
-    if (contentType.includes("application/json")) {
+    if (isJsonContentType(contentType)) {
       return (await response.json()) as T;
     }
 
@@ -284,7 +289,7 @@ export class HttpClient {
     const status = response.status;
     const retryAfter = response.headers.get("retry-after") ?? undefined;
 
-    if (contentType.includes("application/json")) {
+    if (isJsonContentType(contentType)) {
       const payload = await response.json().catch(() => undefined);
       if (status === 429) {
         throw new KsefRateLimitError(status, "Rate limit exceeded", payload, retryAfter);

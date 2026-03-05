@@ -15,6 +15,7 @@ Niskopoziomowy klient dla endpointów `/permissions/*`.
 - `revokeCommonGrant(permissionId)`
 - `queryAuthorizations(request, pageOffset?, pageSize?)`
 - `queryEntitiesRoles(pageOffset?, pageSize?)`
+- `queryEntitiesGrants(request, pageOffset?, pageSize?)`
 - `queryEuEntitiesGrants(request, pageOffset?, pageSize?)`
 - `queryPersonalGrants(request, pageOffset?, pageSize?)`
 - `queryPersonsGrants(request, pageOffset?, pageSize?)`
