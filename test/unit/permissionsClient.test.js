@@ -44,6 +44,47 @@ test("queryEntitiesRoles sends pagination in query params", async () => {
   });
 });
 
+test("queryEntitiesGrants sends pagination in query params", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return {};
+    },
+  };
+  const client = new PermissionsClient(http, async () => "access-token");
+  const request = {
+    contextIdentifier: { type: "Nip", value: "3568707925" },
+  };
+
+  await client.queryEntitiesGrants(request, 0, 25);
+
+  assert.equal(capturedOptions.method, "POST");
+  assert.equal(capturedOptions.path, "/permissions/query/entities/grants");
+  assert.deepEqual(capturedOptions.query, {
+    pageOffset: 0,
+    pageSize: 25,
+  });
+  assert.deepEqual(capturedOptions.body, request);
+});
+
+test("queryEntitiesGrants omits query params when pagination is not provided", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return { hasMore: false, permissions: [] };
+    },
+  };
+  const client = new PermissionsClient(http, async () => "access-token");
+
+  await client.queryEntitiesGrants({});
+
+  assert.equal(capturedOptions.method, "POST");
+  assert.equal(capturedOptions.path, "/permissions/query/entities/grants");
+  assert.equal("query" in capturedOptions, false);
+});
+
 test("queryAuthorizations omits query params when pagination is not provided", async () => {
   let capturedOptions;
   const http = {
@@ -104,6 +145,7 @@ test("permissions operations and query endpoints use expected methods and paths"
   await client.grantSubunits(grantRequest);
   await client.revokeAuthorizationGrant("AUTH/1");
   await client.revokeCommonGrant("COM/2");
+  await client.queryEntitiesGrants({}, 0, 1);
   await client.queryEuEntitiesGrants(queryRequest, 1, 2);
   await client.queryPersonalGrants(queryRequest, 3, 4);
   await client.querySubordinateEntitiesRoles(queryRequest, 5, 6);
@@ -123,6 +165,7 @@ test("permissions operations and query endpoints use expected methods and paths"
       ["POST", "/permissions/subunits/grants"],
       ["DELETE", "/permissions/authorizations/grants/AUTH%2F1"],
       ["DELETE", "/permissions/common/grants/COM%2F2"],
+      ["POST", "/permissions/query/entities/grants"],
       ["POST", "/permissions/query/eu-entities/grants"],
       ["POST", "/permissions/query/personal/grants"],
       ["POST", "/permissions/query/subordinate-entities/roles"],
@@ -132,8 +175,9 @@ test("permissions operations and query endpoints use expected methods and paths"
     ],
   );
   assert.deepEqual(calls[0].body, grantRequest);
-  assert.deepEqual(calls[9].query, { pageOffset: 1, pageSize: 2 });
-  assert.deepEqual(calls[10].query, { pageOffset: 3, pageSize: 4 });
-  assert.deepEqual(calls[11].query, { pageOffset: 5, pageSize: 6 });
-  assert.deepEqual(calls[12].query, { pageOffset: 7, pageSize: 8 });
+  assert.deepEqual(calls[9].query, { pageOffset: 0, pageSize: 1 });
+  assert.deepEqual(calls[10].query, { pageOffset: 1, pageSize: 2 });
+  assert.deepEqual(calls[11].query, { pageOffset: 3, pageSize: 4 });
+  assert.deepEqual(calls[12].query, { pageOffset: 5, pageSize: 6 });
+  assert.deepEqual(calls[13].query, { pageOffset: 7, pageSize: 8 });
 });

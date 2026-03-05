@@ -46,3 +46,43 @@ test("listActiveSessions normalizes authenticationMethodInfo for legacy session 
     displayName: "Profil Zaufany / Węzeł Krajowy",
   });
 });
+
+test("listActiveSessions omits continuation header when token is not provided", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return { items: [] };
+    },
+  };
+  const client = new ActiveSessionsClient(http, async () => "access-token");
+
+  await client.listActiveSessions();
+
+  assert.equal(capturedOptions.method, "GET");
+  assert.equal(capturedOptions.path, "/auth/sessions");
+  assert.equal("headers" in capturedOptions, false);
+  assert.deepEqual(capturedOptions.query, { pageSize: undefined });
+});
+
+test("active session revoke endpoints use expected methods and encoded paths", async () => {
+  const calls = [];
+  const http = {
+    request: async (options) => {
+      calls.push(options);
+      return {};
+    },
+  };
+  const client = new ActiveSessionsClient(http, async () => "access-token");
+
+  await client.revokeCurrentSession();
+  await client.revokeSession("REF/1");
+
+  assert.deepEqual(
+    calls.map((options) => [options.method, options.path, options.authToken]),
+    [
+      ["DELETE", "/auth/sessions/current", "access-token"],
+      ["DELETE", "/auth/sessions/REF%2F1", "access-token"],
+    ],
+  );
+});

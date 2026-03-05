@@ -94,3 +94,89 @@ test("AuthManager reuses in-flight refresh request for concurrent callers", asyn
   assert.equal(tokenB, "refreshed-access-token");
   assert.equal(calls, 1);
 });
+
+test("AuthManager honors custom refresh leeway", async () => {
+  const client = new KsefClient({ baseUrl: "https://api-test.ksef.mf.gov.pl/v2" });
+  const AuthManagerClass = client.authManager.constructor;
+  const manager = new AuthManagerClass(
+    {
+      refreshAccessToken: async () => ({
+        accessToken: { token: "refreshed", validUntil: "2999-01-01T00:00:00Z" },
+      }),
+    },
+    { refreshLeewayMs: 0 },
+  );
+  manager.setTokens({
+    accessToken: {
+      token: "still-valid",
+      validUntil: "2999-01-01T00:00:00Z",
+    },
+    refreshToken: {
+      token: "refresh-token",
+      validUntil: "2999-01-01T00:00:00Z",
+    },
+  });
+
+  assert.equal(await manager.getAccessToken(), "still-valid");
+});
+
+test("AuthManager refresh returns fallback token value when setAccessToken leaves internal token null", async () => {
+  const client = new KsefClient({ baseUrl: "https://api-test.ksef.mf.gov.pl/v2" });
+  const AuthManagerClass = client.authManager.constructor;
+  const manager = new AuthManagerClass({
+    refreshAccessToken: async () => ({
+      accessToken: { token: "refreshed-from-response", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+  });
+  const originalSetAccessToken = manager.setAccessToken;
+  manager.setAccessToken = function patchedSetAccessToken() {
+    this.accessToken = null;
+    this.accessTokenExpiryMs = null;
+  };
+  manager.setTokens({
+    accessToken: {
+      token: "expired-access-token",
+      validUntil: "2000-01-01T00:00:00Z",
+    },
+    refreshToken: {
+      token: "refresh-token",
+      validUntil: "2999-01-01T00:00:00Z",
+    },
+  });
+
+  try {
+    assert.equal(await manager.getAccessToken(), "refreshed-from-response");
+  } finally {
+    manager.setAccessToken = originalSetAccessToken;
+  }
+});
+
+test("AuthManager propagates in-flight refresh rejection to concurrent waiters", async () => {
+  const client = new KsefClient({ baseUrl: "https://api-test.ksef.mf.gov.pl/v2" });
+  client.authManager.setTokens({
+    accessToken: {
+      token: "expired-access-token",
+      validUntil: "2000-01-01T00:00:00Z",
+    },
+    refreshToken: {
+      token: "refresh-token",
+      validUntil: "2999-01-01T00:00:00Z",
+    },
+  });
+
+  let releaseRefresh;
+  const refreshGate = new Promise((resolve) => {
+    releaseRefresh = resolve;
+  });
+  client.auth.refreshAccessToken = async () => {
+    await refreshGate;
+    throw new Error("refresh failed concurrently");
+  };
+
+  const first = client.authManager.getAccessToken();
+  const second = client.authManager.getAccessToken();
+  releaseRefresh();
+
+  await assert.rejects(first, KsefSessionExpiredError);
+  await assert.rejects(second, /refresh failed concurrently/);
+});

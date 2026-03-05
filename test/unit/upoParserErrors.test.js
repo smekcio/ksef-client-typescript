@@ -1,0 +1,136 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { parseUpoXml } from "../../dist/index.js";
+
+function buildValidUpo({
+  idKontekstu = "<Nip>1111111111</Nip>",
+  proof = "<NumerReferencyjnyTokenaKSeF>TOKEN-REF</NumerReferencyjnyTokenaKSeF>",
+  opisPotwierdzenia = "",
+  dokument = `
+    <Dokument>
+      <NipSprzedawcy>1111111111</NipSprzedawcy>
+      <NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu>
+      <NumerFaktury>FV/1</NumerFaktury>
+      <DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury>
+      <DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu>
+      <DataNadaniaNumeruKSeF>2026-01-01T00:01:00Z</DataNadaniaNumeruKSeF>
+      <SkrotDokumentu>HASH</SkrotDokumentu>
+      <TrybWysylki>Online</TrybWysylki>
+    </Dokument>
+  `,
+} = {}) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<Potwierdzenie>
+  <NazwaPodmiotuPrzyjmujacego>KSeF</NazwaPodmiotuPrzyjmujacego>
+  <NumerReferencyjnySesji>SESSION-REF</NumerReferencyjnySesji>
+  <Uwierzytelnienie>
+    <IdKontekstu>${idKontekstu}</IdKontekstu>
+    ${proof}
+  </Uwierzytelnienie>
+  ${opisPotwierdzenia}
+  <NazwaStrukturyLogicznej>Faktura</NazwaStrukturyLogicznej>
+  <KodFormularza>FA (3)</KodFormularza>
+  ${dokument}
+</Potwierdzenie>`;
+}
+
+test("parseUpoXml supports non-NIP context identifiers and alternate proof", () => {
+  const byInternalId = parseUpoXml(
+    buildValidUpo({
+      idKontekstu: "<IdWewnetrzny>INTERNAL-1</IdWewnetrzny>",
+    }),
+  );
+  assert.equal(byInternalId.uwierzytelnienie.idKontekstu.kind, "IdWewnetrzny");
+
+  const byVatUe = parseUpoXml(
+    buildValidUpo({
+      idKontekstu: "<IdZlozonyVatUE>VAT-UE-1</IdZlozonyVatUE>",
+    }),
+  );
+  assert.equal(byVatUe.uwierzytelnienie.idKontekstu.kind, "IdZlozonyVatUE");
+
+  const byPeppol = parseUpoXml(
+    buildValidUpo({
+      idKontekstu: "<IdDostawcyUslugPeppol>PEPPOL-1</IdDostawcyUslugPeppol>",
+      proof: "<SkrotDokumentuUwierzytelniajacego>DOC-HASH</SkrotDokumentuUwierzytelniajacego>",
+    }),
+  );
+  assert.equal(byPeppol.uwierzytelnienie.idKontekstu.kind, "IdDostawcyUslugPeppol");
+  assert.equal(byPeppol.uwierzytelnienie.proof.kind, "SkrotDokumentuUwierzytelniajacego");
+});
+
+test("parseUpoXml returns validation errors for malformed structures", () => {
+  assert.throws(
+    () => parseUpoXml("<Potwierdzenie>text</Potwierdzenie>"),
+    /Expected object at Potwierdzenie/,
+  );
+
+  assert.throws(
+    () =>
+      parseUpoXml(
+        buildValidUpo({
+          idKontekstu: "<Unknown>1</Unknown>",
+        }),
+      ),
+    /Unsupported UPO IdKontekstu/,
+  );
+
+  assert.throws(
+    () =>
+      parseUpoXml(
+        buildValidUpo({
+          proof: "<UnknownProof>1</UnknownProof>",
+        }),
+      ),
+    /Unsupported UPO authentication proof/,
+  );
+
+  assert.throws(
+    () =>
+      parseUpoXml(
+        buildValidUpo({
+          dokument: "",
+        }),
+      ),
+    /Expected at least one Dokument in UPO/,
+  );
+
+  assert.throws(
+    () =>
+      parseUpoXml(
+        buildValidUpo({
+          opisPotwierdzenia: `
+            <OpisPotwierdzenia>
+              <Strona>abc</Strona>
+              <LiczbaStron>1</LiczbaStron>
+              <ZakresDokumentowOd>1</ZakresDokumentowOd>
+              <ZakresDokumentowDo>1</ZakresDokumentowDo>
+              <CalkowitaLiczbaDokumentow>1</CalkowitaLiczbaDokumentow>
+            </OpisPotwierdzenia>
+          `,
+        }),
+      ),
+    /Expected integer at OpisPotwierdzenia.Strona/,
+  );
+
+  assert.throws(
+    () =>
+      parseUpoXml(
+        buildValidUpo({
+          dokument: `
+            <Dokument>
+              <NipSprzedawcy></NipSprzedawcy>
+              <NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu>
+              <NumerFaktury>FV/1</NumerFaktury>
+              <DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury>
+              <DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu>
+              <DataNadaniaNumeruKSeF>2026-01-01T00:01:00Z</DataNadaniaNumeruKSeF>
+              <SkrotDokumentu>HASH</SkrotDokumentu>
+              <TrybWysylki>Online</TrybWysylki>
+            </Dokument>
+          `,
+        }),
+      ),
+    /Expected non-empty string at Dokument.NipSprzedawcy/,
+  );
+});

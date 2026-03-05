@@ -144,3 +144,112 @@ test("getProcedureInstructions returns immutable checklist snapshots", () => {
   const fresh = workflow.getProcedureInstructions("offline24");
   assert.equal(fresh.operationalSteps.includes("tamper"), false);
 });
+
+test("sendOfflineInvoice closes session silently when send fails and forwards optional open flags", async () => {
+  let closeCalls = 0;
+  let openOptions;
+  const sendError = new Error("send failed");
+
+  const session = {
+    referenceNumber: "SESSION-REF-ERR",
+    sendInvoice: async () => {
+      throw sendError;
+    },
+    close: async () => {
+      closeCalls += 1;
+      throw new Error("close failed");
+    },
+    waitForUpo: async () => null,
+  };
+  const onlineWorkflow = {
+    open: async (options) => {
+      openOptions = options;
+      return session;
+    },
+  };
+  const workflow = new OfflineInvoiceWorkflow(onlineWorkflow);
+
+  await assert.rejects(
+    () =>
+      workflow.sendOfflineInvoice({
+        formCode: FORM_CODE,
+        invoice: "<Faktura>...</Faktura>",
+        publicCertificateBase64Der: "CERT-DER",
+        upoV43: true,
+      }),
+    /send failed/,
+  );
+
+  assert.deepEqual(openOptions, {
+    formCode: FORM_CODE,
+    publicCertificateBase64Der: "CERT-DER",
+    upoV43: true,
+  });
+  assert.equal(closeCalls, 1);
+});
+
+test("sendOfflineInvoice parses inline UPO XML when waiting is enabled", async () => {
+  const workflow = new OfflineInvoiceWorkflow({
+    open: async () => ({
+      referenceNumber: "SESSION-REF-UPOLIVE",
+      sendInvoice: async () => ({ referenceNumber: "INVOICE-REF-UPOLIVE" }),
+      close: async () => {},
+      waitForUpo: async () =>
+        "<Potwierdzenie><NazwaPodmiotuPrzyjmujacego>KSeF</NazwaPodmiotuPrzyjmujacego><NumerReferencyjnySesji>REF</NumerReferencyjnySesji><Uwierzytelnienie><IdKontekstu><Nip>1111111111</Nip></IdKontekstu><NumerReferencyjnyTokenaKSeF>TOKEN-1</NumerReferencyjnyTokenaKSeF></Uwierzytelnienie><NazwaStrukturyLogicznej>FA (3)</NazwaStrukturyLogicznej><KodFormularza>FA (3)</KodFormularza><WariantFormularza>1</WariantFormularza><DataWytworzeniaUPO>2026-01-01T00:00:00Z</DataWytworzeniaUPO><Dokument><NipSprzedawcy>1111111111</NipSprzedawcy><NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu><NumerFaktury>FV/1</NumerFaktury><DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury><DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu><DataNadaniaNumeruKSeF>2026-01-01T00:00:01Z</DataNadaniaNumeruKSeF><SkrotDokumentu>ABC</SkrotDokumentu><TrybWysylki>Online</TrybWysylki></Dokument></Potwierdzenie>",
+    }),
+  });
+
+  const result = await workflow.sendOfflineInvoice({
+    formCode: FORM_CODE,
+    invoice: "<Faktura>...</Faktura>",
+  });
+
+  assert.equal(result.upo?.numerReferencyjnySesji, "REF");
+});
+
+test("sendOfflineInvoice closeSilently path preserves original send error when close succeeds", async () => {
+  const sendError = new Error("send failed");
+  let closeCalls = 0;
+  const workflow = new OfflineInvoiceWorkflow({
+    open: async () => ({
+      referenceNumber: "SESSION-REF-CLOSE-SILENT",
+      sendInvoice: async () => {
+        throw sendError;
+      },
+      close: async () => {
+        closeCalls += 1;
+      },
+      waitForUpo: async () => null,
+    }),
+  });
+
+  await assert.rejects(
+    () =>
+      workflow.sendOfflineInvoice({
+        formCode: FORM_CODE,
+        invoice: "<Faktura>...</Faktura>",
+      }),
+    /send failed/,
+  );
+  assert.equal(closeCalls, 1);
+});
+
+test("sendOfflineInvoice handles waitForUpo=true with empty UPO payload", async () => {
+  const workflow = new OfflineInvoiceWorkflow({
+    open: async () => ({
+      referenceNumber: "SESSION-REF-NO-UPO",
+      sendInvoice: async () => ({ referenceNumber: "INVOICE-REF-NO-UPO" }),
+      close: async () => {},
+      waitForUpo: async () => null,
+    }),
+  });
+
+  const result = await workflow.sendOfflineInvoice({
+    formCode: FORM_CODE,
+    invoice: "<Faktura>...</Faktura>",
+    waitForUpo: true,
+  });
+
+  assert.equal(result.upoXml, null);
+  assert.equal(result.upo, null);
+});

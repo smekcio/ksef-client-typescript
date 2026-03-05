@@ -23,7 +23,7 @@ const nodeGlobals = {
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: ["coverage/**", "dist/**", "node_modules/**"],
   },
   {
     ...js.configs.recommended,

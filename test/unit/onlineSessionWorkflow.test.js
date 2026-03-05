@@ -200,3 +200,99 @@ test("OnlineSessionHandle waitForUpo covers success, failure and timeout branche
     null,
   );
 });
+
+test("OnlineSessionHandle failure message omits details when status.details is empty", async () => {
+  const handle = new OnlineSessionHandle(
+    "SESSION-REF-ERR",
+    { cipherKey: Buffer.alloc(32), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+    {
+      getSessionStatus: async () => ({
+        status: { code: 460, description: "Failed" },
+      }),
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({}),
+    },
+    { request: async () => "<upo/>" },
+  );
+
+  await assert.rejects(
+    () => handle.waitForUpo({ pollIntervalMs: 0, maxAttempts: 1 }),
+    /Session failed: 460 Failed$/,
+  );
+});
+
+test("OnlineSessionHandle waitForUpoParsed parses XML when UPO is available", async () => {
+  const handle = new OnlineSessionHandle(
+    "SESSION-REF-PARSED",
+    { cipherKey: Buffer.alloc(32), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+    {
+      getSessionStatus: async () => ({
+        status: { code: 200, description: "Done" },
+        upo: { pages: [{ downloadUrl: "https://download/upo.xml" }] },
+      }),
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({}),
+    },
+    {
+      request: async () =>
+        "<Potwierdzenie><NazwaPodmiotuPrzyjmujacego>KSeF</NazwaPodmiotuPrzyjmujacego><NumerReferencyjnySesji>REF</NumerReferencyjnySesji><Uwierzytelnienie><IdKontekstu><Nip>1111111111</Nip></IdKontekstu><NumerReferencyjnyTokenaKSeF>TOKEN-1</NumerReferencyjnyTokenaKSeF></Uwierzytelnienie><NazwaStrukturyLogicznej>FA (3)</NazwaStrukturyLogicznej><KodFormularza>FA (3)</KodFormularza><WariantFormularza>1</WariantFormularza><DataWytworzeniaUPO>2026-01-01T00:00:00Z</DataWytworzeniaUPO><Dokument><NipSprzedawcy>1111111111</NipSprzedawcy><NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu><NumerFaktury>FV/1</NumerFaktury><DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury><DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu><DataNadaniaNumeruKSeF>2026-01-01T00:00:01Z</DataNadaniaNumeruKSeF><SkrotDokumentu>ABC</SkrotDokumentu><TrybWysylki>Online</TrybWysylki></Dokument></Potwierdzenie>",
+    },
+  );
+
+  const parsed = await handle.waitForUpoParsed({ pollIntervalMs: 0, maxAttempts: 1 });
+  assert.equal(parsed?.numerReferencyjnySesji, "REF");
+});
+
+test("OnlineSessionWorkflow throws when symmetric encryption certificate is missing", async () => {
+  const workflow = new OnlineSessionWorkflow(
+    {
+      openOnlineSession: async () => ({ referenceNumber: "SESSION-REF-FAIL" }),
+    },
+    {
+      getPublicKeyCertificates: async () => [{ usage: ["KsefTokenEncryption"], certificate: "CERT" }],
+    },
+    { request: async () => "<upo/>" },
+  );
+
+  await assert.rejects(
+    () => workflow.open({ formCode: FORM_CODE }),
+    /No public certificate found for usage SymmetricKeyEncryption/,
+  );
+});
+
+test("OnlineSessionHandle waitForUpo uses defaults and handles missing status payload", async () => {
+  const successHandle = new OnlineSessionHandle(
+    "SESSION-REF-DEFAULTS",
+    { cipherKey: Buffer.alloc(32), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+    {
+      getSessionStatus: async () => ({
+        status: { code: 200, description: "Done" },
+        upo: { pages: [{ downloadUrl: "https://download/default-upo.xml" }] },
+      }),
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({}),
+    },
+    {
+      request: async () => "<upo-default/>",
+    },
+  );
+  assert.equal(await successHandle.waitForUpo(), "<upo-default/>");
+
+  const missingStatusHandle = new OnlineSessionHandle(
+    "SESSION-REF-NOSTATUS",
+    { cipherKey: Buffer.alloc(32), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+    {
+      getSessionStatus: async () => ({}),
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({}),
+    },
+    {
+      request: async () => "<upo/>",
+    },
+  );
+
+  await assert.rejects(
+    () => missingStatusHandle.waitForUpo({ pollIntervalMs: 0, maxAttempts: 1 }),
+    /Session failed: undefined undefined/,
+  );
+});

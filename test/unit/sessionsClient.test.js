@@ -42,6 +42,23 @@ test("getSessions sends required sessionType and optional filters in query", asy
   assert.equal(capturedOptions.headers["x-continuation-token"], "next-page-token");
 });
 
+test("getSessions omits continuation token header when not provided", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return {};
+    },
+  };
+  const client = new SessionsClient(http, async () => "access-token");
+
+  await client.getSessions({ sessionType: "Batch" });
+
+  assert.equal(capturedOptions.path, "/sessions");
+  assert.equal(capturedOptions.query.sessionType, "Batch");
+  assert.equal("headers" in capturedOptions, false);
+});
+
 test("openOnlineSession toggles upo-v4-3 feature header based on upoV43 flag", async () => {
   const calls = [];
   const http = {

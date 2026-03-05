@@ -93,3 +93,14 @@ test("PersonTokenService handles missing and malformed optional claims", () => {
   assert.deepEqual(parsed.rolesRaw, ["\\uZZZZ"]);
   assert.deepEqual(parsed.permissionsEffective, []);
 });
+
+test("PersonTokenService normalizes missing audience claim to empty array", () => {
+  const service = new PersonTokenService();
+  const token = buildJwt({
+    iss: "https://issuer.example",
+    aud: null,
+  });
+
+  const parsed = service.parse(token);
+  assert.deepEqual(parsed.audiences, []);
+});

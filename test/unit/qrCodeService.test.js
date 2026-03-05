@@ -29,3 +29,23 @@ test("QrCodeService renders PNG/SVG/DataURL when qrcode dependency is present", 
   const dataUrl = await service.toDataUrl("https://ksef.mf.gov.pl", { width: 120 });
   assert.match(dataUrl, /^data:image\/png;base64,/);
 });
+
+test("QrCodeService converts non-Buffer toBuffer output into Buffer", async () => {
+  try {
+    await import("qrcode");
+  } catch {
+    return;
+  }
+
+  const originalIsBuffer = Buffer.isBuffer;
+  Buffer.isBuffer = () => false;
+  try {
+    const service = new QrCodeService();
+    const png = await service.toPngBuffer("https://ksef.mf.gov.pl");
+    assert.equal(originalIsBuffer(png), true);
+    assert.equal(png.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC), true);
+    assert.equal(png.equals(PNG_MAGIC), false);
+  } finally {
+    Buffer.isBuffer = originalIsBuffer;
+  }
+});

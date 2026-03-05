@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { OpenApiModels } from "../../dist/index.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -106,4 +107,11 @@ test("API clients cover all operations defined in OpenAPI spec", (t) => {
     `Missing OpenAPI operations in TypeScript clients: ${missing.join(", ")}`,
   );
   assert.deepEqual(extra, [], `Extra operations not present in OpenAPI spec: ${extra.join(", ")}`);
+});
+
+test("OpenAPI generated metadata constants are exposed", () => {
+  assert.equal(typeof OpenApiModels.OPENAPI_SPEC_VERSION, "string");
+  assert.ok(OpenApiModels.OPENAPI_SPEC_VERSION.length > 0);
+  assert.equal(typeof OpenApiModels.OPENAPI_SCHEMA_COUNT, "number");
+  assert.ok(OpenApiModels.OPENAPI_SCHEMA_COUNT > 0);
 });

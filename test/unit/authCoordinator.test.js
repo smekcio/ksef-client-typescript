@@ -174,3 +174,134 @@ test("authenticateWithKsefToken fails when required certificate usage is missing
     },
   );
 });
+
+test("authenticateWithKsefToken derives timestamp from challenge.timestamp when timestampMs is missing", async () => {
+  const originalEncryptKsefToken = CryptographyService.encryptKsefToken;
+  const encryptCalls = [];
+  const authClient = {
+    getChallenge: async () => ({
+      challenge: "challenge-value",
+      timestamp: "2026-03-03T10:00:00.000Z",
+    }),
+    authenticateWithKsefToken: async () => ({
+      referenceNumber: "AUTH-REF-TS",
+      authenticationToken: { token: "AUTH-TOKEN", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+    getAuthStatus: async () => ({
+      status: { code: 200, description: "Ok" },
+    }),
+    redeemToken: async () => ({
+      accessToken: { token: "access", validUntil: "2999-01-01T00:00:00Z" },
+      refreshToken: { token: "refresh", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+  };
+  const securityClient = {
+    getPublicKeyCertificates: async () => [{ usage: ["KsefTokenEncryption"], certificate: "CERT" }],
+  };
+  const coordinator = new AuthCoordinator(authClient, securityClient);
+
+  CryptographyService.encryptKsefToken = (...args) => {
+    encryptCalls.push(args);
+    return "encrypted-token";
+  };
+
+  try {
+    await coordinator.authenticateWithKsefToken({
+      token: "plain-token",
+      context: { type: "Nip", value: "1234567890" },
+      pollIntervalMs: 0,
+      maxAttempts: 1,
+    });
+    assert.equal(encryptCalls.length, 1);
+    assert.equal(encryptCalls[0][1], Date.parse("2026-03-03T10:00:00.000Z"));
+  } finally {
+    CryptographyService.encryptKsefToken = originalEncryptKsefToken;
+  }
+});
+
+test("authenticateWithKsefToken falls back to Date.now when challenge timestamp is invalid", async () => {
+  const originalEncryptKsefToken = CryptographyService.encryptKsefToken;
+  const originalDateNow = Date.now;
+  const encryptCalls = [];
+  Date.now = () => 1705000000000;
+  const authClient = {
+    getChallenge: async () => ({
+      challenge: "challenge-value",
+      timestamp: "invalid-date",
+    }),
+    authenticateWithKsefToken: async () => ({
+      referenceNumber: "AUTH-REF-NOW",
+      authenticationToken: { token: "AUTH-TOKEN", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+    getAuthStatus: async () => ({
+      status: { code: 200, description: "Ok" },
+    }),
+    redeemToken: async () => ({
+      accessToken: { token: "access", validUntil: "2999-01-01T00:00:00Z" },
+      refreshToken: { token: "refresh", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+  };
+  const securityClient = {
+    getPublicKeyCertificates: async () => [{ usage: ["KsefTokenEncryption"], certificate: "CERT" }],
+  };
+  const coordinator = new AuthCoordinator(authClient, securityClient);
+
+  CryptographyService.encryptKsefToken = (...args) => {
+    encryptCalls.push(args);
+    return "encrypted-token";
+  };
+
+  try {
+    await coordinator.authenticateWithKsefToken({
+      token: "plain-token",
+      context: { type: "Nip", value: "1234567890" },
+      pollIntervalMs: 0,
+      maxAttempts: 1,
+    });
+    assert.equal(encryptCalls.length, 1);
+    assert.equal(encryptCalls[0][1], 1705000000000);
+  } finally {
+    Date.now = originalDateNow;
+    CryptographyService.encryptKsefToken = originalEncryptKsefToken;
+  }
+});
+
+test("authenticateWithXadesSignature uses default polling options and handles missing status payload", async () => {
+  const authClient = {
+    authenticateWithXadesSignature: async () => ({
+      referenceNumber: "AUTH-REF-DEFAULTS",
+      authenticationToken: { token: "AUTH-TOKEN", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+    getAuthStatus: async () => ({}),
+    redeemToken: async () => {
+      throw new Error("redeemToken should not be called");
+    },
+  };
+  const coordinator = new AuthCoordinator(authClient, { getPublicKeyCertificates: async () => [] });
+
+  await assert.rejects(
+    () => coordinator.authenticateWithXadesSignature({ signedXml: "<SignedXml/>" }),
+    /Authentication failed: undefined undefined/,
+  );
+});
+
+test("authenticateWithXadesSignature failure omits details when no detail list is provided", async () => {
+  const authClient = {
+    authenticateWithXadesSignature: async () => ({
+      referenceNumber: "AUTH-REF-NO-DETAILS",
+      authenticationToken: { token: "AUTH-TOKEN", validUntil: "2999-01-01T00:00:00Z" },
+    }),
+    getAuthStatus: async () => ({
+      status: { code: 460, description: "Rejected" },
+    }),
+    redeemToken: async () => {
+      throw new Error("redeemToken should not be called");
+    },
+  };
+  const coordinator = new AuthCoordinator(authClient, { getPublicKeyCertificates: async () => [] });
+
+  await assert.rejects(
+    () => coordinator.authenticateWithXadesSignature({ signedXml: "<SignedXml/>", pollIntervalMs: 0, maxAttempts: 1 }),
+    /Authentication failed: 460 Rejected$/,
+  );
+});
