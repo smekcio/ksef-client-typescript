@@ -79,7 +79,11 @@ function parseUrl(urlText: string): URL {
 }
 
 function normalizeHost(value: string): string {
-  return value.toLowerCase().replace(/\.+$/, "");
+  const normalized = value.toLowerCase().replace(/\.+$/, "");
+  if (normalized.startsWith("[") && normalized.endsWith("]")) {
+    return normalized.slice(1, -1);
+  }
+  return normalized;
 }
 
 function isHostAllowed(host: string, allowedHosts: string[]): boolean {

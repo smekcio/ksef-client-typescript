@@ -166,7 +166,8 @@ async function runInit(
   context: CommandContext,
 ): Promise<CliJson> {
   const config = await readConfig(context.cliHome);
-  const profileName = getStringOption(options, "profile") ?? config.currentProfile ?? "default";
+  const requestedProfile = getStringOption(options, "profile");
+  const profileName = requestedProfile === undefined ? config.currentProfile : requestedProfile;
   const current = config.profiles[profileName] ?? {};
   const updated = applyProfilePatch(current, options);
 
@@ -197,8 +198,8 @@ async function runProfile(
   const config = await readConfig(context.cliHome);
 
   if (!subcommand || subcommand === "show") {
-    const name = rest[0] ?? getStringOption(options, "profile") ?? config.currentProfile;
-    const [profileName, profile] = getProfile(config, name);
+    const requestedName = rest[0] ?? getStringOption(options, "profile");
+    const [profileName, profile] = getProfile(config, requestedName);
     return {
       profile: profileName,
       activeProfile: config.currentProfile,
@@ -562,11 +563,7 @@ async function runSend(
     };
   } finally {
     if (!closed) {
-      try {
-        await session.close();
-      } catch {
-        // ignore close failure to preserve original send error
-      }
+      await session.close().catch(() => undefined);
     }
   }
 }
@@ -608,7 +605,7 @@ async function runUpo(
   } else if (ksefNumber) {
     xml = await client.sessions.getSessionInvoiceUpoByKsefNumber(sessionReference, ksefNumber);
   } else {
-    xml = await client.sessions.getSessionUpo(sessionReference, upoReference ?? "");
+    xml = await client.sessions.getSessionUpo(sessionReference, upoReference as string);
   }
 
   const outputFile = getStringOption(options, "output");
@@ -757,10 +754,20 @@ function applyTokens(client: KsefClient, tokens: StoredTokens): void {
 }
 
 function createClient(profile: ProfileConfig): KsefClient {
-  if (profile.baseUrl) {
-    return new KsefClient({ baseUrl: profile.baseUrl });
-  }
-  return new KsefClient({ environment: profile.environment ?? "TEST" });
+  const baseOptions = profile.baseUrl
+    ? { baseUrl: profile.baseUrl }
+    : { environment: profile.environment ?? "TEST" };
+
+  return new KsefClient({
+    ...baseOptions,
+    ...(profile.strictPresignedUrlValidation !== undefined && {
+      strictPresignedUrlValidation: profile.strictPresignedUrlValidation,
+    }),
+    ...(profile.allowedPresignedHosts ? { allowedPresignedHosts: profile.allowedPresignedHosts } : {}),
+    ...(profile.allowPrivateNetworkPresignedUrls !== undefined && {
+      allowPrivateNetworkPresignedUrls: profile.allowPrivateNetworkPresignedUrls,
+    }),
+  });
 }
 
 async function loadProfileContext(

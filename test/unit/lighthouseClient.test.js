@@ -83,3 +83,19 @@ test("KsefClient exposes lighthouse client with baseLighthouseUrl", async () => 
     await closeServer(server);
   }
 });
+
+test("LighthouseClient throws when base URL is empty after normalization", async () => {
+  const client = new LighthouseClient(
+    {
+      request: async () => {
+        throw new Error("should not call request");
+      },
+    },
+    "///",
+  );
+
+  await assert.rejects(
+    () => client.getStatus(),
+    /Lighthouse base URL is missing/,
+  );
+});

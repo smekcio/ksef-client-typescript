@@ -86,3 +86,68 @@ test("buildCertificateVerificationUrl supports ECDSA DER signatures", () => {
   );
   assert.equal(verified, true);
 });
+
+test("buildCertificateVerificationUrl uses IEEE-P1363 encoding for EC by default", () => {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+  const service = new VerificationLinkService({ baseQrUrl: "https://qr.example.test" });
+  const invoiceHash = toBase64Url(Buffer.from("invoice-hash-ec-p1363", "utf8"));
+
+  const url = service.buildCertificateVerificationUrl({
+    sellerNip: "5265877635",
+    contextIdentifierType: "Nip",
+    contextIdentifierValue: "5265877635",
+    certificateSerial: "SERIAL-EC-P1363",
+    invoiceHash,
+    privateKeyPem,
+  });
+
+  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
+  const pathWithoutProtocol = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
+  const digest = digestPath(pathWithoutProtocol);
+  const signature = fromBase64Url(signatureSegment);
+
+  const verified = crypto.verify(
+    null,
+    digest,
+    {
+      key: publicKey,
+      dsaEncoding: "ieee-p1363",
+    },
+    signature,
+  );
+  assert.equal(verified, true);
+});
+
+test("buildInvoiceVerificationUrl accepts preformatted date string and base64url hash", () => {
+  const service = new VerificationLinkService({ baseQrUrl: "https://qr.example.test/" });
+  const hashBase64Url = toBase64Url(Buffer.from("hash-url", "utf8"));
+  const url = service.buildInvoiceVerificationUrl("5265877635", "31-12-2026", hashBase64Url);
+  assert.equal(url, `https://qr.example.test/invoice/5265877635/31-12-2026/${hashBase64Url}`);
+});
+
+test("buildInvoiceVerificationUrl decodes base64url hash values containing URL-safe characters", () => {
+  const service = new VerificationLinkService({ baseQrUrl: "https://qr.example.test/" });
+  const base64UrlHash = "-w";
+  const url = service.buildInvoiceVerificationUrl("5265877635", "01-01-2026", base64UrlHash);
+  assert.equal(url, "https://qr.example.test/invoice/5265877635/01-01-2026/-w");
+});
+
+test("buildCertificateVerificationUrl rejects unsupported private key types", () => {
+  const { privateKey } = crypto.generateKeyPairSync("ed25519");
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+  const service = new VerificationLinkService({ baseQrUrl: "https://qr.example.test/" });
+
+  assert.throws(
+    () =>
+      service.buildCertificateVerificationUrl({
+        sellerNip: "5265877635",
+        contextIdentifierType: "Nip",
+        contextIdentifierValue: "5265877635",
+        certificateSerial: "SERIAL-ED",
+        invoiceHash: Buffer.from("invoice-hash", "utf8").toString("base64"),
+        privateKeyPem,
+      }),
+    /Unsupported private key type for signature/,
+  );
+});

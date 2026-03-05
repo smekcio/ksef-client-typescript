@@ -21,6 +21,9 @@ export interface ProfileConfig {
   lighthouseEnvironment?: KsefLighthouseEnvironment;
   context?: ContextIdentifier;
   tokenStore?: TokenStoreConfig;
+  strictPresignedUrlValidation?: boolean;
+  allowedPresignedHosts?: string[];
+  allowPrivateNetworkPresignedUrls?: boolean;
 }
 
 export interface CliConfigFile {
