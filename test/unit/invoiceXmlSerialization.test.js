@@ -184,6 +184,26 @@ test("buildFakturaXml covers comparePKey edge cases and nested array normalizati
   assert.match(xml, /<1>tekst<\/1>/);
 });
 
+test("buildFakturaXml normalizes object entries inside keyed arrays", () => {
+  const faktura = minimalFaktura();
+  faktura.Fa = {
+    FaWiersz: [
+      {
+        P_11Vat: "23",
+        P_7: "Produkt A",
+        P_6A: "szt.",
+      },
+    ],
+  };
+
+  const xml = buildFakturaXml(faktura, { schema: "FA3" });
+  const p7Index = xml.indexOf("<P_7>");
+  const p11VatIndex = xml.indexOf("<P_11Vat>");
+
+  assert.ok(p7Index >= 0);
+  assert.ok(p11VatIndex > p7Index);
+});
+
 test("serializeInvoiceXml rejects unsupported input type", () => {
   assert.throws(() => serializeInvoiceXml(123), KsefValidationError);
 });

@@ -22,6 +22,8 @@ const skipMissingUpoFixture = fs.existsSync(upoInvoicePath)
   : `Missing fixture: ${upoInvoicePath}`;
 
 const FORM_CODE = { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" };
+const INLINE_UPO_XML =
+  "<Potwierdzenie><NazwaPodmiotuPrzyjmujacego>KSeF</NazwaPodmiotuPrzyjmujacego><NumerReferencyjnySesji>REF</NumerReferencyjnySesji><Uwierzytelnienie><IdKontekstu><Nip>1111111111</Nip></IdKontekstu><NumerReferencyjnyTokenaKSeF>TOKEN-1</NumerReferencyjnyTokenaKSeF></Uwierzytelnienie><NazwaStrukturyLogicznej>FA (3)</NazwaStrukturyLogicznej><KodFormularza>FA (3)</KodFormularza><WariantFormularza>1</WariantFormularza><DataWytworzeniaUPO>2026-01-01T00:00:00Z</DataWytworzeniaUPO><Dokument><NipSprzedawcy>1111111111</NipSprzedawcy><NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu><NumerFaktury>FV/1</NumerFaktury><DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury><DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu><DataNadaniaNumeruKSeF>2026-01-01T00:00:01Z</DataNadaniaNumeruKSeF><SkrotDokumentu>ABC</SkrotDokumentu><TrybWysylki>Online</TrybWysylki></Dokument></Potwierdzenie>";
 
 test("sendOfflineInvoice sends invoice with offlineMode=true and closes session", async () => {
   let openOptions;
@@ -194,8 +196,7 @@ test("sendOfflineInvoice parses inline UPO XML when waiting is enabled", async (
       referenceNumber: "SESSION-REF-UPOLIVE",
       sendInvoice: async () => ({ referenceNumber: "INVOICE-REF-UPOLIVE" }),
       close: async () => {},
-      waitForUpo: async () =>
-        "<Potwierdzenie><NazwaPodmiotuPrzyjmujacego>KSeF</NazwaPodmiotuPrzyjmujacego><NumerReferencyjnySesji>REF</NumerReferencyjnySesji><Uwierzytelnienie><IdKontekstu><Nip>1111111111</Nip></IdKontekstu><NumerReferencyjnyTokenaKSeF>TOKEN-1</NumerReferencyjnyTokenaKSeF></Uwierzytelnienie><NazwaStrukturyLogicznej>FA (3)</NazwaStrukturyLogicznej><KodFormularza>FA (3)</KodFormularza><WariantFormularza>1</WariantFormularza><DataWytworzeniaUPO>2026-01-01T00:00:00Z</DataWytworzeniaUPO><Dokument><NipSprzedawcy>1111111111</NipSprzedawcy><NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu><NumerFaktury>FV/1</NumerFaktury><DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury><DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu><DataNadaniaNumeruKSeF>2026-01-01T00:00:01Z</DataNadaniaNumeruKSeF><SkrotDokumentu>ABC</SkrotDokumentu><TrybWysylki>Online</TrybWysylki></Dokument></Potwierdzenie>",
+      waitForUpo: async () => INLINE_UPO_XML,
     }),
   });
 
@@ -252,4 +253,28 @@ test("sendOfflineInvoice handles waitForUpo=true with empty UPO payload", async 
 
   assert.equal(result.upoXml, null);
   assert.equal(result.upo, null);
+});
+
+test("sendOfflineTechnicalCorrection uses trimmed hash and works without external fixtures", async () => {
+  let sendOptions;
+  const workflow = new OfflineInvoiceWorkflow({
+    open: async () => ({
+      referenceNumber: "SESSION-REF-TRIM",
+      sendInvoice: async (options) => {
+        sendOptions = options;
+        return { referenceNumber: "INVOICE-REF-TRIM" };
+      },
+      close: async () => {},
+      waitForUpo: async () => INLINE_UPO_XML,
+    }),
+  });
+
+  const result = await workflow.sendOfflineTechnicalCorrection({
+    formCode: FORM_CODE,
+    invoice: "<Faktura>...</Faktura>",
+    hashOfCorrectedInvoice: "  BASE64_SHA256_HASH  ",
+  });
+
+  assert.equal(sendOptions.hashOfCorrectedInvoice, "BASE64_SHA256_HASH");
+  assert.equal(result.upo?.kodFormularza, "FA (3)");
 });

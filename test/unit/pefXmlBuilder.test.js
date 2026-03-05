@@ -131,3 +131,16 @@ test("buildPefXml throws validation error for schema/root mismatch", () => {
     },
   );
 });
+
+test("buildPefXml builds CreditNote without external fixtures", () => {
+  const xml = buildPefXml({
+    CreditNote: {
+      "cbc:ID": "KOR/1/2026",
+      "cbc:IssueDate": "2026-01-01",
+    },
+  });
+
+  assert.match(xml, /<CreditNote/);
+  assert.match(xml, /urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2/);
+  assert.match(xml, /cbc:ID>KOR\/1\/2026/);
+});

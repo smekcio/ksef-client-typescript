@@ -59,6 +59,26 @@ test("parseUpoXml supports non-NIP context identifiers and alternate proof", () 
   assert.equal(byPeppol.uwierzytelnienie.proof.kind, "SkrotDokumentuUwierzytelniajacego");
 });
 
+test("parseUpoXml parses numeric OpisPotwierdzenia values", () => {
+  const parsed = parseUpoXml(
+    buildValidUpo({
+      opisPotwierdzenia: `
+        <OpisPotwierdzenia>
+          <Strona>2</Strona>
+          <LiczbaStron>5</LiczbaStron>
+          <ZakresDokumentowOd>11</ZakresDokumentowOd>
+          <ZakresDokumentowDo>20</ZakresDokumentowDo>
+          <CalkowitaLiczbaDokumentow>99</CalkowitaLiczbaDokumentow>
+        </OpisPotwierdzenia>
+      `,
+    }),
+  );
+
+  assert.equal(parsed.opisPotwierdzenia?.strona, 2);
+  assert.equal(parsed.opisPotwierdzenia?.liczbaStron, 5);
+  assert.equal(parsed.opisPotwierdzenia?.calkowitaLiczbaDokumentow, 99);
+});
+
 test("parseUpoXml returns validation errors for malformed structures", () => {
   assert.throws(
     () => parseUpoXml("<Potwierdzenie>text</Potwierdzenie>"),
