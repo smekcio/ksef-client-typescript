@@ -164,9 +164,11 @@ export class HttpClient {
           await response.arrayBuffer().catch(() => undefined);
           const retryAfter = response.headers.get("retry-after") ?? undefined;
           const delayMs = computeRetryDelayMs(retryAfter, attempt, this.maxRetryDelayMs);
+          clearTimeout(timeout);
           await sleep(delayMs);
           continue;
         }
+        clearTimeout(timeout);
         return await this.handleResponse<T>(response, options.responseType);
       } catch (error) {
         lastError = error;
@@ -176,12 +178,12 @@ export class HttpClient {
           attempt < maxAttempts
         ) {
           const delayMs = computeRetryDelayMs(undefined, attempt, this.maxRetryDelayMs);
+          clearTimeout(timeout);
           await sleep(delayMs);
           continue;
         }
-        throw error;
-      } finally {
         clearTimeout(timeout);
+        break;
       }
     }
 

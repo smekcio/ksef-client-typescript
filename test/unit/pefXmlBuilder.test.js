@@ -1,10 +1,11 @@
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
-import { buildPefXml } from "../../dist/index.js";
+import { buildPefXml, isPefUblDocumentInput, KsefValidationError } from "../../dist/index.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -111,4 +112,22 @@ test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture
   const xml = buildPefXml({ CreditNote: stripRootAttributes(root) });
   const xsd = loadXsd(pefKor3XsdPath);
   validateXml(xml, xsd);
+});
+
+test("isPefUblDocumentInput accepts exactly one supported root object", () => {
+  assert.equal(isPefUblDocumentInput({ Invoice: { ID: "1" } }), true);
+  assert.equal(isPefUblDocumentInput({ CreditNote: { ID: "1" } }), true);
+  assert.equal(isPefUblDocumentInput({ Invoice: { ID: "1" }, CreditNote: { ID: "2" } }), false);
+  assert.equal(isPefUblDocumentInput({ Invoice: [] }), false);
+});
+
+test("buildPefXml throws validation error for schema/root mismatch", () => {
+  assert.throws(
+    () => buildPefXml({ schema: "PEF_KOR", Invoice: { ID: "1" } }),
+    (error) => {
+      assert.ok(error instanceof KsefValidationError);
+      assert.match(error.message, /PEF schema mismatch/);
+      return true;
+    },
+  );
 });

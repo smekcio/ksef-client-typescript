@@ -22,3 +22,20 @@ test("queryProviders maps pageOffset/pageSize to query params", async () => {
   });
   assert.equal(capturedOptions.authToken, undefined);
 });
+
+test("queryProviders omits query object when pagination params are not provided", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return {};
+    },
+  };
+  const client = new PeppolClient(http, async () => "access-token");
+
+  await client.queryProviders();
+
+  assert.equal(capturedOptions.method, "GET");
+  assert.equal(capturedOptions.path, "/peppol/query");
+  assert.equal("query" in capturedOptions, false);
+});

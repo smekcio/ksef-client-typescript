@@ -53,6 +53,25 @@ test("getAuthStatus normalizes authenticationMethodInfo when response contains l
   });
 });
 
+test("getAuthStatus uses generic fallback for unknown authentication method", async () => {
+  const http = {
+    request: async () => ({
+      startDate: "2026-02-19T10:00:00Z",
+      authenticationMethod: "FutureMethod",
+      status: { code: 200, description: "ok" },
+    }),
+  };
+  const client = new AuthClient(http);
+
+  const status = await client.getAuthStatus("ref-unknown", "authentication-token");
+
+  assert.deepEqual(status.authenticationMethodInfo, {
+    category: "Other",
+    code: "FutureMethod",
+    displayName: "FutureMethod",
+  });
+});
+
 test("getChallenge returns challenge with required clientIp and timestampMs", async () => {
   const http = {
     request: async () => ({

@@ -51,3 +51,10 @@ test(
     assert.equal(upo.opisPotwierdzenia.calkowitaLiczbaDokumentow, 2);
   },
 );
+
+test("parseUpoXml accepts Buffer input", { skip: skipMissingInvoiceFixture }, () => {
+  const xmlBuffer = fs.readFileSync(upoInvoicePath);
+  const upo = parseUpoXml(xmlBuffer);
+  assert.equal(upo.kodFormularza, "FA (3)");
+  assert.equal(upo.dokumenty.length, 1);
+});

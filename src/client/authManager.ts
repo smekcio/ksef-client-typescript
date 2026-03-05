@@ -61,13 +61,14 @@ export class AuthManager {
       return this.accessToken ?? response.accessToken.token;
     })();
     try {
-      return await this.refreshInFlight;
+      const refreshedAccessToken = await this.refreshInFlight;
+      this.refreshInFlight = null;
+      return refreshedAccessToken;
     } catch {
       this.accessToken = null;
       this.refreshToken = null;
-      throw new KsefSessionExpiredError("Failed to refresh access token.");
-    } finally {
       this.refreshInFlight = null;
+      throw new KsefSessionExpiredError("Failed to refresh access token.");
     }
   }
 }

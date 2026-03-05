@@ -60,4 +60,47 @@ test("PersonTokenService parses token claims and normalizes role-related fields"
 test("PersonTokenService throws on malformed JWT", () => {
   const service = new PersonTokenService();
   assert.throws(() => service.parse("invalid-token"), /Invalid JWT format/);
+  assert.throws(() => service.parse("a..c"), /Invalid JWT format/);
+});
+
+test("PersonTokenService handles missing and malformed optional claims", () => {
+  const service = new PersonTokenService();
+  const token = buildJwt({
+    aud: "single-audience",
+    exp: "",
+    iat: "not-a-number",
+    typ: "",
+    civ: 0,
+    sud: "not-json",
+    per: 'one,two,,"three"',
+    pec: "single",
+    rol: '"\\uZZZZ"',
+    pep: null,
+  });
+
+  const parsed = service.parse(token);
+  assert.equal(parsed.issuer, null);
+  assert.deepEqual(parsed.audiences, ["single-audience"]);
+  assert.equal(parsed.issuedAt, null);
+  assert.equal(parsed.expiresAt, null);
+  assert.equal(parsed.tokenType, null);
+  assert.equal(parsed.contextIdType, null);
+  assert.equal(parsed.contextIdValue, null);
+  assert.equal(parsed.subjectDetails, null);
+  assert.equal(parsed.ipPolicy, null);
+  assert.deepEqual(parsed.permissions, ["one", "two", "three"]);
+  assert.deepEqual(parsed.permissionsExcluded, ["single"]);
+  assert.deepEqual(parsed.rolesRaw, ["\\uZZZZ"]);
+  assert.deepEqual(parsed.permissionsEffective, []);
+});
+
+test("PersonTokenService normalizes missing audience claim to empty array", () => {
+  const service = new PersonTokenService();
+  const token = buildJwt({
+    iss: "https://issuer.example",
+    aud: null,
+  });
+
+  const parsed = service.parse(token);
+  assert.deepEqual(parsed.audiences, []);
 });
