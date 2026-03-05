@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.3.0...v0.3.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* **ci:** stabilize zip tests on node20 and restore 100% branch coverage ([ebc26b5](https://github.com/smekcio/ksef-client-typescript/commit/ebc26b5d1802fa5b9b5d3335e677174dfe64bb11))
+
 ## [0.3.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.2.0...v0.3.0) (2026-03-03)
 
 
