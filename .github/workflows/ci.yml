@@ -80,7 +80,7 @@ jobs:
         run: npm run build
 
       - name: Run tests with coverage
-        run: npm exec -- c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/unit/*.test.js test/e2e/*.test.js
+        run: NODE_OPTIONS=--enable-source-maps npm exec -- c8 --reporter=text-summary --reporter=lcov --reporter=html node --test test/unit/*.test.js test/e2e/*.test.js
 
       - name: Enforce coverage threshold
         run: npm exec -- c8 check-coverage --statements 100 --branches 100 --functions 100 --lines 100
