@@ -74,3 +74,7 @@ Biblioteka udostępnia dwa poziomy użycia:
 **Przykłady:**
 
 - [Przykłady](examples/README.md)
+
+**Utrzymanie repozytorium:**
+
+- [Maintainers guide](maintainers.md)
