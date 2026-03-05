@@ -79,6 +79,44 @@ test("parseUpoXml parses numeric OpisPotwierdzenia values", () => {
   assert.equal(parsed.opisPotwierdzenia?.calkowitaLiczbaDokumentow, 99);
 });
 
+test("parseUpoXml accepts Buffer input without external fixtures", () => {
+  const xmlBuffer = Buffer.from(buildValidUpo(), "utf8");
+  const parsed = parseUpoXml(xmlBuffer);
+  assert.equal(parsed.kodFormularza, "FA (3)");
+});
+
+test("parseUpoXml supports multiple Dokument entries from inline XML", () => {
+  const parsed = parseUpoXml(
+    buildValidUpo({
+      dokument: `
+        <Dokument>
+          <NipSprzedawcy>1111111111</NipSprzedawcy>
+          <NumerKSeFDokumentu>KSEF-1</NumerKSeFDokumentu>
+          <NumerFaktury>FV/1</NumerFaktury>
+          <DataWystawieniaFaktury>2026-01-01</DataWystawieniaFaktury>
+          <DataPrzeslaniaDokumentu>2026-01-01T00:00:00Z</DataPrzeslaniaDokumentu>
+          <DataNadaniaNumeruKSeF>2026-01-01T00:01:00Z</DataNadaniaNumeruKSeF>
+          <SkrotDokumentu>HASH-1</SkrotDokumentu>
+          <TrybWysylki>Online</TrybWysylki>
+        </Dokument>
+        <Dokument>
+          <NipSprzedawcy>2222222222</NipSprzedawcy>
+          <NumerKSeFDokumentu>KSEF-2</NumerKSeFDokumentu>
+          <NumerFaktury>FV/2</NumerFaktury>
+          <DataWystawieniaFaktury>2026-01-02</DataWystawieniaFaktury>
+          <DataPrzeslaniaDokumentu>2026-01-02T00:00:00Z</DataPrzeslaniaDokumentu>
+          <DataNadaniaNumeruKSeF>2026-01-02T00:01:00Z</DataNadaniaNumeruKSeF>
+          <SkrotDokumentu>HASH-2</SkrotDokumentu>
+          <TrybWysylki>Offline</TrybWysylki>
+        </Dokument>
+      `,
+    }),
+  );
+
+  assert.equal(parsed.dokumenty.length, 2);
+  assert.equal(parsed.dokumenty[1]?.numerKSeFDokumentu, "KSEF-2");
+});
+
 test("parseUpoXml returns validation errors for malformed structures", () => {
   assert.throws(
     () => parseUpoXml("<Potwierdzenie>text</Potwierdzenie>"),
