@@ -1,10 +1,12 @@
 import { BaseClient } from "../client/baseClient";
 import {
+  EntityPermissionsQueryRequest,
   PermissionsGrantRequest,
   PermissionsListResponse,
   PermissionsOperationResponse,
   PermissionsQueryPaging,
   PermissionsQueryRequest,
+  QueryEntityPermissionsResponse,
 } from "../types/permissions";
 
 export class PermissionsClient extends BaseClient {
@@ -68,6 +70,28 @@ export class PermissionsClient extends BaseClient {
     return this.getQuery("/permissions/query/entities/roles", {
       pageOffset,
       pageSize,
+    });
+  }
+
+  async queryEntitiesGrants(
+    request: EntityPermissionsQueryRequest,
+    pageOffset?: number,
+    pageSize?: number,
+  ): Promise<QueryEntityPermissionsResponse> {
+    const token = await this.getAccessToken();
+    const query =
+      pageOffset !== undefined || pageSize !== undefined
+        ? {
+            pageOffset,
+            pageSize,
+          }
+        : undefined;
+    return this.http.request<QueryEntityPermissionsResponse>({
+      method: "POST",
+      path: "/permissions/query/entities/grants",
+      ...(query ? { query } : {}),
+      body: request,
+      authToken: token,
     });
   }
 

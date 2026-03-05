@@ -120,7 +120,8 @@ export class CryptographyService {
 
   static normalizeCertificatePem(certificate: string): string {
     if (certificate.includes("BEGIN ")) {
-      return certificate.trim().endsWith("\n") ? certificate : `${certificate.trim()}\n`;
+      const trimmed = certificate.trim();
+      return certificate.endsWith("\n") ? certificate : `${trimmed}\n`;
     }
     return CryptographyService.toPemFromBase64Der(certificate);
   }
