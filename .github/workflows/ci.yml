@@ -81,7 +81,7 @@ jobs:
 
       - name: Run tests with coverage
         run: >
-          NODE_OPTIONS=--enable-source-maps npm exec -- c8 --reporter=text-summary --reporter=lcov --reporter=html
+          NODE_OPTIONS=--enable-source-maps npm exec -- c8 --reporter=text-summary --reporter=text --reporter=lcov --reporter=html
           sh -lc 'node --test $(find test/unit -name "*.test.js" ! -name "cliArgs.test.js" ! -name "cliTokenStore.test.js" -print) test/e2e/*.test.js'
 
       - name: Enforce coverage threshold
