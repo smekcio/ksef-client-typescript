@@ -74,7 +74,7 @@ function shouldBypassProxy(hostname: string, noProxy?: string): boolean {
 }
 
 function isJsonContentType(contentType: string): boolean {
-  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  const mediaType = contentType.split(";", 1)[0]!.trim().toLowerCase();
   return mediaType === "application/json" || mediaType.endsWith("+json");
 }
 

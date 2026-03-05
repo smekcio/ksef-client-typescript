@@ -9,12 +9,14 @@ import { ZipFile } from "yazl";
 import { createZip, unzip } from "../../dist/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zipModuleUrl = pathToFileURL(path.resolve(__dirname, "../../src/utils/zip.ts")).href;
+const distModuleUrl = pathToFileURL(path.resolve(__dirname, "../../dist/index.js")).href;
 
 async function runNodeWithLoader({ loaderSource, script }) {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-zip-loader-"));
   const loaderPath = path.join(tempDir, "loader.mjs");
   const loaderUrl = pathToFileURL(loaderPath).href;
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_V8_COVERAGE;
   await writeFile(loaderPath, loaderSource, "utf8");
 
   try {
@@ -23,7 +25,7 @@ async function runNodeWithLoader({ loaderSource, script }) {
       ["--experimental-loader", loaderUrl, "--input-type=module", "--eval", script],
       {
         cwd: process.cwd(),
-        env: process.env,
+        env: childEnv,
         encoding: "utf8",
       },
     );
@@ -183,7 +185,7 @@ test("unzip handles callback with missing zipfile object", async () => {
     `,
     script: `
       import assert from "node:assert/strict";
-      import { unzip } from ${JSON.stringify(zipModuleUrl)};
+      import { unzip } from ${JSON.stringify(distModuleUrl)};
       await assert.rejects(() => unzip(Buffer.from("PK", "utf8")), /Failed to open zip buffer/);
     `,
   });
@@ -247,7 +249,7 @@ test("unzip handles entries with undefined size metadata by applying zero defaul
     `,
     script: `
       import assert from "node:assert/strict";
-      import { unzip } from ${JSON.stringify(zipModuleUrl)};
+      import { unzip } from ${JSON.stringify(distModuleUrl)};
       const files = await unzip(Buffer.from("PK", "utf8"));
       assert.equal(files.size, 1);
       assert.equal(files.get("x.txt")?.toString("utf8"), "x");
@@ -306,7 +308,7 @@ test("unzip handles missing read stream object from openReadStream callback", as
     `,
     script: `
       import assert from "node:assert/strict";
-      import { unzip } from ${JSON.stringify(zipModuleUrl)};
+      import { unzip } from ${JSON.stringify(distModuleUrl)};
       await assert.rejects(() => unzip(Buffer.from("PK", "utf8")), /Failed to read zip entry/);
     `,
   });
