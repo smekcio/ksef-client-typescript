@@ -579,6 +579,7 @@ export type InternalId = string;
 export type InvoiceExportRequest = {
   encryption: EncryptionInfo;
   filters: InvoiceQueryFilters;
+  onlyMetadata?: boolean;
 };
 
 export type InvoiceExportStatusResponse = {
@@ -705,7 +706,7 @@ export type InvoiceQueryFilters = {
   subjectType: InvoiceQuerySubjectType;
 };
 
-export type InvoiceQueryFormType = "FA" | "PEF" | "RR";
+export type InvoiceQueryFormType = "FA_RR" | "FA" | "PEF" | "RR";
 
 export type InvoiceQuerySubjectType = "Subject1" | "Subject2" | "Subject3" | "SubjectAuthorized";
 

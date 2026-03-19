@@ -27,17 +27,18 @@ Niskopoziomowy klient dla sesji online i batch oraz dokumentów UPO.
   - `FA (3)` / `1-0E` / `FA`
   - `PEF (3)` / `2-1` / `PEF`
   - `PEF_KOR (3)` / `2-1` / `PEF`
-  - `FA_RR (1)` / `1-0E` / `RR`
+  - `FA_RR (1)` / `1-1E` / `FA_RR`
 - `openBatchSession(...)` obsługuje `formCode`:
   - `FA (2)` / `1-0E` / `FA`
   - `FA (3)` / `1-0E` / `FA`
-  - `FA_RR (1)` / `1-0E` / `RR`
+  - `FA_RR (1)` / `1-1E` / `FA_RR`
 - Dla `openOnlineSession(..., true)` oraz `openBatchSession(..., true)` SDK ustawia nagłówek `X-KSeF-Feature: upo-v4-3`.
 - `sendOnlineInvoice(...)` wymaga zaszyfrowanego ładunku `SendInvoiceRequest` (`invoiceHash`, `encryptedInvoiceContent` itd.).
 - Metody `getSessionInvoiceUpoByReferenceNumber`, `getSessionInvoiceUpoByKsefNumber` i `getSessionUpo` zwracają XML jako `string`.
 - W sesji batch upload części odbywa się po `partUploadRequests` na pre-signed URL i nie korzysta z Bearer tokena.
 - Dla faktur RR przekazuj gotowy XML (`string`/`Buffer`) do `sendOnlineInvoice(...)` lub workflowów;
   builder `buildFakturaXml` generuje wyłącznie schematy FA (`FA2`/`FA3`).
+- Dla `FA_RR (1)` w wersji `1-1E` używaj `formCode.value = "FA_RR"`; historyczne `RR` pozostaje tylko wariantem kompatybilnościowym.
 
 ## Przykłady TypeScript
 

@@ -45,6 +45,7 @@ W praktyce: full to "pojedyncza paczka", incremental to "ciągłe domykanie okna
 - `filters` (wymagane)
 - `encryptionData` (opcjonalnie)
 - `publicCertificateBase64Der` (opcjonalnie; alternatywa do `encryptionData`)
+- `onlyMetadata` (opcjonalnie; gdy `true`, eksport zwraca tylko `_metadata.json`)
 
 Gdy nie podasz `encryptionData` ani `publicCertificateBase64Der`, workflow sam pobierze certyfikat
 `SymmetricKeyEncryption` i zbuduje dane szyfrowania.
@@ -71,6 +72,7 @@ Szczegół praktyczny: dla `YYYY-MM-DD` SDK parsuje datę jako UTC `00:00:00`, w
 
 ```ts
 const started = await client.workflows.exports.startExport({
+  onlyMetadata: true,
   filters: {
     subjectType: "Subject1",
     dateRange: {
@@ -96,6 +98,8 @@ const processed = await client.workflows.exports.downloadAndProcessPackage(
 console.log(processed.metadataSummaries.length);
 console.log(Object.keys(processed.invoiceXmlFiles).length);
 ```
+
+Jeśli ustawisz `onlyMetadata: true`, `invoiceXmlFiles` będzie puste, a cała zawartość paczki trafi do `metadataSummaries`.
 
 ## Przykład 2: jawne `encryptionData`
 

@@ -23,8 +23,8 @@ const FORM_CODE_MAP: Record<string, OnlineSessionFormCode> = {
   },
   FARR1: {
     systemCode: "FA_RR (1)",
-    schemaVersion: "1-0E",
-    value: "RR",
+    schemaVersion: "1-1E",
+    value: "FA_RR",
   },
 };
 

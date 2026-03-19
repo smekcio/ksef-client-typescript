@@ -12,7 +12,8 @@ Niskopoziomowy klient dla endpointów `/invoices/*`.
 ## Najważniejsze informacje
 
 - `getInvoice(...)` zwraca XML faktury jako `string`.
-- `exportInvoices(...)` obsługuje opcjonalne `includeMetadata`. Gdy ustawisz `includeMetadata: true`, SDK dodaje nagłówek `X-KSeF-Feature: include-metadata` (potwierdzone testami jednostkowymi).
+- `exportInvoices(...)` obsługuje opcjonalne `onlyMetadata`. Gdy ustawisz `onlyMetadata: true`, eksport zwróci wyłącznie `_metadata.json` bez XML faktur.
+- Legacy alias `includeMetadata` jest nadal mapowany przez SDK do `onlyMetadata`, ale nowy kod powinien używać już tylko `onlyMetadata`.
 - `queryInvoiceMetadata(...)` i `exportInvoices(...)` wykonują lokalną walidację `filters` przed wywołaniem HTTP.
 - Ten klient nie ma osobnej metody pobrania partów eksportu. Dane potrzebne do pobrania (`package.parts[]`, w tym `url` i `method`) pochodzą z `getInvoiceExportStatus(referenceNumber)`.
 
@@ -63,7 +64,7 @@ console.log(metadata);
 
 ```ts
 const init = await client.invoices.exportInvoices({
-  includeMetadata: true,
+  onlyMetadata: true,
   encryption: {
     encryptedSymmetricKey: "BASE64",
     initializationVector: "BASE64",
@@ -132,6 +133,8 @@ await client.invoices.queryInvoiceMetadata({
   },
 });
 ```
+
+Przy `onlyMetadata: true` paczka eksportu zawiera tylko `_metadata.json`.
 
 ## Pobieranie partów eksportu
 

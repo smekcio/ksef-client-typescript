@@ -71,6 +71,8 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
 
   let exportPart = Buffer.from("");
   let exportPartHash = "";
+  const exportRequests = [];
+  const onlineSessionRequests = [];
   let address;
 
   const upoXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -232,6 +234,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     }
 
     if (req.method === "POST" && url.pathname === "/v2/sessions/online") {
+      onlineSessionRequests.push(JSON.parse((await readBody(req)) || "{}"));
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ referenceNumber: "ONLINE-REF-1" }));
       return;
@@ -292,6 +295,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     if (req.method === "POST" && url.pathname === "/v2/invoices/exports") {
       const raw = await readBody(req);
       const body = JSON.parse(raw || "{}");
+      exportRequests.push(body);
       const encryptedSymmetricKey = body?.encryption?.encryptedSymmetricKey;
       const initializationVector = body?.encryption?.initializationVector;
       const cipherKey = crypto.privateDecrypt(
@@ -578,6 +582,36 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     assert.equal(exitCode, 0, `${capture.stderr.join("\n")}\n${capture.stdout.join("\n")}`);
     assert.match(capture.stdout[0], /ONLINE-REF-1/);
     assert.match(await readFile(upoOut, "utf8"), /<Potwierdzenie>/);
+    assert.deepEqual(onlineSessionRequests[0].formCode, {
+      systemCode: "FA (2)",
+      schemaVersion: "1-0E",
+      value: "FA",
+    });
+
+    capture = createCaptureIo();
+    exitCode = await runCli(
+      [
+        "--json",
+        "send",
+        "--profile",
+        "default",
+        "--invoice-file",
+        invoiceFile,
+        "--form-code",
+        "FARR1",
+      ],
+      {
+        io: capture.io,
+        env,
+        cwd: tempDir,
+      },
+    );
+    assert.equal(exitCode, 0, `${capture.stderr.join("\n")}\n${capture.stdout.join("\n")}`);
+    assert.deepEqual(onlineSessionRequests[1].formCode, {
+      systemCode: "FA_RR (1)",
+      schemaVersion: "1-1E",
+      value: "FA_RR",
+    });
 
     capture = createCaptureIo();
     exitCode = await runCli(
@@ -643,7 +677,16 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
 
     capture = createCaptureIo();
     exitCode = await runCli(
-      ["--json", "export", "--profile", "default", "--filters-file", filtersFile, "--no-wait"],
+      [
+        "--json",
+        "export",
+        "--profile",
+        "default",
+        "--filters-file",
+        filtersFile,
+        "--only-metadata",
+        "--no-wait",
+      ],
       {
         io: capture.io,
         env,
@@ -652,6 +695,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     );
     assert.equal(exitCode, 0);
     assert.match(capture.stdout[0], /"state": "started"/);
+    assert.equal(exportRequests[0].onlyMetadata, true);
 
     capture = createCaptureIo();
     exitCode = await runCli(

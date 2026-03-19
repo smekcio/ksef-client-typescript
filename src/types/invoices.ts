@@ -20,6 +20,10 @@ export interface InvoiceQueryFilters extends JsonObject {
 export interface InvoiceExportRequest {
   encryption: EncryptionInfo;
   filters: InvoiceQueryFilters;
+  onlyMetadata?: boolean;
+  /**
+   * @deprecated Use `onlyMetadata` instead.
+   */
   includeMetadata?: boolean;
 }
 
