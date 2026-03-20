@@ -75,6 +75,95 @@ test("InvoiceExportWorkflow.startExport uses provided encryption data", async ()
   });
 });
 
+test("InvoiceExportWorkflow.startExport passes onlyMetadata to export request", async () => {
+  const calls = [];
+  const workflow = new InvoiceExportWorkflow(
+    {
+      exportInvoices: async (request) => {
+        calls.push(request);
+        return { referenceNumber: "EXP-REF-ONLY-METADATA" };
+      },
+    },
+    {
+      getPublicKeyCertificates: async () => {
+        throw new Error("should not be called");
+      },
+    },
+    {},
+  );
+
+  const encryptionData = {
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: {
+      encryptedSymmetricKey: "abc",
+      initializationVector: "def",
+    },
+  };
+
+  const result = await workflow.startExport({
+    filters: {
+      subjectType: "Subject1",
+      dateRange: {
+        dateType: "Issue",
+        from: "2025-01-01",
+        to: "2025-01-02",
+      },
+    },
+    encryptionData,
+    onlyMetadata: true,
+  });
+
+  assert.equal(result.referenceNumber, "EXP-REF-ONLY-METADATA");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].onlyMetadata, true);
+});
+
+test("InvoiceExportWorkflow.startExport maps legacy includeMetadata to onlyMetadata", async () => {
+  const calls = [];
+  const workflow = new InvoiceExportWorkflow(
+    {
+      exportInvoices: async (request) => {
+        calls.push(request);
+        return { referenceNumber: "EXP-REF-INCLUDE-METADATA" };
+      },
+    },
+    {
+      getPublicKeyCertificates: async () => {
+        throw new Error("should not be called");
+      },
+    },
+    {},
+  );
+
+  const encryptionData = {
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: {
+      encryptedSymmetricKey: "abc",
+      initializationVector: "def",
+    },
+  };
+
+  const result = await workflow.startExport({
+    filters: {
+      subjectType: "Subject1",
+      dateRange: {
+        dateType: "Issue",
+        from: "2025-01-01",
+        to: "2025-01-02",
+      },
+    },
+    encryptionData,
+    includeMetadata: false,
+  });
+
+  assert.equal(result.referenceNumber, "EXP-REF-INCLUDE-METADATA");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].onlyMetadata, false);
+  assert.equal(calls[0].includeMetadata, undefined);
+});
+
 test("InvoiceExportWorkflow.startExport builds encryption data from security certificate", async () => {
   const certBase64Der = certPemToBase64Der(fixtures.rsaCertPem);
 

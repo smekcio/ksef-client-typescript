@@ -17,6 +17,11 @@ export interface ExportStartOptions {
   filters: InvoiceQueryFilters;
   encryptionData?: EncryptionData;
   publicCertificateBase64Der?: string;
+  onlyMetadata?: boolean;
+  /**
+   * @deprecated Use `onlyMetadata` instead.
+   */
+  includeMetadata?: boolean;
 }
 
 export interface ExportResult {
@@ -72,6 +77,9 @@ export class InvoiceExportWorkflow {
     const request: InvoiceExportRequest = {
       encryption: encryptionData.encryptionInfo,
       filters: options.filters,
+      ...((options.onlyMetadata ?? options.includeMetadata) !== undefined
+        ? { onlyMetadata: options.onlyMetadata ?? options.includeMetadata }
+        : {}),
     };
     const response = await this.invoicesClient.exportInvoices(request);
     return {

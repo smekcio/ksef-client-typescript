@@ -651,8 +651,12 @@ async function runExport(
     throw new CliError("export requires --filters-file.");
   }
   const filters = await readJsonFile<InvoiceQueryFilters>(filtersFile, context.cwd);
+  const onlyMetadata = getBooleanOption(options, "only-metadata");
 
-  const started = await client.workflows.exports.startExport({ filters });
+  const started = await client.workflows.exports.startExport({
+    filters,
+    ...(onlyMetadata ? { onlyMetadata: true } : {}),
+  });
   const wait = !getBooleanOption(options, "no-wait");
   if (!wait) {
     return {
@@ -1085,7 +1089,7 @@ function helpText(): string {
     "  ksef-ts health --with-auth",
     "  ksef-ts invoice get <ksef-number> --output invoice.xml",
     "  ksef-ts send --invoice-file ./invoice.xml --wait-upo --upo-output upo.xml",
-    "  ksef-ts export --filters-file ./filters.json --out-dir ./exports",
+    "  ksef-ts export --filters-file ./filters.json --only-metadata --out-dir ./exports",
   ].join("\n");
 }
 

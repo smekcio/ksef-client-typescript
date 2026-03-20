@@ -46,16 +46,18 @@ export class InvoicesClient extends BaseClient {
   }
 
   async exportInvoices(request: InvoiceExportRequest): Promise<InvoiceExportInitResponse> {
-    const { includeMetadata, ...body } = request;
+    const { onlyMetadata, includeMetadata, ...body } = request;
     const normalizedFilters = normalizeInvoiceQueryFilters(body.filters);
     validateInvoiceQueryFilters(normalizedFilters);
     const token = await this.getAccessToken();
     return this.http.request<InvoiceExportInitResponse>({
       method: "POST",
       path: "/invoices/exports",
-      ...(includeMetadata ? { headers: { "X-KSeF-Feature": "include-metadata" } } : {}),
       body: {
         ...body,
+        ...((onlyMetadata ?? includeMetadata) !== undefined
+          ? { onlyMetadata: onlyMetadata ?? includeMetadata }
+          : {}),
         filters: normalizedFilters,
       },
       authToken: token,

@@ -1,11 +1,11 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-docs`
 
-Data analizy: **2026-03-03**
+Data analizy: **2026-03-19**
 
 ## Zakres i źródła
 
-- Kontrakt API: `ksef-docs/open-api.json` (`2.2.0`)
-- Changelog: `ksef-docs/api-changelog.md` (wersje `2.1.0`, `2.1.1`, `2.1.2`, `2.2.0`)
+- Kontrakt API: `ksef-docs/open-api.json` (`2.3.0`)
+- Changelog: `ksef-docs/api-changelog.md` (wersje do `2.3.0`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/client/*`, `docs/*`
 - Weryfikacja dodatkowa: `temp/openapi-test-v2.json` (`https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`)
 
@@ -16,26 +16,25 @@ Data analizy: **2026-03-03**
 - Nadmiarowe endpointy po stronie TS: **0**
 - Zgodność kontraktu `ksef-docs` vs `api-test`: **zgodna** (po odfiltrowaniu opisów/metadanych)
 
-## Zmiany uwzględnione po stronie SDK (2.2.0)
+## Zmiany uwzględnione po stronie SDK (2.3.0)
 
-1. Uprawnienia (`/permissions/*`)
-   - dodano obsługę endpointu `POST /permissions/query/entities/grants`;
-   - dodano ścisłe typy request/response:
-     - `EntityPermissionsQueryRequest`,
-     - `QueryEntityPermissionsResponse`,
-     - `EntityPermissionItem` i typy pomocnicze.
+1. Eksport faktur (`/invoices/exports`)
+   - `InvoiceExportRequest` wspiera `onlyMetadata`;
+   - klient i workflow eksportu wysyłają `onlyMetadata` w body requestu zgodnie z kontraktem 2.3.0;
+   - stary alias `includeMetadata` jest utrzymany wyłącznie jako warstwa kompatybilności po stronie SDK.
 
-2. Uwierzytelnianie (`/auth/challenge`)
-   - model `AuthChallengeResponse` obejmuje `clientIp`;
-   - `timestampMs` jest traktowany jako pole wymagane zgodnie z kontraktem 2.2.0.
+2. Form codes `FA_RR`
+   - modele OpenAPI obejmują `InvoiceQueryFormType = "FA_RR" | "FA" | "PEF" | "RR"`;
+   - typy sesji online/batch wspierają aktualny wariant `FA_RR (1) / 1-1E / FA_RR`;
+   - CLI mapuje skrót `FARR1` do bieżącego wariantu `1-1E / FA_RR`.
 
-3. Obsługa błędów HTTP
-   - parser odpowiedzi w `HttpClient` obsługuje `application/problem+json` oraz inne media type kończące się na `+json`;
-   - błędy `401/403` w formacie Problem Details są mapowane do `KsefApiError` z payloadem JSON.
+3. Modele OpenAPI
+   - odświeżono `src/types/openapi.generated.ts` do `ksef-docs 2.3.0`;
+   - zaktualizowano liczbę schematów i eksportowane typy pomocnicze zgodnie z najnowszym kontraktem.
 
-4. Modele OpenAPI
-   - odświeżono `src/types/openapi.generated.ts` do aktualnej specyfikacji;
-   - zaktualizowano licznik schematów i typy dodane w 2.2.0.
+4. Dokumentacja SDK
+   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.3.0`;
+   - dokumentacja `invoices`, workflowów eksportu oraz sesji opisuje `onlyMetadata` i aktualne `FA_RR`.
 
 ## Weryfikacja parity endpointów
 
@@ -55,9 +54,9 @@ Data analizy: **2026-03-03**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została uaktualniona do spójności z KSeF `2.2.0`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.3.0`:
 
-- deklaracje kompatybilności API (`v2.2.0`) w README i docs,
-- opis nowej metody `queryEntitiesGrants(...)` w dokumentacji `permissions`,
-- doprecyzowanie, że challenge auth zawiera `clientIp`,
+- deklaracje kompatybilności API (`v2.3.0`) w README i docs,
+- opis `onlyMetadata` w dokumentacji `invoices` i workflowu eksportu,
+- aktualne wskazówki dla `FA_RR (1)` w wersji `1-1E`,
 - zaktualizowany raport parity i wyniki walidacji.

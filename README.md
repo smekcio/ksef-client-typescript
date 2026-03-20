@@ -5,7 +5,7 @@ Biblioteka udostępnia typowane klienty endpointów, gotowe workflowy (auth/sesj
 
 ## Kompatybilność
 
-- KSeF API: `v2.2.0`
+- KSeF API: `v2.3.0`
 - Node.js: `>= 20`
 - Środowiska: `TEST`, `DEMO`, `PRD`
 

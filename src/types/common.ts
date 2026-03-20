@@ -156,20 +156,37 @@ export interface PefKor3FormCode extends FormCode {
   value: "PEF";
 }
 
-export interface FaRr1FormCode extends FormCode {
+export interface FaRr1LegacyFormCode extends FormCode {
   systemCode: "FA_RR (1)";
   schemaVersion: "1-0E";
   value: "RR";
 }
+
+export interface FaRr1TransitionFormCode extends FormCode {
+  systemCode: "FA_RR (1)";
+  schemaVersion: "1-1E";
+  value: "RR";
+}
+
+export interface FaRr1FormCode extends FormCode {
+  systemCode: "FA_RR (1)";
+  schemaVersion: "1-1E";
+  value: "FA_RR";
+}
+
+export type AnyFaRr1FormCode =
+  | FaRr1LegacyFormCode
+  | FaRr1TransitionFormCode
+  | FaRr1FormCode;
 
 export type OnlineSessionFormCode =
   | Fa2FormCode
   | Fa3FormCode
   | Pef3FormCode
   | PefKor3FormCode
-  | FaRr1FormCode;
+  | AnyFaRr1FormCode;
 
-export type BatchSessionFormCode = Fa2FormCode | Fa3FormCode | FaRr1FormCode;
+export type BatchSessionFormCode = Fa2FormCode | Fa3FormCode | AnyFaRr1FormCode;
 
 export interface AuthorizationPolicy {
   allowedIps?: {

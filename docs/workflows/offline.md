@@ -36,6 +36,7 @@ Każda instrukcja zawiera:
 - `waitForUpoOptions` (opcjonalnie; `pollIntervalMs`, `maxAttempts`)
 
 Obsługiwane `formCode` są takie same jak w sesji online (`FA (2)`, `FA (3)`, `PEF (3)`, `PEF_KOR (3)`, `FA_RR (1)`).
+Dla `FA_RR (1)` w wersji `1-1E` używaj `formCode.value = "FA_RR"`.
 Dla RR przekazuj gotowy XML (`string`/`Buffer`).
 
 ## Opcje `sendOfflineTechnicalCorrection(options)`
