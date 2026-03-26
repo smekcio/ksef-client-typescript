@@ -48,13 +48,16 @@ npm run check:openapi-coverage -- --openapi ../ksef-docs/open-api.json --src src
 - `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - kontrola pokrycia endpointów.
 - `Validate OpenAPI Models` (`.github/workflows/validate-models.yml`) - pobranie OpenAPI, regeneracja modeli i diff.
 - `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja wersjonowania i changeloga.
-- `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki.
+- `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki po opublikowaniu GitHub Release.
+- `Publish to GitHub Packages` (`.github/workflows/publish-github-packages.yml`) - publikacja scoped package po opublikowaniu GitHub Release.
 - `Release Published Validation` (`.github/workflows/release-published.yml`) - walidacja opublikowanego release.
 
 ## Release
 
 - Używaj Conventional Commits (`feat:`, `fix:`, `chore:` itd.).
 - `Release Please` aktualizuje wersję i `CHANGELOG.md` automatycznie.
+- Po publikacji GitHub Release workflowy `publish-npm.yml` i `publish-github-packages.yml` publikują odpowiednio do npm i GitHub Packages.
+- npm publish musi odbywać się z `publish-npm.yml`, bo to ten workflow jest powiązany z npm Trusted Publishing.
 - Przed merge release PR upewnij się, że `main` zawiera wszystkie wymagane commity funkcjonalne.
 
 ## Bezpieczeństwo

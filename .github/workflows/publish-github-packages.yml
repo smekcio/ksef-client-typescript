@@ -1,11 +1,22 @@
 name: Publish to GitHub Packages
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref or tag to publish. Defaults to the release tag or current ref.
+        required: false
+        type: string
 
 permissions:
   contents: read
   packages: write
+
+concurrency:
+  group: publish-gpr-${{ github.event.release.tag_name || inputs.ref || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -13,13 +24,33 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Resolve publish ref
+        id: target
+        shell: bash
+        run: |
+          ref="${{ github.event.release.tag_name || inputs.ref || github.ref }}"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          case "$ref" in
+            refs/tags/*)
+              echo "tag=${ref#refs/tags/}" >> "$GITHUB_OUTPUT"
+              ;;
+            v*)
+              echo "tag=$ref" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "tag=" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
-      - name: Setup Node.js 24
+      - name: Checkout publish ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           registry-url: https://npm.pkg.github.com
           scope: "@smekcio"
           cache: npm
@@ -27,6 +58,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify version matches release tag
+        if: steps.target.outputs.tag != ''
+        env:
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          node --input-type=module -e "
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const tag = process.env.RELEASE_TAG.startsWith('v')
+            ? process.env.RELEASE_TAG.slice(1)
+            : process.env.RELEASE_TAG;
+          if (pkg.version !== tag) {
+            console.error(\`package.json version (\${pkg.version}) does not match release tag (\${tag})\`);
+            process.exit(1);
+          }
+          console.log(\`OK: \${pkg.version} == \${tag}\`);
+          "
 
       - name: Lint
         run: npm run lint

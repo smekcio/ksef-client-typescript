@@ -20,10 +20,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
 
-      - name: Setup Node.js 24
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
 
