@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.4.0...v0.4.1) (2026-03-26)
+
+
+### Bug Fixes
+
+* **ci:** publish releases from dedicated trusted workflows ([#23](https://github.com/smekcio/ksef-client-typescript/issues/23)) ([2620436](https://github.com/smekcio/ksef-client-typescript/commit/2620436e6649d9f9bc6a9358c9713768c2fdf749))
+* **ci:** use node 24 for npm trusted publishing ([4ce1675](https://github.com/smekcio/ksef-client-typescript/commit/4ce1675dc2b671975d6e885cbdb272334fd95d48))
+
 ## [0.4.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.3.1...v0.4.0) (2026-03-20)
 
 
