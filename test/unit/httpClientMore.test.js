@@ -106,6 +106,7 @@ test("HttpClient throws KsefHttpError for non-json error body", async () => {
         assert.ok(error instanceof KsefHttpError);
         assert.equal(error.statusCode, 503);
         assert.equal(error.responseBody, "service unavailable");
+        assert.equal(error.problem, undefined);
         return true;
       },
     );
@@ -177,6 +178,9 @@ test("HttpClient does not retry non-idempotent POST on 429", async () => {
       (error) => {
         assert.ok(error instanceof KsefRateLimitError);
         assert.equal(error.statusCode, 429);
+        assert.deepEqual(error.responseBody, { status: 429, message: "too many requests" });
+        assert.equal(error.retryAfter, "1");
+        assert.equal(error.retryAfterSeconds, 1);
         return true;
       },
     );
@@ -330,6 +334,10 @@ test("HttpClient non-json 429 throws KsefRateLimitError and skipAuth relative pa
       (error) => {
         assert.ok(error instanceof KsefRateLimitError);
         assert.equal(error.statusCode, 429);
+        assert.equal(error.responseBody, "too many");
+        assert.equal(error.retryAfter, "0");
+        assert.equal(error.retryAfterSeconds, 0);
+        assert.equal(error.problem, undefined);
         return true;
       },
     );

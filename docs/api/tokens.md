@@ -21,6 +21,11 @@ Token KSeF możesz wykorzystać np. w autoryzacji przez `authenticateWithKsefTok
   `"InvoiceRead"`, `"InvoiceWrite"`, `"CredentialsRead"`, `"CredentialsManage"`, `"SubunitManage"`,
   `"EnforcementOperations"`, `"Introspection"`.
 - Stronicowanie listy tokenów działa przez nagłówek `x-continuation-token` (potwierdzone testami jednostkowymi).
+- Od KSeF API `2.4.0` `GET /tokens` może zwrócić także informacje o tokenie użytym do bieżącego
+  uwierzytelnienia, nawet bez `CredentialsManage` / `CredentialsRead`.
+- Od KSeF API `2.4.0` `GET /tokens/{referenceNumber}` oraz `DELETE /tokens/{referenceNumber}`
+  mogą dotyczyć bieżącego tokenu uwierzytelniającego również bez dodatkowego uprawnienia
+  `CredentialsManage`.
 
 ## Przykłady TypeScript
 

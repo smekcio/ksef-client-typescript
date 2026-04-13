@@ -3,12 +3,23 @@ import type { BodyInit, Dispatcher, RequestInit, Response } from "undici";
 import { HttpMethod, JsonObject } from "../types/common";
 import { validatePresignedUrlSecurity } from "./presignedUrlPolicy";
 import {
+  type KsefApiProblem,
   KsefApiError,
   KsefAuthStatusError,
   KsefHttpError,
   KsefRateLimitError,
   KsefValidationError,
+  type UnknownApiProblem,
 } from "../errors/errors";
+import type {
+  BadRequestProblemDetails,
+  ExceptionResponse,
+  ForbiddenProblemDetails,
+  GoneProblemDetails,
+  TooManyRequestsProblemDetails,
+  TooManyRequestsResponse,
+  UnauthorizedProblemDetails,
+} from "../types/openapi.generated";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -76,6 +87,96 @@ function shouldBypassProxy(hostname: string, noProxy?: string): boolean {
 function isJsonContentType(contentType: string): boolean {
   const mediaType = contentType.split(";", 1)[0]!.trim().toLowerCase();
   return mediaType === "application/json" || mediaType.endsWith("+json");
+}
+
+function parseRetryAfterMs(retryAfter: string | undefined): number | undefined {
+  if (!retryAfter) {
+    return undefined;
+  }
+
+  const trimmed = retryAfter.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const seconds = Number(trimmed);
+  if (!Number.isNaN(seconds)) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+
+  const dateMs = Date.parse(trimmed);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+
+  return undefined;
+}
+
+function parseRetryAfterSeconds(retryAfter: string | undefined): number | undefined {
+  const delayMs = parseRetryAfterMs(retryAfter);
+  if (delayMs === undefined) {
+    return undefined;
+  }
+  return Math.ceil(delayMs / 1000);
+}
+
+function coerceProblemStatus(status: unknown, fallbackStatus: number): number {
+  const coerced = Number(status);
+  return Number.isFinite(coerced) ? coerced : fallbackStatus;
+}
+
+function isProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & { detail: string; title: string } {
+  return typeof payload.title === "string" && typeof payload.detail === "string";
+}
+
+function createUnknownApiProblem(
+  statusCode: number,
+  payload: Record<string, unknown>,
+): UnknownApiProblem {
+  const detail = typeof payload.detail === "string" ? payload.detail : undefined;
+  return {
+    raw: payload,
+    status: coerceProblemStatus(payload.status, statusCode),
+    title: typeof payload.title === "string" ? payload.title : "API error",
+    ...(detail !== undefined ? { detail } : {}),
+  };
+}
+
+function parseApiProblem(statusCode: number, payload: unknown): KsefApiProblem | undefined {
+  if (!isPlainObject(payload)) {
+    return undefined;
+  }
+
+  if ("exception" in payload) {
+    return payload as ExceptionResponse;
+  }
+
+  if (statusCode === 429 && isPlainObject(payload.status)) {
+    return payload as TooManyRequestsResponse;
+  }
+
+  if (isProblemDetailsPayload(payload)) {
+    if (statusCode === 400 && Array.isArray(payload.errors)) {
+      return payload as BadRequestProblemDetails;
+    }
+    if (statusCode === 401) {
+      return payload as UnauthorizedProblemDetails;
+    }
+    if (statusCode === 403 && typeof payload.reasonCode === "string") {
+      return payload as ForbiddenProblemDetails;
+    }
+    if (statusCode === 410) {
+      return payload as GoneProblemDetails;
+    }
+    if (statusCode === 429) {
+      return payload as TooManyRequestsProblemDetails;
+    }
+    return createUnknownApiProblem(statusCode, payload);
+  }
+
+  return Object.keys(payload).length > 0 ? createUnknownApiProblem(statusCode, payload) : undefined;
 }
 
 export class HttpClient {
@@ -291,8 +392,16 @@ export class HttpClient {
 
     if (isJsonContentType(contentType)) {
       const payload = await response.json().catch(() => undefined);
+      const problem = parseApiProblem(status, payload);
       if (status === 429) {
-        throw new KsefRateLimitError(status, "Rate limit exceeded", payload, retryAfter);
+        throw new KsefRateLimitError(
+          status,
+          "Rate limit exceeded",
+          payload,
+          retryAfter,
+          parseRetryAfterSeconds(retryAfter),
+          problem,
+        );
       }
       if (status === 460) {
         const statusDetails = extractStatusDetails(payload);
@@ -303,15 +412,22 @@ export class HttpClient {
             `Authentication failed with ${status}: certificate is suspended.${detailsSuffix}`,
             payload,
             statusDetails,
+            problem,
           );
         }
       }
-      throw new KsefApiError(status, `API request failed with ${status}`, payload);
+      throw new KsefApiError(status, `API request failed with ${status}`, payload, problem);
     }
 
     const text = await response.text().catch(() => undefined);
     if (status === 429) {
-      throw new KsefRateLimitError(status, "Rate limit exceeded", text, retryAfter);
+      throw new KsefRateLimitError(
+        status,
+        "Rate limit exceeded",
+        text,
+        retryAfter,
+        parseRetryAfterSeconds(retryAfter),
+      );
     }
     throw new KsefHttpError(status, `HTTP request failed with ${status}`, text);
   }
@@ -409,15 +525,9 @@ function computeRetryDelayMs(
 ): number {
   const clamp = (value: number) => Math.max(0, Math.min(maxDelayMs, value));
 
-  if (retryAfter) {
-    const seconds = Number(retryAfter);
-    if (!Number.isNaN(seconds)) {
-      return clamp(Math.round(seconds * 1000));
-    }
-    const dateMs = Date.parse(retryAfter);
-    if (!Number.isNaN(dateMs)) {
-      return clamp(dateMs - Date.now());
-    }
+  const retryAfterMs = parseRetryAfterMs(retryAfter);
+  if (retryAfterMs !== undefined) {
+    return clamp(retryAfterMs);
   }
 
   const base = Math.min(maxDelayMs, 500 * 2 ** Math.max(0, attempt - 1));

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { test } from "node:test";
-import { KsefApiError, KsefClient } from "../../dist/index.js";
+import { KsefApiError, KsefClient, KsefRateLimitError } from "../../dist/index.js";
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -222,6 +222,158 @@ test("HttpClient parses application/problem+json errors as KsefApiError", async 
           detail: "Missing permissions",
           reasonCode: "missing-permissions",
         });
+        assert.deepEqual(error.problem, {
+          title: "Forbidden",
+          status: 403,
+          detail: "Missing permissions",
+          reasonCode: "missing-permissions",
+        });
+        return true;
+      },
+    );
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient maps 400, 401, 410 and 429 problem details to error.problem", async () => {
+  const responses = {
+    "/v2/problem-400": {
+      status: 400,
+      body: {
+        title: "Bad Request",
+        status: 400,
+        detail: "Validation failed",
+        timestamp: "2026-04-13T20:15:00Z",
+        traceId: "trace-400",
+        instance: "/problem-400",
+        errors: [{ code: 12001, description: "Invalid field", details: ["field:a"] }],
+      },
+    },
+    "/v2/problem-401": {
+      status: 401,
+      body: {
+        title: "Unauthorized",
+        status: 401,
+        detail: "Missing bearer token",
+        timestamp: "2026-04-13T20:16:00Z",
+        traceId: "trace-401",
+      },
+    },
+    "/v2/problem-410": {
+      status: 410,
+      body: {
+        title: "Gone",
+        status: 410,
+        detail: "Authentication status has expired",
+        timestamp: "2026-04-13T20:17:00Z",
+        traceId: "trace-410",
+        instance: "/problem-410",
+      },
+    },
+    "/v2/problem-429": {
+      status: 429,
+      headers: {
+        "Retry-After": "Wed, 01 Jan 2099 00:00:00 GMT",
+      },
+      body: {
+        title: "Too Many Requests",
+        status: 429,
+        detail: "Retry later",
+        timestamp: "2026-04-13T20:18:00Z",
+        traceId: "trace-429",
+        instance: "/problem-429",
+      },
+    },
+  };
+
+  const server = createServer((req, res) => {
+    const entry = responses[req.url];
+    if (!entry) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "Not found" }));
+      return;
+    }
+
+    res.writeHead(entry.status, {
+      "Content-Type": "application/problem+json",
+      ...(entry.headers ?? {}),
+    });
+    res.end(JSON.stringify(entry.body));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/problem-400" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.equal(error.problem.timestamp, "2026-04-13T20:15:00Z");
+        assert.equal(error.problem.errors[0].code, 12001);
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/problem-401" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.equal(error.problem.timestamp, "2026-04-13T20:16:00Z");
+        assert.equal(error.problem.title, "Unauthorized");
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/problem-410" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.equal(error.problem.timestamp, "2026-04-13T20:17:00Z");
+        assert.equal(error.problem.title, "Gone");
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/problem-429" }),
+      (error) => {
+        assert.ok(error instanceof KsefRateLimitError);
+        assert.equal(error.problem.timestamp, "2026-04-13T20:18:00Z");
+        assert.equal(error.retryAfter, "Wed, 01 Jan 2099 00:00:00 GMT");
+        assert.ok((error.retryAfterSeconds ?? 0) > 0);
+        return true;
+      },
+    );
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient falls back to UnknownApiProblem for unknown json payloads", async () => {
+  const server = createServer((_, res) => {
+    res.writeHead(418, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "teapot", nested: { a: 1 } }));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/unknown-json" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.equal(error.problem.status, 418);
+        assert.equal(error.problem.title, "API error");
+        assert.deepEqual(error.problem.raw, { error: "teapot", nested: { a: 1 } });
         return true;
       },
     );
