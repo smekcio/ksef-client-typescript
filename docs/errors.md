@@ -26,6 +26,10 @@ Przy odpowiedziach JSON SDK próbuje zmapować `error.problem` do jednego z mode
 - `ExceptionResponse` dla klasycznego formatu błędu KSeF
 - fallback `UnknownApiProblem`, gdy JSON nie pasuje do znanego modelu
 
+Mapowanie do konkretnego typed modelu następuje tylko wtedy, gdy payload spełnia wymagane pola
+kontraktu `ksef-docs 2.4.0`. Przy częściowym albo niepoprawnym `problem+json` SDK zachowuje
+`responseBody`, a `error.problem` przechodzi do `UnknownApiProblem`.
+
 `410 Gone` może pojawić się po wygaśnięciu retencji technicznych statusów operacji asynchronicznych
 np. dla `GET /auth/{referenceNumber}` albo `GET /invoices/exports/{referenceNumber}`.
 

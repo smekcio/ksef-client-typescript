@@ -12,6 +12,7 @@ import {
   type UnknownApiProblem,
 } from "../errors/errors";
 import type {
+  ApiError,
   BadRequestProblemDetails,
   ExceptionResponse,
   ForbiddenProblemDetails,
@@ -125,10 +126,119 @@ function coerceProblemStatus(status: unknown, fallbackStatus: number): number {
   return Number.isFinite(coerced) ? coerced : fallbackStatus;
 }
 
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || isString(value);
+}
+
+function isOptionalNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || isNullableString(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function isOptionalStringArrayOrNull(value: unknown): value is string[] | null | undefined {
+  return value === undefined || value === null || isStringArray(value);
+}
+
+function isApiErrorPayload(value: unknown): value is ApiError {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return (
+    isNumber(value.code) &&
+    isString(value.description) &&
+    isOptionalStringArrayOrNull(value.details)
+  );
+}
+
+function isApiErrorArray(value: unknown): value is ApiError[] {
+  return Array.isArray(value) && value.every(isApiErrorPayload);
+}
+
+function hasRequiredProblemDetailsFields(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & {
+  detail: string;
+  status: number;
+  timestamp: string;
+  title: string;
+} {
+  return (
+    isString(payload.title) &&
+    isNumber(payload.status) &&
+    isString(payload.detail) &&
+    isString(payload.timestamp)
+  );
+}
+
 function isProblemDetailsPayload(
   payload: Record<string, unknown>,
 ): payload is Record<string, unknown> & { detail: string; title: string } {
-  return typeof payload.title === "string" && typeof payload.detail === "string";
+  return isString(payload.title) && isString(payload.detail);
+}
+
+function isBadRequestProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is BadRequestProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId) &&
+    isApiErrorArray(payload.errors)
+  );
+}
+
+function isUnauthorizedProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is UnauthorizedProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isOptionalNullableString(payload.instance) &&
+    isOptionalNullableString(payload.traceId)
+  );
+}
+
+function isForbiddenProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is ForbiddenProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.reasonCode) &&
+    isOptionalNullableString(payload.instance) &&
+    isOptionalNullableString(payload.traceId) &&
+    (payload.security === undefined || payload.security === null || isPlainObject(payload.security))
+  );
+}
+
+function isGoneProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is GoneProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId)
+  );
+}
+
+function isTooManyRequestsProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is TooManyRequestsProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId)
+  );
 }
 
 function createUnknownApiProblem(
@@ -158,20 +268,20 @@ function parseApiProblem(statusCode: number, payload: unknown): KsefApiProblem |
   }
 
   if (isProblemDetailsPayload(payload)) {
-    if (statusCode === 400 && Array.isArray(payload.errors)) {
-      return payload as BadRequestProblemDetails;
+    if (statusCode === 400 && isBadRequestProblemDetailsPayload(payload)) {
+      return payload;
     }
-    if (statusCode === 401) {
-      return payload as UnauthorizedProblemDetails;
+    if (statusCode === 401 && isUnauthorizedProblemDetailsPayload(payload)) {
+      return payload;
     }
-    if (statusCode === 403 && typeof payload.reasonCode === "string") {
-      return payload as ForbiddenProblemDetails;
+    if (statusCode === 403 && isForbiddenProblemDetailsPayload(payload)) {
+      return payload;
     }
-    if (statusCode === 410) {
-      return payload as GoneProblemDetails;
+    if (statusCode === 410 && isGoneProblemDetailsPayload(payload)) {
+      return payload;
     }
-    if (statusCode === 429) {
-      return payload as TooManyRequestsProblemDetails;
+    if (statusCode === 429 && isTooManyRequestsProblemDetailsPayload(payload)) {
+      return payload;
     }
     return createUnknownApiProblem(statusCode, payload);
   }

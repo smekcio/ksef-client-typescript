@@ -187,7 +187,7 @@ test("HttpClient rejects skipAuth combined with authToken", async () => {
   );
 });
 
-test("HttpClient parses application/problem+json errors as KsefApiError", async () => {
+test("HttpClient falls back to UnknownApiProblem for partial 403 problem-details payload", async () => {
   const server = createServer((_, res) => {
     res.writeHead(403, { "Content-Type": "application/problem+json" });
     res.end(
@@ -223,10 +223,15 @@ test("HttpClient parses application/problem+json errors as KsefApiError", async 
           reasonCode: "missing-permissions",
         });
         assert.deepEqual(error.problem, {
+          raw: {
+            title: "Forbidden",
+            status: 403,
+            detail: "Missing permissions",
+            reasonCode: "missing-permissions",
+          },
           title: "Forbidden",
           status: 403,
           detail: "Missing permissions",
-          reasonCode: "missing-permissions",
         });
         return true;
       },
@@ -236,7 +241,7 @@ test("HttpClient parses application/problem+json errors as KsefApiError", async 
   }
 });
 
-test("HttpClient maps 400, 401, 410 and 429 problem details to error.problem", async () => {
+test("HttpClient maps complete 400, 401, 403, 410 and 429 problem details to error.problem", async () => {
   const responses = {
     "/v2/problem-400": {
       status: 400,
@@ -258,6 +263,17 @@ test("HttpClient maps 400, 401, 410 and 429 problem details to error.problem", a
         detail: "Missing bearer token",
         timestamp: "2026-04-13T20:16:00Z",
         traceId: "trace-401",
+      },
+    },
+    "/v2/problem-403": {
+      status: 403,
+      body: {
+        title: "Forbidden",
+        status: 403,
+        detail: "Missing permissions",
+        reasonCode: "missing-permissions",
+        timestamp: "2026-04-13T20:16:30Z",
+        traceId: "trace-403",
       },
     },
     "/v2/problem-410": {
@@ -325,6 +341,16 @@ test("HttpClient maps 400, 401, 410 and 429 problem details to error.problem", a
         assert.ok(error instanceof KsefApiError);
         assert.equal(error.problem.timestamp, "2026-04-13T20:16:00Z");
         assert.equal(error.problem.title, "Unauthorized");
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/problem-403" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.equal(error.problem.timestamp, "2026-04-13T20:16:30Z");
+        assert.equal(error.problem.reasonCode, "missing-permissions");
         return true;
       },
     );
@@ -404,6 +430,167 @@ test("HttpClient keeps problem undefined for empty json error payloads", async (
         return true;
       },
     );
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient falls back to UnknownApiProblem for partial typed problem-details payloads", async () => {
+  const responses = {
+    "/v2/partial-400-no-timestamp": {
+      status: 400,
+      body: {
+        title: "Bad Request",
+        status: 400,
+        detail: "Validation failed",
+        instance: "/partial-400-no-timestamp",
+        traceId: "trace-400-no-timestamp",
+        errors: [{ code: 12001, description: "Invalid field" }],
+      },
+    },
+    "/v2/partial-400-invalid-errors": {
+      status: 400,
+      body: {
+        title: "Bad Request",
+        status: 400,
+        detail: "Validation failed",
+        instance: "/partial-400-invalid-errors",
+        timestamp: "2026-04-13T20:15:30Z",
+        traceId: "trace-400-invalid-errors",
+        errors: [{ code: "12001", description: "Invalid field" }],
+      },
+    },
+    "/v2/partial-400-nonobject-error": {
+      status: 400,
+      body: {
+        title: "Bad Request",
+        status: 400,
+        detail: "Validation failed",
+        instance: "/partial-400-nonobject-error",
+        timestamp: "2026-04-13T20:15:45Z",
+        traceId: "trace-400-nonobject-error",
+        errors: ["invalid-entry"],
+      },
+    },
+    "/v2/partial-401": {
+      status: 401,
+      body: {
+        title: "Unauthorized",
+        status: 401,
+        detail: "Missing bearer token",
+      },
+    },
+    "/v2/partial-403-invalid-security": {
+      status: 403,
+      body: {
+        title: "Forbidden",
+        status: 403,
+        detail: "Missing permissions",
+        reasonCode: "missing-permissions",
+        timestamp: "2026-04-13T20:16:45Z",
+        security: ["invalid-security-shape"],
+      },
+    },
+    "/v2/partial-410": {
+      status: 410,
+      body: {
+        title: "Gone",
+        status: 410,
+        detail: "Authentication status has expired",
+        instance: "/partial-410",
+        traceId: "trace-410",
+      },
+    },
+    "/v2/partial-429": {
+      status: 429,
+      headers: {
+        "Retry-After": "1",
+      },
+      body: {
+        title: "Too Many Requests",
+        status: 429,
+        detail: "Retry later",
+        instance: "/partial-429",
+        traceId: "trace-429",
+      },
+    },
+  };
+
+  const server = createServer((req, res) => {
+    const entry = responses[req.url];
+    if (!entry) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "Not found" }));
+      return;
+    }
+
+    res.writeHead(entry.status, {
+      "Content-Type": "application/problem+json",
+      ...(entry.headers ?? {}),
+    });
+    res.end(JSON.stringify(entry.body));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    for (const [path, expected] of Object.entries({
+      "/partial-400-no-timestamp": {
+        status: 400,
+        title: "Bad Request",
+        detail: "Validation failed",
+        raw: responses["/v2/partial-400-no-timestamp"].body,
+      },
+      "/partial-400-invalid-errors": {
+        status: 400,
+        title: "Bad Request",
+        detail: "Validation failed",
+        raw: responses["/v2/partial-400-invalid-errors"].body,
+      },
+      "/partial-400-nonobject-error": {
+        status: 400,
+        title: "Bad Request",
+        detail: "Validation failed",
+        raw: responses["/v2/partial-400-nonobject-error"].body,
+      },
+      "/partial-401": {
+        status: 401,
+        title: "Unauthorized",
+        detail: "Missing bearer token",
+        raw: responses["/v2/partial-401"].body,
+      },
+      "/partial-403-invalid-security": {
+        status: 403,
+        title: "Forbidden",
+        detail: "Missing permissions",
+        raw: responses["/v2/partial-403-invalid-security"].body,
+      },
+      "/partial-410": {
+        status: 410,
+        title: "Gone",
+        detail: "Authentication status has expired",
+        raw: responses["/v2/partial-410"].body,
+      },
+      "/partial-429": {
+        status: 429,
+        title: "Too Many Requests",
+        detail: "Retry later",
+        raw: responses["/v2/partial-429"].body,
+      },
+    })) {
+      await assert.rejects(
+        () => client.http.request({ method: "GET", path }),
+        (error) => {
+          assert.ok(error instanceof KsefApiError);
+          assert.deepEqual(error.problem, expected);
+          return true;
+        },
+      );
+    }
   } finally {
     await closeServer(server);
   }
