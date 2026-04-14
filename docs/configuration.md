@@ -8,6 +8,7 @@ Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(.
 - gdy ustawisz `baseUrl` bez sufiksu `/v2`, biblioteka automatycznie doda `/v2` (chyba ze `appendV2: false`),
 - `KsefClient.connect(...)` rozszerza `KsefClientOptions` o opcje potrzebne do logowania tokenem KSeF,
 - `headers` są globalne i trafiają do wszystkich requestów klienta, także do requestów na pre-signed URL (upload/download), więc nie należy umieszczać tam `Authorization`.
+- dla KSeF `2.4.0` możesz przez `headers` włączyć `X-Error-Format: problem-details`, aby otrzymywać bogatsze odpowiedzi błędów dla `400` i `429`.
 
 ## `KsefClientOptions`
 
@@ -117,6 +118,7 @@ Walidacja hosta/IP i allowlista dzialaja niezaleznie od `strictPresignedUrlValid
 
 - stałe nagłówki diagnostyczne i śledzące, np. `X-Request-Id`, `X-Correlation-Id`,
 - nagłówki identyfikujące aplikację lub wersję integracji, np. `X-App-Name`, `X-App-Version`,
+- `X-Error-Format: problem-details`, jeśli chcesz wymusić format `application/problem+json` dla `400` i `429`,
 - wymagane przez infrastrukturę pośrednią (proxy/gateway), jeśli mają wartość niesekretną i mogą być wysyłane do wszystkich hostów.
 
 ### Czego unikać
@@ -155,7 +157,10 @@ const client = new KsefClient({
   timeoutMs: 45_000,
   proxy: process.env.HTTPS_PROXY,
   noProxy: process.env.NO_PROXY,
-  headers: { "X-App-Name": "ksef-integration" },
+  headers: {
+    "X-App-Name": "ksef-integration",
+    "X-Error-Format": "problem-details",
+  },
   retryOn429: true,
   maxRetryAttempts: 3,
   maxRetryDelayMs: 10_000,

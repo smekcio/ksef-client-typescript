@@ -3,12 +3,24 @@ import type { BodyInit, Dispatcher, RequestInit, Response } from "undici";
 import { HttpMethod, JsonObject } from "../types/common";
 import { validatePresignedUrlSecurity } from "./presignedUrlPolicy";
 import {
+  type KsefApiProblem,
   KsefApiError,
   KsefAuthStatusError,
   KsefHttpError,
   KsefRateLimitError,
   KsefValidationError,
+  type UnknownApiProblem,
 } from "../errors/errors";
+import type {
+  ApiError,
+  BadRequestProblemDetails,
+  ExceptionResponse,
+  ForbiddenProblemDetails,
+  GoneProblemDetails,
+  TooManyRequestsProblemDetails,
+  TooManyRequestsResponse,
+  UnauthorizedProblemDetails,
+} from "../types/openapi.generated";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -76,6 +88,205 @@ function shouldBypassProxy(hostname: string, noProxy?: string): boolean {
 function isJsonContentType(contentType: string): boolean {
   const mediaType = contentType.split(";", 1)[0]!.trim().toLowerCase();
   return mediaType === "application/json" || mediaType.endsWith("+json");
+}
+
+function parseRetryAfterMs(retryAfter: string | undefined): number | undefined {
+  if (!retryAfter) {
+    return undefined;
+  }
+
+  const trimmed = retryAfter.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const seconds = Number(trimmed);
+  if (!Number.isNaN(seconds)) {
+    return Math.max(0, Math.round(seconds * 1000));
+  }
+
+  const dateMs = Date.parse(trimmed);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+
+  return undefined;
+}
+
+function parseRetryAfterSeconds(retryAfter: string | undefined): number | undefined {
+  const delayMs = parseRetryAfterMs(retryAfter);
+  if (delayMs === undefined) {
+    return undefined;
+  }
+  return Math.ceil(delayMs / 1000);
+}
+
+function coerceProblemStatus(status: unknown, fallbackStatus: number): number {
+  const coerced = Number(status);
+  return Number.isFinite(coerced) ? coerced : fallbackStatus;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || isString(value);
+}
+
+function isOptionalNullableString(value: unknown): value is string | null | undefined {
+  return value === undefined || isNullableString(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function isOptionalStringArrayOrNull(value: unknown): value is string[] | null | undefined {
+  return value === undefined || value === null || isStringArray(value);
+}
+
+function isApiErrorPayload(value: unknown): value is ApiError {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return (
+    isNumber(value.code) &&
+    isString(value.description) &&
+    isOptionalStringArrayOrNull(value.details)
+  );
+}
+
+function isApiErrorArray(value: unknown): value is ApiError[] {
+  return Array.isArray(value) && value.every(isApiErrorPayload);
+}
+
+function hasRequiredProblemDetailsFields(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & {
+  detail: string;
+  status: number;
+  timestamp: string;
+  title: string;
+} {
+  return (
+    isString(payload.title) &&
+    isNumber(payload.status) &&
+    isString(payload.detail) &&
+    isString(payload.timestamp)
+  );
+}
+
+function isProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is Record<string, unknown> & { detail: string; title: string } {
+  return isString(payload.title) && isString(payload.detail);
+}
+
+function isBadRequestProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is BadRequestProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId) &&
+    isApiErrorArray(payload.errors)
+  );
+}
+
+function isUnauthorizedProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is UnauthorizedProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isOptionalNullableString(payload.instance) &&
+    isOptionalNullableString(payload.traceId)
+  );
+}
+
+function isForbiddenProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is ForbiddenProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.reasonCode) &&
+    isOptionalNullableString(payload.instance) &&
+    isOptionalNullableString(payload.traceId) &&
+    (payload.security === undefined || payload.security === null || isPlainObject(payload.security))
+  );
+}
+
+function isGoneProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is GoneProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId)
+  );
+}
+
+function isTooManyRequestsProblemDetailsPayload(
+  payload: Record<string, unknown>,
+): payload is TooManyRequestsProblemDetails {
+  return (
+    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.instance) &&
+    isString(payload.traceId)
+  );
+}
+
+function createUnknownApiProblem(
+  statusCode: number,
+  payload: Record<string, unknown>,
+): UnknownApiProblem {
+  const detail = typeof payload.detail === "string" ? payload.detail : undefined;
+  return {
+    raw: payload,
+    status: coerceProblemStatus(payload.status, statusCode),
+    title: typeof payload.title === "string" ? payload.title : "API error",
+    ...(detail !== undefined ? { detail } : {}),
+  };
+}
+
+function parseApiProblem(statusCode: number, payload: unknown): KsefApiProblem | undefined {
+  if (!isPlainObject(payload)) {
+    return undefined;
+  }
+
+  if ("exception" in payload) {
+    return payload as ExceptionResponse;
+  }
+
+  if (statusCode === 429 && isPlainObject(payload.status)) {
+    return payload as TooManyRequestsResponse;
+  }
+
+  if (isProblemDetailsPayload(payload)) {
+    if (statusCode === 400 && isBadRequestProblemDetailsPayload(payload)) {
+      return payload;
+    }
+    if (statusCode === 401 && isUnauthorizedProblemDetailsPayload(payload)) {
+      return payload;
+    }
+    if (statusCode === 403 && isForbiddenProblemDetailsPayload(payload)) {
+      return payload;
+    }
+    if (statusCode === 410 && isGoneProblemDetailsPayload(payload)) {
+      return payload;
+    }
+    if (statusCode === 429 && isTooManyRequestsProblemDetailsPayload(payload)) {
+      return payload;
+    }
+    return createUnknownApiProblem(statusCode, payload);
+  }
+
+  return Object.keys(payload).length > 0 ? createUnknownApiProblem(statusCode, payload) : undefined;
 }
 
 export class HttpClient {
@@ -291,8 +502,16 @@ export class HttpClient {
 
     if (isJsonContentType(contentType)) {
       const payload = await response.json().catch(() => undefined);
+      const problem = parseApiProblem(status, payload);
       if (status === 429) {
-        throw new KsefRateLimitError(status, "Rate limit exceeded", payload, retryAfter);
+        throw new KsefRateLimitError(
+          status,
+          "Rate limit exceeded",
+          payload,
+          retryAfter,
+          parseRetryAfterSeconds(retryAfter),
+          problem,
+        );
       }
       if (status === 460) {
         const statusDetails = extractStatusDetails(payload);
@@ -303,15 +522,22 @@ export class HttpClient {
             `Authentication failed with ${status}: certificate is suspended.${detailsSuffix}`,
             payload,
             statusDetails,
+            problem,
           );
         }
       }
-      throw new KsefApiError(status, `API request failed with ${status}`, payload);
+      throw new KsefApiError(status, `API request failed with ${status}`, payload, problem);
     }
 
     const text = await response.text().catch(() => undefined);
     if (status === 429) {
-      throw new KsefRateLimitError(status, "Rate limit exceeded", text, retryAfter);
+      throw new KsefRateLimitError(
+        status,
+        "Rate limit exceeded",
+        text,
+        retryAfter,
+        parseRetryAfterSeconds(retryAfter),
+      );
     }
     throw new KsefHttpError(status, `HTTP request failed with ${status}`, text);
   }
@@ -409,15 +635,9 @@ function computeRetryDelayMs(
 ): number {
   const clamp = (value: number) => Math.max(0, Math.min(maxDelayMs, value));
 
-  if (retryAfter) {
-    const seconds = Number(retryAfter);
-    if (!Number.isNaN(seconds)) {
-      return clamp(Math.round(seconds * 1000));
-    }
-    const dateMs = Date.parse(retryAfter);
-    if (!Number.isNaN(dateMs)) {
-      return clamp(dateMs - Date.now());
-    }
+  const retryAfterMs = parseRetryAfterMs(retryAfter);
+  if (retryAfterMs !== undefined) {
+    return clamp(retryAfterMs);
   }
 
   const base = Math.min(maxDelayMs, 500 * 2 ** Math.max(0, attempt - 1));
