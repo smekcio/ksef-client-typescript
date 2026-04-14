@@ -156,6 +156,39 @@ test("buildFakturaXml orders P_* keys naturally", () => {
   assert.ok(p141Index >= 0 && p142Index > p141Index && p1410Index > p142Index);
 });
 
+test("buildFakturaXml interleaves FA3 VAT amount fields to match the schema order", () => {
+  const faktura = minimalFaktura();
+  faktura.Fa = {
+    KodWaluty: "PLN",
+    P_1: "2026-04-07",
+    P_2: "100/4/2026",
+    P_13_1: "916.00",
+    P_14_1: "210.68",
+    P_14_1W: "210.68",
+    P_13_2: "46.00",
+    P_14_2: "3.68",
+    P_13_6_1: "20.00",
+    P_15: "1176.36",
+  };
+
+  const xml = buildFakturaXml(faktura, { schema: "FA3" });
+  const p131Index = xml.indexOf("<P_13_1>");
+  const p141Index = xml.indexOf("<P_14_1>");
+  const p141wIndex = xml.indexOf("<P_14_1W>");
+  const p132Index = xml.indexOf("<P_13_2>");
+  const p142Index = xml.indexOf("<P_14_2>");
+  const p1361Index = xml.indexOf("<P_13_6_1>");
+  const p15Index = xml.indexOf("<P_15>");
+
+  assert.ok(p131Index >= 0);
+  assert.ok(p141Index > p131Index);
+  assert.ok(p141wIndex > p141Index);
+  assert.ok(p132Index > p141Index);
+  assert.ok(p142Index > p132Index);
+  assert.ok(p1361Index > p142Index);
+  assert.ok(p15Index > p1361Index);
+});
+
 test("buildFakturaXml covers comparePKey edge cases and nested array normalization", () => {
   const faktura = minimalFaktura();
   faktura.Naglowek.KodFormularza = "FA";
