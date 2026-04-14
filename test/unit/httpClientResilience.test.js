@@ -382,6 +382,198 @@ test("HttpClient falls back to UnknownApiProblem for unknown json payloads", asy
   }
 });
 
+test("HttpClient keeps problem undefined for empty json error payloads", async () => {
+  const server = createServer((_, res) => {
+    res.writeHead(418, { "Content-Type": "application/json" });
+    res.end("{}");
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/empty-json" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.deepEqual(error.responseBody, {});
+        assert.equal(error.problem, undefined);
+        return true;
+      },
+    );
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient preserves legacy exception, legacy 429 and unmatched problem-details payloads", async () => {
+  const responses = {
+    "/v2/exception-response": {
+      status: 500,
+      contentType: "application/json",
+      body: {
+        exception: "ServerException",
+        statusCode: 500,
+        message: "Legacy server error",
+      },
+    },
+    "/v2/legacy-429": {
+      status: 429,
+      contentType: "application/json",
+      body: {
+        status: {
+          code: 429,
+          message: "Too many requests",
+        },
+      },
+    },
+    "/v2/unmatched-problem": {
+      status: 422,
+      contentType: "application/problem+json",
+      body: {
+        title: "Unprocessable Entity",
+        status: "422",
+        detail: "The payload is semantically invalid",
+      },
+    },
+  };
+
+  const server = createServer((req, res) => {
+    const entry = responses[req.url];
+    if (!entry) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "Not found" }));
+      return;
+    }
+
+    res.writeHead(entry.status, { "Content-Type": entry.contentType });
+    res.end(JSON.stringify(entry.body));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/exception-response" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.deepEqual(error.problem, {
+          exception: "ServerException",
+          statusCode: 500,
+          message: "Legacy server error",
+        });
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/legacy-429" }),
+      (error) => {
+        assert.ok(error instanceof KsefRateLimitError);
+        assert.deepEqual(error.problem, {
+          status: {
+            code: 429,
+            message: "Too many requests",
+          },
+        });
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/unmatched-problem" }),
+      (error) => {
+        assert.ok(error instanceof KsefApiError);
+        assert.deepEqual(error.problem, {
+          title: "Unprocessable Entity",
+          status: 422,
+          detail: "The payload is semantically invalid",
+          raw: {
+            title: "Unprocessable Entity",
+            status: "422",
+            detail: "The payload is semantically invalid",
+          },
+        });
+        return true;
+      },
+    );
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient leaves retryAfterSeconds undefined for blank or invalid Retry-After headers", async () => {
+  const responses = {
+    "/v2/retry-after-invalid": {
+      retryAfter: "not-a-date",
+    },
+  };
+
+  const server = createServer((req, res) => {
+    const entry = responses[req.url];
+    if (!entry) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
+
+    res.writeHead(429, {
+      "Content-Type": "text/plain",
+      "Retry-After": entry.retryAfter,
+    });
+    res.end("too many");
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    await assert.rejects(
+      () =>
+        client.http.throwForError(
+          {
+            status: 429,
+            headers: {
+              get(name) {
+                return name.toLowerCase() === "retry-after" ? "   " : null;
+              },
+            },
+            text: async () => "too many",
+          },
+          "text/plain",
+        ),
+      (error) => {
+        assert.ok(error instanceof KsefRateLimitError);
+        assert.equal(error.retryAfter, "   ");
+        assert.equal(error.retryAfterSeconds, undefined);
+        return true;
+      },
+    );
+
+    await assert.rejects(
+      () => client.http.request({ method: "GET", path: "/retry-after-invalid" }),
+      (error) => {
+        assert.ok(error instanceof KsefRateLimitError);
+        assert.equal(error.retryAfter, "not-a-date");
+        assert.equal(error.retryAfterSeconds, undefined);
+        return true;
+      },
+    );
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test("HttpClient parses application/*+json success responses as JSON", async () => {
   const server = createServer((_, res) => {
     res.writeHead(200, { "Content-Type": "application/vnd.ksef+json" });
