@@ -2,7 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
-export const OPENAPI_SCHEMA_COUNT = 283 as const;
+export const OPENAPI_SCHEMA_COUNT = 287 as const;
 
 export type AllowedIps = {
   ip4Addresses?: Array<string> | null;
@@ -11,6 +11,12 @@ export type AllowedIps = {
 };
 
 export type AmountType = "Brutto" | "Netto" | "Vat";
+
+export type ApiError = {
+  code: number;
+  description: string;
+  details?: Array<string> | null;
+};
 
 export type ApiRateLimitsOverride = {
   batchSession: ApiRateLimitValuesOverride;
@@ -111,6 +117,16 @@ export type AuthenticationTokenStatus = "Active" | "Failed" | "Pending" | "Revok
 
 export type AuthorizationPolicy = {
   allowedIps?: AllowedIps | null;
+};
+
+export type BadRequestProblemDetails = {
+  detail: string;
+  errors: Array<ApiError>;
+  instance: string;
+  status: number;
+  timestamp: string;
+  title: string;
+  traceId: string;
 };
 
 export type BatchFileInfo = {
@@ -517,6 +533,7 @@ export type ForbiddenProblemDetails = {
   reasonCode: string;
   security?: Record<string, unknown | null> | null;
   status: number;
+  timestamp: string;
   title: string;
   traceId?: string | null;
 };
@@ -535,6 +552,15 @@ export type GenerateTokenRequest = {
 export type GenerateTokenResponse = {
   referenceNumber: ReferenceNumber;
   token: string;
+};
+
+export type GoneProblemDetails = {
+  detail: string;
+  instance: string;
+  status: number;
+  timestamp: string;
+  title: string;
+  traceId: string;
 };
 
 export type IdDocument = {
@@ -1381,6 +1407,15 @@ export type TokenStatusResponse = {
   statusDetails?: Array<string> | null;
 };
 
+export type TooManyRequestsProblemDetails = {
+  detail: string;
+  instance: string;
+  status: number;
+  timestamp: string;
+  title: string;
+  traceId: string;
+};
+
 export type TooManyRequestsResponse = {
   status: {
     code: number;
@@ -1393,6 +1428,7 @@ export type UnauthorizedProblemDetails = {
   detail: string;
   instance?: string | null;
   status: number;
+  timestamp: string;
   title: string;
   traceId?: string | null;
 };
@@ -1414,6 +1450,7 @@ export type UpoResponse = {
 export interface OpenApiGeneratedSchemaMap {
   AllowedIps: AllowedIps;
   AmountType: AmountType;
+  ApiError: ApiError;
   ApiRateLimitsOverride: ApiRateLimitsOverride;
   ApiRateLimitValuesOverride: ApiRateLimitValuesOverride;
   AttachmentPermissionGrantRequest: AttachmentPermissionGrantRequest;
@@ -1432,6 +1469,7 @@ export interface OpenApiGeneratedSchemaMap {
   AuthenticationTokensResponse: AuthenticationTokensResponse;
   AuthenticationTokenStatus: AuthenticationTokenStatus;
   AuthorizationPolicy: AuthorizationPolicy;
+  BadRequestProblemDetails: BadRequestProblemDetails;
   BatchFileInfo: BatchFileInfo;
   BatchFilePartInfo: BatchFilePartInfo;
   BatchSessionContextLimitsOverride: BatchSessionContextLimitsOverride;
@@ -1520,6 +1558,7 @@ export interface OpenApiGeneratedSchemaMap {
   FormCode: FormCode;
   GenerateTokenRequest: GenerateTokenRequest;
   GenerateTokenResponse: GenerateTokenResponse;
+  GoneProblemDetails: GoneProblemDetails;
   IdDocument: IdDocument;
   IndirectPermissionsGrantRequest: IndirectPermissionsGrantRequest;
   IndirectPermissionsSubjectIdentifier: IndirectPermissionsSubjectIdentifier;
@@ -1690,6 +1729,7 @@ export interface OpenApiGeneratedSchemaMap {
   TokenInfo: TokenInfo;
   TokenPermissionType: TokenPermissionType;
   TokenStatusResponse: TokenStatusResponse;
+  TooManyRequestsProblemDetails: TooManyRequestsProblemDetails;
   TooManyRequestsResponse: TooManyRequestsResponse;
   UnauthorizedProblemDetails: UnauthorizedProblemDetails;
   UnblockContextAuthenticationRequest: UnblockContextAuthenticationRequest;

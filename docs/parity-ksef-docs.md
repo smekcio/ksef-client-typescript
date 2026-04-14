@@ -1,11 +1,11 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-docs`
 
-Data analizy: **2026-03-19**
+Data analizy: **2026-04-13**
 
 ## Zakres i źródła
 
-- Kontrakt API: `ksef-docs/open-api.json` (`2.3.0`)
-- Changelog: `ksef-docs/api-changelog.md` (wersje do `2.3.0`)
+- Kontrakt API: `ksef-docs/open-api.json` (`2.4.0`)
+- Changelog: `ksef-docs/api-changelog.md` (wersje do `2.4.0`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/client/*`, `docs/*`
 - Weryfikacja dodatkowa: `temp/openapi-test-v2.json` (`https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`)
 
@@ -16,25 +16,29 @@ Data analizy: **2026-03-19**
 - Nadmiarowe endpointy po stronie TS: **0**
 - Zgodność kontraktu `ksef-docs` vs `api-test`: **zgodna** (po odfiltrowaniu opisów/metadanych)
 
-## Zmiany uwzględnione po stronie SDK (2.3.0)
+## Zmiany uwzględnione po stronie SDK (2.4.0)
 
-1. Eksport faktur (`/invoices/exports`)
-   - `InvoiceExportRequest` wspiera `onlyMetadata`;
-   - klient i workflow eksportu wysyłają `onlyMetadata` w body requestu zgodnie z kontraktem 2.3.0;
-   - stary alias `includeMetadata` jest utrzymany wyłącznie jako warstwa kompatybilności po stronie SDK.
+1. Modele OpenAPI
+   - odświeżono `src/types/openapi.generated.ts` do `ksef-docs 2.4.0`;
+   - liczba schematów wzrosła do `287`;
+   - modele obejmują nowe typy `ApiError`, `BadRequestProblemDetails`, `GoneProblemDetails`,
+     `TooManyRequestsProblemDetails` oraz pola `timestamp` w `ForbiddenProblemDetails`
+     i `UnauthorizedProblemDetails`.
 
-2. Form codes `FA_RR`
-   - modele OpenAPI obejmują `InvoiceQueryFormType = "FA_RR" | "FA" | "PEF" | "RR"`;
-   - typy sesji online/batch wspierają aktualny wariant `FA_RR (1) / 1-1E / FA_RR`;
-   - CLI mapuje skrót `FARR1` do bieżącego wariantu `1-1E / FA_RR`.
+2. Runtime błędów HTTP
+   - `HttpClient` rozpoznaje `application/problem+json` dla `400`, `401`, `403`, `410`, `429`;
+   - błędy `KsefApiError` i `KsefRateLimitError` udostępniają `problem` z rozpoznanym payloadem;
+   - `KsefRateLimitError` udostępnia również `retryAfterSeconds`, obok dotychczasowego `retryAfter`.
 
-3. Modele OpenAPI
-   - odświeżono `src/types/openapi.generated.ts` do `ksef-docs 2.3.0`;
-   - zaktualizowano liczbę schematów i eksportowane typy pomocnicze zgodnie z najnowszym kontraktem.
+3. Tokeny KSeF
+   - kontrakt i dokumentacja odzwierciedlają semantykę `2.4.0` dla operacji na bieżącym tokenie
+     uwierzytelniającym przy `GET /tokens`, `GET /tokens/{referenceNumber}` i
+     `DELETE /tokens/{referenceNumber}`.
 
 4. Dokumentacja SDK
-   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.3.0`;
-   - dokumentacja `invoices`, workflowów eksportu oraz sesji opisuje `onlyMetadata` i aktualne `FA_RR`.
+   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.4.0`;
+   - dokumentacja opisuje `X-Error-Format: problem-details`, `410 Gone` oraz zaktualizowane
+     zachowanie endpointów tokenów.
 
 ## Weryfikacja parity endpointów
 
@@ -54,9 +58,9 @@ Data analizy: **2026-03-19**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została uaktualniona do spójności z KSeF `2.3.0`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.4.0`:
 
-- deklaracje kompatybilności API (`v2.3.0`) w README i docs,
-- opis `onlyMetadata` w dokumentacji `invoices` i workflowu eksportu,
-- aktualne wskazówki dla `FA_RR (1)` w wersji `1-1E`,
+- deklaracje kompatybilności API (`v2.4.0`) w README i docs,
+- opis `problem+json` i `X-Error-Format` w dokumentacji błędów i konfiguracji,
+- opis self-token semantics w dokumentacji `tokens`,
 - zaktualizowany raport parity i wyniki walidacji.
