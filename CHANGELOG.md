@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.4.1...v0.5.0) (2026-04-14)
+
+
+### Features
+
+* **api:** align TypeScript SDK with KSeF API 2.4.0, enhance error handling and documentation ([#27](https://github.com/smekcio/ksef-client-typescript/issues/27)) ([aacfd7e](https://github.com/smekcio/ksef-client-typescript/commit/aacfd7e0aaad9a4d96608a5f5bf4f94d4ba27df2))
+
 ## [0.4.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.4.0...v0.4.1) (2026-03-26)
 
 
