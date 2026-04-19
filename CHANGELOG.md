@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.5.0...v0.5.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* support encrypted private key passwords in verification link ([#29](https://github.com/smekcio/ksef-client-typescript/issues/29)) ([c576f0f](https://github.com/smekcio/ksef-client-typescript/commit/c576f0fb3195d668ad9e603285a654774e630122))
+
 ## [0.5.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.4.1...v0.5.0) (2026-04-14)
 
 
