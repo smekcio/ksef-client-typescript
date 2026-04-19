@@ -37,6 +37,7 @@ Najważniejsze pola:
 - `certificateSerial`
 - `invoiceHash` (Base64 lub Base64Url)
 - `privateKeyPem` (wymagany)
+- `privateKeyPassword` (opcjonalny, wymagany dla zaszyfrowanego `privateKeyPem`)
 - `signatureFormat`: `"p1363"` (domyślnie) albo `"der"` dla ECDSA
 
 Przykład:
@@ -49,6 +50,7 @@ const url = client.verificationLinks.buildCertificateVerificationUrl({
   certificateSerial: "SERIAL",
   invoiceHash: "BASE64_HASH",
   privateKeyPem: process.env.KSEF_QR_PRIVATE_KEY_PEM!,
+  privateKeyPassword: process.env.KSEF_QR_PRIVATE_KEY_PASSWORD,
   signatureFormat: "p1363",
 });
 ```

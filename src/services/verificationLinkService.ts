@@ -26,6 +26,7 @@ export class VerificationLinkService {
     certificateSerial: string;
     invoiceHash: string;
     privateKeyPem: string;
+    privateKeyPassword?: string;
     signatureFormat?: "p1363" | "der";
   }): string {
     const hashBytes = decodeBase64OrUrl(options.invoiceHash);
@@ -43,6 +44,7 @@ export class VerificationLinkService {
     const signature = signPath(
       pathToSign,
       options.privateKeyPem,
+      options.privateKeyPassword,
       options.signatureFormat ?? "p1363",
     );
     const signatureUrl = toBase64Url(signature);
@@ -70,9 +72,10 @@ function decodeBase64OrUrl(value: string): Buffer {
 function signPath(
   pathToSign: string,
   privateKeyPem: string,
+  privateKeyPassword: string | undefined,
   signatureFormat: "p1363" | "der",
 ): Buffer {
-  const privateKey = crypto.createPrivateKey(privateKeyPem);
+  const privateKey = loadPrivateKey(privateKeyPem, privateKeyPassword);
   const digest = crypto.createHash("sha256").update(pathToSign, "utf8").digest();
   if (privateKey.asymmetricKeyType === "rsa") {
     return crypto.sign(null, digest, {
@@ -88,4 +91,39 @@ function signPath(
     });
   }
   throw new Error("Unsupported private key type for signature.");
+}
+
+function loadPrivateKey(privateKeyPem: string, privateKeyPassword?: string): crypto.KeyObject {
+  try {
+    return crypto.createPrivateKey({
+      key: privateKeyPem,
+      format: "pem",
+      passphrase: privateKeyPassword,
+    });
+  } catch (error) {
+    throw mapPrivateKeyLoadError(error);
+  }
+}
+
+function mapPrivateKeyLoadError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : "";
+  const opensslErrorStack = Array.isArray((error as { opensslErrorStack?: unknown })?.opensslErrorStack)
+    ? ((error as { opensslErrorStack?: unknown[] }).opensslErrorStack ?? [])
+        .filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const details = [message, ...opensslErrorStack].join("\n");
+
+  if (
+    details.includes("bad password read")
+    || details.includes("unable to get passphrase")
+  ) {
+    return new Error("Private key is encrypted; provide privateKeyPassword.");
+  }
+  if (
+    details.includes("bad decrypt")
+    || details.includes("cipherfinal error")
+  ) {
+    return new Error("Failed to decrypt private key; check privateKeyPassword.");
+  }
+  return new Error("Failed to load private key from PEM.");
 }
