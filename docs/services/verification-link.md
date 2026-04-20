@@ -37,7 +37,7 @@ Najważniejsze pola:
 - `certificateSerial`
 - `invoiceHash` (Base64 lub Base64Url)
 - `privateKeyPem` (wymagany)
-- `privateKeyPassword` (opcjonalny, jeśli PEM jest zaszyfrowany)
+- `privateKeyPassword` (opcjonalny, wymagany dla zaszyfrowanego `privateKeyPem`)
 - `signatureFormat`: `"p1363"` (domyślnie) albo `"der"` dla ECDSA
 
 Przykład:

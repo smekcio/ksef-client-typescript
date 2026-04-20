@@ -75,12 +75,8 @@ function signPath(
   privateKeyPassword: string | undefined,
   signatureFormat: "p1363" | "der",
 ): Buffer {
-  const privateKey = crypto.createPrivateKey({
-    key: privateKeyPem,
-    format: "pem",
-    ...(privateKeyPassword ? { passphrase: privateKeyPassword } : {}),
-  });
   const data = Buffer.from(pathToSign, "utf8");
+  const privateKey = loadPrivateKey(privateKeyPem, privateKeyPassword);
   if (privateKey.asymmetricKeyType === "rsa") {
     return crypto.sign("sha256", data, {
       key: privateKey,
@@ -95,4 +91,39 @@ function signPath(
     });
   }
   throw new Error("Unsupported private key type for signature.");
+}
+
+function loadPrivateKey(privateKeyPem: string, privateKeyPassword?: string): crypto.KeyObject {
+  try {
+    return crypto.createPrivateKey({
+      key: privateKeyPem,
+      format: "pem",
+      passphrase: privateKeyPassword,
+    });
+  } catch (error) {
+    throw mapPrivateKeyLoadError(error);
+  }
+}
+
+function mapPrivateKeyLoadError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : "";
+  const opensslErrorStack = Array.isArray((error as { opensslErrorStack?: unknown })?.opensslErrorStack)
+    ? ((error as { opensslErrorStack?: unknown[] }).opensslErrorStack ?? [])
+        .filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const details = [message, ...opensslErrorStack].join("\n");
+
+  if (
+    details.includes("bad password read")
+    || details.includes("unable to get passphrase")
+  ) {
+    return new Error("Private key is encrypted; provide privateKeyPassword.");
+  }
+  if (
+    details.includes("bad decrypt")
+    || details.includes("cipherfinal error")
+  ) {
+    return new Error("Failed to decrypt private key; check privateKeyPassword.");
+  }
+  return new Error("Failed to load private key from PEM.");
 }
