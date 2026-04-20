@@ -55,4 +55,17 @@ const url = client.verificationLinks.buildCertificateVerificationUrl({
 });
 ```
 
+Podpis dla „KOD II” obejmuje surowy fragment URL bez prefiksu `https://` albo `http://`.
+
+Przykład podpisywanego ciągu:
+
+```text
+qr.example.test/certificate/Nip/5265877635/5265877635/SERIAL/BASE64URL_HASH
+```
+
+Parametry podpisu:
+
+- RSA-PSS: `SHA-256`, `MGF1(SHA-256)`, `saltLength = 32`
+- ECDSA P-256: `SHA-256`, wynik domyślnie w formacie `p1363`, opcjonalnie `der`
+
 Powiązane: [QR](qr.md).

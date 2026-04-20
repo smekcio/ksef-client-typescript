@@ -7,6 +7,15 @@ function digestPath(pathToSign) {
   return crypto.createHash("sha256").update(pathToSign, "utf8").digest();
 }
 
+function extractSignedPath(url) {
+  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
+  const pathToSign = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
+  return {
+    pathToSign: Buffer.from(pathToSign, "utf8"),
+    signature: fromBase64Url(signatureSegment),
+  };
+}
+
 function exportPrivateKeyPem(privateKey, options = {}) {
   return privateKey.export({
     type: "pkcs8",
@@ -54,22 +63,31 @@ test("buildCertificateVerificationUrl signs path for RSA key", () => {
     privateKeyPem,
   });
 
-  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
-  const pathWithoutProtocol = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
-  const digest = digestPath(pathWithoutProtocol);
-  const signature = fromBase64Url(signatureSegment);
+  const { pathToSign, signature } = extractSignedPath(url);
 
   const verified = crypto.verify(
-    null,
-    digest,
+    "sha256",
+    pathToSign,
     {
       key: publicKey,
       padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+      saltLength: 32,
     },
     signature,
   );
   assert.equal(verified, true);
+
+  const verifiedOldBehavior = crypto.verify(
+    "sha256",
+    digestPath(pathToSign.toString("utf8")),
+    {
+      key: publicKey,
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: 32,
+    },
+    signature,
+  );
+  assert.equal(verifiedOldBehavior, false);
 });
 
 test("buildCertificateVerificationUrl signs path for encrypted RSA key", () => {
@@ -91,22 +109,31 @@ test("buildCertificateVerificationUrl signs path for encrypted RSA key", () => {
     privateKeyPassword: "secret-pass",
   });
 
-  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
-  const pathWithoutProtocol = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
-  const digest = digestPath(pathWithoutProtocol);
-  const signature = fromBase64Url(signatureSegment);
+  const { pathToSign, signature } = extractSignedPath(url);
 
   const verified = crypto.verify(
-    null,
-    digest,
+    "sha256",
+    pathToSign,
     {
       key: publicKey,
       padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+      saltLength: 32,
     },
     signature,
   );
   assert.equal(verified, true);
+
+  const verifiedOldBehavior = crypto.verify(
+    "sha256",
+    digestPath(pathToSign.toString("utf8")),
+    {
+      key: publicKey,
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: 32,
+    },
+    signature,
+  );
+  assert.equal(verifiedOldBehavior, false);
 });
 
 test("buildCertificateVerificationUrl supports ECDSA DER signatures", () => {
@@ -125,14 +152,11 @@ test("buildCertificateVerificationUrl supports ECDSA DER signatures", () => {
     signatureFormat: "der",
   });
 
-  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
-  const pathWithoutProtocol = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
-  const digest = digestPath(pathWithoutProtocol);
-  const signature = fromBase64Url(signatureSegment);
+  const { pathToSign, signature } = extractSignedPath(url);
 
   const verified = crypto.verify(
-    null,
-    digest,
+    "sha256",
+    pathToSign,
     {
       key: publicKey,
       dsaEncoding: "der",
@@ -140,6 +164,17 @@ test("buildCertificateVerificationUrl supports ECDSA DER signatures", () => {
     signature,
   );
   assert.equal(verified, true);
+
+  const verifiedOldBehavior = crypto.verify(
+    "sha256",
+    digestPath(pathToSign.toString("utf8")),
+    {
+      key: publicKey,
+      dsaEncoding: "der",
+    },
+    signature,
+  );
+  assert.equal(verifiedOldBehavior, false);
 });
 
 test("buildCertificateVerificationUrl uses IEEE-P1363 encoding for EC by default", () => {
@@ -157,14 +192,54 @@ test("buildCertificateVerificationUrl uses IEEE-P1363 encoding for EC by default
     privateKeyPem,
   });
 
-  const signatureSegment = url.slice(url.lastIndexOf("/") + 1);
-  const pathWithoutProtocol = url.replace(/^https?:\/\//, "").replace(/\/[^/]+$/, "");
-  const digest = digestPath(pathWithoutProtocol);
-  const signature = fromBase64Url(signatureSegment);
+  const { pathToSign, signature } = extractSignedPath(url);
 
   const verified = crypto.verify(
-    null,
-    digest,
+    "sha256",
+    pathToSign,
+    {
+      key: publicKey,
+      dsaEncoding: "ieee-p1363",
+    },
+    signature,
+  );
+  assert.equal(verified, true);
+
+  const verifiedOldBehavior = crypto.verify(
+    "sha256",
+    digestPath(pathToSign.toString("utf8")),
+    {
+      key: publicKey,
+      dsaEncoding: "ieee-p1363",
+    },
+    signature,
+  );
+  assert.equal(verifiedOldBehavior, false);
+});
+
+test("buildCertificateVerificationUrl accepts encrypted ECDSA keys when password is provided", () => {
+  const passphrase = "secret-passphrase";
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const privateKeyPem = exportPrivateKeyPem(privateKey, {
+    cipher: "aes-256-cbc",
+    passphrase,
+  });
+  const service = new VerificationLinkService({ baseQrUrl: "https://qr.example.test/" });
+
+  const url = service.buildCertificateVerificationUrl({
+    sellerNip: "5265877635",
+    contextIdentifierType: "Nip",
+    contextIdentifierValue: "5265877635",
+    certificateSerial: "SERIAL-EC-ENC",
+    invoiceHash: Buffer.from("invoice-hash-ec-enc", "utf8").toString("base64"),
+    privateKeyPem,
+    privateKeyPassword: passphrase,
+  });
+
+  const { pathToSign, signature } = extractSignedPath(url);
+  const verified = crypto.verify(
+    "sha256",
+    pathToSign,
     {
       key: publicKey,
       dsaEncoding: "ieee-p1363",

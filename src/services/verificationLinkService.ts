@@ -75,17 +75,17 @@ function signPath(
   privateKeyPassword: string | undefined,
   signatureFormat: "p1363" | "der",
 ): Buffer {
+  const data = Buffer.from(pathToSign, "utf8");
   const privateKey = loadPrivateKey(privateKeyPem, privateKeyPassword);
-  const digest = crypto.createHash("sha256").update(pathToSign, "utf8").digest();
   if (privateKey.asymmetricKeyType === "rsa") {
-    return crypto.sign(null, digest, {
+    return crypto.sign("sha256", data, {
       key: privateKey,
       padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+      saltLength: 32,
     });
   }
   if (privateKey.asymmetricKeyType === "ec") {
-    return crypto.sign(null, digest, {
+    return crypto.sign("sha256", data, {
       key: privateKey,
       dsaEncoding: signatureFormat === "der" ? "der" : "ieee-p1363",
     });
