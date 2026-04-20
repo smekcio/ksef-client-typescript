@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
+
 ## [0.5.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.4.1...v0.5.0) (2026-04-14)
 
 

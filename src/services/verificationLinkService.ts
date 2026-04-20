@@ -26,6 +26,7 @@ export class VerificationLinkService {
     certificateSerial: string;
     invoiceHash: string;
     privateKeyPem: string;
+    privateKeyPassword?: string;
     signatureFormat?: "p1363" | "der";
   }): string {
     const hashBytes = decodeBase64OrUrl(options.invoiceHash);
@@ -43,6 +44,7 @@ export class VerificationLinkService {
     const signature = signPath(
       pathToSign,
       options.privateKeyPem,
+      options.privateKeyPassword,
       options.signatureFormat ?? "p1363",
     );
     const signatureUrl = toBase64Url(signature);
@@ -70,19 +72,24 @@ function decodeBase64OrUrl(value: string): Buffer {
 function signPath(
   pathToSign: string,
   privateKeyPem: string,
+  privateKeyPassword: string | undefined,
   signatureFormat: "p1363" | "der",
 ): Buffer {
-  const privateKey = crypto.createPrivateKey(privateKeyPem);
-  const digest = crypto.createHash("sha256").update(pathToSign, "utf8").digest();
+  const privateKey = crypto.createPrivateKey({
+    key: privateKeyPem,
+    format: "pem",
+    ...(privateKeyPassword ? { passphrase: privateKeyPassword } : {}),
+  });
+  const data = Buffer.from(pathToSign, "utf8");
   if (privateKey.asymmetricKeyType === "rsa") {
-    return crypto.sign(null, digest, {
+    return crypto.sign("sha256", data, {
       key: privateKey,
       padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN,
+      saltLength: 32,
     });
   }
   if (privateKey.asymmetricKeyType === "ec") {
-    return crypto.sign(null, digest, {
+    return crypto.sign("sha256", data, {
       key: privateKey,
       dsaEncoding: signatureFormat === "der" ? "der" : "ieee-p1363",
     });
