@@ -99,6 +99,9 @@ export class IncrementalExportWorkflow {
         options.continuationPoints,
         options.subjectType,
         status.package ?? {},
+        {
+          dateType: filters.dateRange?.dateType,
+        },
       );
 
       const nextFrom = getEffectiveStartDate(

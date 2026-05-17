@@ -120,6 +120,16 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
       "Invoice query filters.dateRange.dateType must be a non-empty string.",
     );
   }
+  const normalizedDateType = dateType.trim();
+  const restrictToPermanentStorageHwmDate = dateRange.restrictToPermanentStorageHwmDate;
+  if (
+    restrictToPermanentStorageHwmDate === true &&
+    normalizedDateType.toLowerCase() !== "permanentstorage"
+  ) {
+    throw new KsefValidationError(
+      "Invoice query filters.dateRange.restrictToPermanentStorageHwmDate requires dateType PermanentStorage.",
+    );
+  }
 
   const fromValue = dateRange.from;
   const toValue = dateRange.to;

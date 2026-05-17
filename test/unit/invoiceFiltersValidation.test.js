@@ -451,3 +451,19 @@ test("normalizeInvoiceQueryFilters supports negative timezone offset formatting"
     Intl.DateTimeFormat = originalDateTimeFormat;
   }
 });
+
+test("validateInvoiceQueryFilters rejects restrictToPermanentStorageHwmDate for non-permanent dateType", () => {
+  assert.throws(
+    () =>
+      validateInvoiceQueryFilters({
+        subjectType: "Subject1",
+        dateRange: {
+          dateType: "Issue",
+          from: "2025-01-01",
+          to: "2025-01-02",
+          restrictToPermanentStorageHwmDate: true,
+        },
+      }),
+    /requires dateType PermanentStorage/,
+  );
+});

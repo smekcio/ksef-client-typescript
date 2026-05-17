@@ -118,7 +118,14 @@ export class InvoiceExportWorkflow {
     encryptionData: EncryptionData,
     options: DownloadPackageOptions = {},
   ): Promise<PackageProcessingResult> {
-    const parts = status.package?.parts ?? [];
+    const packageInfo = status.package ?? undefined;
+    if (!packageInfo || packageInfo.invoiceCount === 0) {
+      return { metadataSummaries: [], invoiceXmlFiles: {} };
+    }
+    const parts = packageInfo.parts ?? [];
+    if (parts.length === 0) {
+      return { metadataSummaries: [], invoiceXmlFiles: {} };
+    }
     const verifyHashes = resolveRequireExportPartHash(options, this.requireExportPartHash);
     const encryptedParts = await this.downloadParts(parts, verifyHashes);
     const decryptedParts = encryptedParts.map((part) =>

@@ -32,6 +32,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./documents/fa3": {
+      "types": "./dist/documents/fa3.d.ts",
+      "import": "./dist/documents/fa3.js",
+      "require": "./dist/documents/fa3.cjs"
+    },
     "./cli": {
       "import": "./dist/cli/index.js",
       "require": "./dist/cli/index.cjs"

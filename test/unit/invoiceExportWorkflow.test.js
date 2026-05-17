@@ -603,20 +603,17 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage returns empty result when 
     },
   );
 
-  await assert.rejects(
-    () =>
-      workflow.downloadAndProcessPackage(
-        {
-          status: { code: 200, description: "ok" },
-        },
-        {
-          cipherKey: CryptographyService.generateAesKey(),
-          cipherIv: CryptographyService.generateIv(),
-          encryptionInfo: {},
-        },
-      ),
-    /end of central directory record signature not found/,
+  const result = await workflow.downloadAndProcessPackage(
+    {
+      status: { code: 200, description: "ok" },
+    },
+    {
+      cipherKey: CryptographyService.generateAesKey(),
+      cipherIv: CryptographyService.generateIv(),
+      encryptionInfo: {},
+    },
   );
+  assert.deepEqual(result, { metadataSummaries: [], invoiceXmlFiles: {} });
 });
 
 test("InvoiceExportWorkflow treats non-string encryptedPartHash as missing when hash verification is required", async () => {

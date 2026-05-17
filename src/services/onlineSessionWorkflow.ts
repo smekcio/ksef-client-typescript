@@ -21,9 +21,16 @@ export interface OnlineInvoiceSendOptions {
   hashOfCorrectedInvoice?: string;
 }
 
+export interface OnlineSessionState {
+  referenceNumber: string;
+  encryptionData: EncryptionData;
+  upoV43?: boolean;
+}
+
 export class OnlineSessionHandle {
   readonly referenceNumber: string;
   readonly encryptionData: EncryptionData;
+  readonly upoV43: boolean;
   private readonly sessionsClient: SessionsClient;
   private readonly http: HttpClient;
 
@@ -32,11 +39,25 @@ export class OnlineSessionHandle {
     encryptionData: EncryptionData,
     sessionsClient: SessionsClient,
     http: HttpClient,
+    upoV43 = false,
   ) {
     this.referenceNumber = referenceNumber;
     this.encryptionData = encryptionData;
     this.sessionsClient = sessionsClient;
     this.http = http;
+    this.upoV43 = upoV43;
+  }
+
+  getState(): OnlineSessionState {
+    return {
+      referenceNumber: this.referenceNumber,
+      encryptionData: {
+        cipherKey: Buffer.from(this.encryptionData.cipherKey),
+        cipherIv: Buffer.from(this.encryptionData.cipherIv),
+        encryptionInfo: { ...this.encryptionData.encryptionInfo },
+      },
+      upoV43: this.upoV43,
+    };
   }
 
   async sendInvoice(options: OnlineInvoiceSendOptions): Promise<SendInvoiceResponse> {
@@ -64,6 +85,55 @@ export class OnlineSessionHandle {
 
   async status(): Promise<SessionStatusResponse> {
     return await this.sessionsClient.getSessionStatus(this.referenceNumber);
+  }
+
+  async getInvoiceStatus(invoiceReferenceNumber: string): Promise<Record<string, unknown>> {
+    return await this.sessionsClient.getSessionInvoiceStatus(
+      this.referenceNumber,
+      invoiceReferenceNumber,
+    );
+  }
+
+  async listInvoices(
+    pageOffset?: number,
+    pageSize?: number,
+    continuationToken?: string,
+  ): Promise<Record<string, unknown>> {
+    return await this.sessionsClient.getSessionInvoices(
+      this.referenceNumber,
+      pageOffset,
+      pageSize,
+      continuationToken,
+    );
+  }
+
+  async listFailedInvoices(
+    pageSize?: number,
+    continuationToken?: string,
+  ): Promise<Record<string, unknown>> {
+    return await this.sessionsClient.getSessionFailedInvoices(
+      this.referenceNumber,
+      pageSize,
+      continuationToken,
+    );
+  }
+
+  async getInvoiceUpoByReference(invoiceReferenceNumber: string): Promise<string> {
+    return await this.sessionsClient.getSessionInvoiceUpoByReferenceNumber(
+      this.referenceNumber,
+      invoiceReferenceNumber,
+    );
+  }
+
+  async getInvoiceUpoByKsefNumber(ksefNumber: string): Promise<string> {
+    return await this.sessionsClient.getSessionInvoiceUpoByKsefNumber(
+      this.referenceNumber,
+      ksefNumber,
+    );
+  }
+
+  async getSessionUpo(upoReferenceNumber: string): Promise<string> {
+    return await this.sessionsClient.getSessionUpo(this.referenceNumber, upoReferenceNumber);
   }
 
   async waitForUpo(options: WaitForUpoOptions = {}): Promise<string | null> {
@@ -133,6 +203,21 @@ export class OnlineSessionWorkflow {
       encryption,
       this.sessionsClient,
       this.http,
+      Boolean(options.upoV43),
+    );
+  }
+
+  resume(state: OnlineSessionState): OnlineSessionHandle {
+    if (!state || typeof state.referenceNumber !== "string" || !state.referenceNumber.trim()) {
+      throw new KsefValidationError("Online session state requires non-empty referenceNumber.");
+    }
+    validateEncryptionData(state.encryptionData);
+    return new OnlineSessionHandle(
+      state.referenceNumber,
+      state.encryptionData,
+      this.sessionsClient,
+      this.http,
+      Boolean(state.upoV43),
     );
   }
 
@@ -145,5 +230,13 @@ export class OnlineSessionWorkflow {
       throw new KsefError(`No public certificate found for usage ${usage}.`);
     }
     return cert.certificate;
+  }
+}
+
+function validateEncryptionData(value: EncryptionData): void {
+  const hasKey = Buffer.isBuffer(value?.cipherKey) && value.cipherKey.length > 0;
+  const hasIv = Buffer.isBuffer(value?.cipherIv) && value.cipherIv.length > 0;
+  if (!hasKey || !hasIv) {
+    throw new KsefValidationError("Online session state requires cipherKey and cipherIv.");
   }
 }
