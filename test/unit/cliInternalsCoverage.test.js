@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distCliPath = path.resolve(__dirname, "../../dist/cli/index.js");
 const distCliMapPath = path.resolve(__dirname, "../../dist/cli/index.js.map");
+const distRootPath = path.resolve(__dirname, "../../dist");
 
 async function loadCliInternalsModule() {
   const tempBaseDir = path.resolve(__dirname, "../../.tmp");
@@ -17,6 +18,20 @@ async function loadCliInternalsModule() {
   const tempMapPath = path.join(tempDir, "index.js.map");
 
   try {
+    const distEntries = await readdir(distRootPath, { withFileTypes: true });
+    for (const entry of distEntries) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      if (!entry.name.endsWith(".js")) {
+        continue;
+      }
+      if (!entry.name.startsWith("chunk-") && !entry.name.startsWith("libxmljs2-")) {
+        continue;
+      }
+      await copyFile(path.join(distRootPath, entry.name), path.join(tempBaseDir, entry.name));
+    }
+
     const source = await readFile(distCliPath, "utf8");
     const withoutSourceMapComment = source.replace(
       /\n\/\/# sourceMappingURL=index\.js\.map\s*$/u,

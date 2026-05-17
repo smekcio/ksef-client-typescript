@@ -425,3 +425,59 @@ test("BatchSessionWorkflow reports missing encrypted part when mapped parts arra
     CryptographyService.sha256Base64 = originalSha256Base64;
   }
 });
+
+test("BatchSessionWorkflow open/resume flows expose state and enforce zip identity", async () => {
+  const originalGetEncryptionData = CryptographyService.getEncryptionData;
+  const originalEncryptAes = CryptographyService.encryptAes256Cbc;
+  const originalSha256Base64 = CryptographyService.sha256Base64;
+
+  const uploaded = [];
+  const sessionsClient = {
+    openBatchSession: async () => ({
+      referenceNumber: "BATCH-RESUME-1",
+      partUploadRequests: [{ ordinalNumber: 1, method: "PUT", url: "https://upload/1", headers: {} }],
+    }),
+    closeBatchSession: async () => {},
+    getSessionStatus: async () => ({ status: { code: 100, description: "Processing" } }),
+    getSessionFailedInvoices: async () => ({ items: [] }),
+  };
+  const workflow = new BatchSessionWorkflow(
+    sessionsClient,
+    { getPublicKeyCertificates: async () => [{ usage: ["SymmetricKeyEncryption"], certificate: "CERT" }] },
+    { request: async (options) => uploaded.push(options) },
+  );
+
+  CryptographyService.getEncryptionData = () => ({
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: { encryptedSymmetricKey: "k", initializationVector: "i" },
+  });
+  CryptographyService.encryptAes256Cbc = (part) => Buffer.from(part);
+  CryptographyService.sha256Base64 = (value) => `sha:${Buffer.from(value).length}`;
+
+  try {
+    const handle = await workflow.open({
+      formCode: FORM_CODE,
+      zipBytes: Buffer.from("abc", "utf8"),
+      maxPartSizeBytes: 10,
+      upoV43: true,
+    });
+    await handle.uploadParts(1);
+    const state = handle.getState();
+    assert.equal(state.referenceNumber, "BATCH-RESUME-1");
+    assert.equal(state.upoV43, true);
+    assert.equal(uploaded.length, 1);
+
+    const resumed = await workflow.resume(state, { zipBytes: Buffer.from("abc", "utf8") });
+    assert.equal(resumed.referenceNumber, "BATCH-RESUME-1");
+
+    await assert.rejects(
+      () => workflow.resume(state, { zipBytes: Buffer.from("abcd", "utf8") }),
+      /hash does not match saved state|size does not match saved state/,
+    );
+  } finally {
+    CryptographyService.getEncryptionData = originalGetEncryptionData;
+    CryptographyService.encryptAes256Cbc = originalEncryptAes;
+    CryptographyService.sha256Base64 = originalSha256Base64;
+  }
+});

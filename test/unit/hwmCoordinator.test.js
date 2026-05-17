@@ -26,6 +26,21 @@ test("updateContinuationPoint prioritizes truncated package date and clears when
   assert.equal("invoice" in continuationPoints, false);
 });
 
+test("updateContinuationPoint ignores HWM updates for non-permanent date types", () => {
+  const continuationPoints = { invoice: "2025-01-01T00:00:00Z" };
+  updateContinuationPoint(
+    continuationPoints,
+    "invoice",
+    {
+      isTruncated: true,
+      lastPermanentStorageDate: "2025-01-02T00:00:00Z",
+      permanentStorageHwmDate: "2025-01-03T00:00:00Z",
+    },
+    { dateType: "Issue" },
+  );
+  assert.equal("invoice" in continuationPoints, false);
+});
+
 test("getEffectiveStartDate returns continuation point when available", () => {
   const continuationPoints = { subjectA: "2025-02-10T10:00:00Z" };
 

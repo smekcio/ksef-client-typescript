@@ -296,3 +296,45 @@ test("OnlineSessionHandle waitForUpo uses defaults and handles missing status pa
     /Session failed: undefined undefined/,
   );
 });
+
+test("OnlineSessionWorkflow resume restores handle state and validates encryption data", async () => {
+  const workflow = new OnlineSessionWorkflow(
+    {
+      getSessionStatus: async () => ({ status: { code: 200, description: "Done" } }),
+      getSessionInvoiceStatus: async (_sessionRef, invoiceRef) => ({ invoiceRef }),
+      getSessionInvoices: async () => ({ items: [] }),
+      getSessionFailedInvoices: async () => ({ items: [] }),
+      getSessionInvoiceUpoByReferenceNumber: async () => "<upo/>",
+      getSessionInvoiceUpoByKsefNumber: async () => "<upo/>",
+      getSessionUpo: async () => "<upo/>",
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({ referenceNumber: "INV-1" }),
+    },
+    { getPublicKeyCertificates: async () => [] },
+    { request: async () => "<upo/>" },
+  );
+
+  const state = {
+    referenceNumber: "SESSION-RESUME-1",
+    encryptionData: {
+      cipherKey: Buffer.alloc(32, 1),
+      cipherIv: Buffer.alloc(16, 2),
+      encryptionInfo: {},
+    },
+    upoV43: true,
+  };
+  const handle = workflow.resume(state);
+  assert.equal(handle.referenceNumber, "SESSION-RESUME-1");
+  assert.equal(handle.upoV43, true);
+  assert.deepEqual(handle.getState().referenceNumber, "SESSION-RESUME-1");
+  assert.deepEqual(await handle.getInvoiceStatus("INV-REF"), { invoiceRef: "INV-REF" });
+
+  assert.throws(
+    () =>
+      workflow.resume({
+        referenceNumber: "bad",
+        encryptionData: { cipherKey: Buffer.alloc(0), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+      }),
+    /requires cipherKey and cipherIv/,
+  );
+});
