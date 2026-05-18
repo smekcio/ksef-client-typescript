@@ -32,9 +32,22 @@ const VALUE_OPTIONS = new Set<string>([
   "hash-of-corrected-invoice",
   "upo-output",
   "session-ref",
+  "session-id",
   "invoice-ref",
   "upo-ref",
   "out-dir",
+  "id",
+  "in",
+  "out",
+  "system-code",
+  "schema-version",
+  "form-value",
+  "invoice",
+  "poll-interval",
+  "save-upo",
+  "parallelism",
+  "zip",
+  "dir",
 ]);
 
 export function parseArgv(argv: string[]): ParsedArgv {
