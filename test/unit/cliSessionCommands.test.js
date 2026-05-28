@@ -148,6 +148,94 @@ test("session online send validates --save-upo requires --wait-upo", async () =>
   }
 });
 
+test("session batch close validates --save-upo requires --wait-upo", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-session-"));
+  try {
+    const capture = createCaptureIo();
+    const exitCode = await runCli(
+      ["--json", "session", "batch", "close", "--id", "demo-batch", "--save-upo", "upo.xml"],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+    assert.equal(exitCode, 2);
+    const errorPayload = JSON.parse(capture.stderr[0]);
+    assert.match(errorPayload.error.message, /--save-upo requires --wait-upo/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("session upload/close validate numeric polling and parallelism flags", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-session-"));
+  try {
+    let capture = createCaptureIo();
+    let exitCode = await runCli(
+      ["--json", "session", "batch", "upload", "--id", "demo-batch", "--parallelism", "0"],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+    assert.equal(exitCode, 2);
+    let errorPayload = JSON.parse(capture.stderr[0]);
+    assert.match(errorPayload.error.message, /--parallelism/i);
+
+    capture = createCaptureIo();
+    exitCode = await runCli(
+      [
+        "--json",
+        "session",
+        "online",
+        "send",
+        "--id",
+        "demo-online",
+        "--invoice-file",
+        "invoice.xml",
+        "--poll-interval-ms",
+        "0",
+      ],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+    assert.equal(exitCode, 2);
+    errorPayload = JSON.parse(capture.stderr[0]);
+    assert.match(errorPayload.error.message, /--poll-interval-ms/i);
+
+    capture = createCaptureIo();
+    exitCode = await runCli(
+      [
+        "--json",
+        "session",
+        "online",
+        "send",
+        "--id",
+        "demo-online",
+        "--invoice-file",
+        "invoice.xml",
+        "--max-attempts",
+        "0",
+      ],
+      {
+        io: capture.io,
+        env: { KSEF_CLI_HOME: tempDir },
+        cwd: tempDir,
+      },
+    );
+    assert.equal(exitCode, 2);
+    errorPayload = JSON.parse(capture.stderr[0]);
+    assert.match(errorPayload.error.message, /--max-attempts/i);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("session batch open validates source selection", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "ksef-cli-session-"));
   try {
@@ -167,4 +255,3 @@ test("session batch open validates source selection", async () => {
     await rm(tempDir, { recursive: true, force: true });
   }
 });
-

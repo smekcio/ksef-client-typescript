@@ -69,12 +69,15 @@ test("parseArgv handles sparse argv, -- separator and --key=value syntax", async
     "--profile=dev",
     "--page-size",
     "25",
+    "--save-session",
+    "resume-1",
     "--",
     "invoice",
     "query",
   ]);
   assert.equal(parsed.options.profile, "dev");
   assert.equal(parsed.options["page-size"], "25");
+  assert.equal(parsed.options["save-session"], "resume-1");
   assert.deepEqual(parsed.positionals, ["invoice", "query"]);
 });
 

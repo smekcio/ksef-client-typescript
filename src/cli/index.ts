@@ -546,10 +546,15 @@ async function runSend(
   const invoiceXml = await readFile(path.resolve(context.cwd, invoiceFile), "utf8");
   const formCode = parseFormCode(getStringOption(options, "form-code"));
   const waitForUpo = getBooleanOption(options, "wait-upo");
-  const pollIntervalMs = getNumberOption(options, "poll-interval-ms");
-  const maxAttempts = getNumberOption(options, "max-attempts");
+  const pollIntervalMs = waitForUpo ? resolvePollIntervalMs(options, 2000) : undefined;
+  const maxAttempts = waitForUpo ? resolveMaxAttempts(options, 60) : undefined;
   const hashOfCorrectedInvoice = getStringOption(options, "hash-of-corrected-invoice");
-  const sessionId = getStringOption(options, "session-id");
+  const sessionId = getStringOption(options, "session-id") ?? getStringOption(options, "save-session");
+  const upoOutput = getStringOption(options, "upo-output") ?? getStringOption(options, "save-upo");
+  const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
+  if (upoOutput && !waitForUpo) {
+    throw new CliError("Option --save-upo/--upo-output requires --wait-upo.");
+  }
 
   const session = await client.workflows.sessions.online.open({
     formCode,
@@ -609,9 +614,8 @@ async function runSend(
       });
       if (upoXml) {
         upo = toJsonValue(parseUpoXml(upoXml));
-        const upoOutput = getStringOption(options, "upo-output");
         if (upoOutput) {
-          await writeOutputFile(upoOutput, upoXml, context.cwd);
+          await saveOutputFile(upoOutput, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
         }
       }
     }
@@ -791,6 +795,7 @@ async function runSessionOnline(
     const waitStatus = getBooleanOption(options, "wait-status");
     const waitUpo = getBooleanOption(options, "wait-upo");
     const saveUpo = getStringOption(options, "save-upo");
+    const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
     if (saveUpo && !waitUpo) {
       throw new CliError("Option --save-upo requires --wait-upo.");
     }
@@ -846,10 +851,10 @@ async function runSessionOnline(
             saveUpo,
             `upo-${updated.sessionState.referenceNumber}-${invoiceRef}.xml`,
           );
-          await writeOutputFile(outputPath, upoXml, context.cwd);
+          await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
           result.upoPath = path.resolve(context.cwd, outputPath);
-      } else {
-        result.upoPath = "";
+        } else {
+          result.upoPath = "";
       }
     }
 
@@ -952,38 +957,25 @@ async function runSessionBatch(
         totalParts,
       };
     }
-
-    const partByOrdinal = new Map<number, string>();
-    for (const [index, item] of state.batchFile.fileParts.entries()) {
-      const encrypted = state.encryptedPartsBase64[index];
-      if (encrypted) {
-        partByOrdinal.set(item.ordinalNumber, encrypted);
-      }
-    }
-    const remainingRequests = state.partUploadRequests.filter(
-      (request) => !uploaded.has(request.ordinalNumber),
-    );
-    const remainingEncryptedParts = remainingRequests.map((request) => {
-      const value = partByOrdinal.get(request.ordinalNumber);
-      if (!value) {
-        throw new CliError(
-          `Cannot resume batch session: missing encrypted part for ordinal ${request.ordinalNumber}.`,
-          EXIT_CONFIG,
-        );
-      }
-      return value;
+    const handle = await client.workflows.sessions.batch.resume(state, { zipBytes });
+    let updateQueue = Promise.resolve();
+    await handle.uploadParts({
+      parallelism,
+      skipOrdinals: [...uploaded],
+      progressCallback: (ordinalNumber) => {
+        updateQueue = updateQueue.then(async () => {
+          if (!uploaded.has(ordinalNumber)) {
+            uploaded.add(ordinalNumber);
+            checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+              stage: "uploading",
+              uploadedOrdinals: [...uploaded].sort((a, b) => a - b),
+            })) as BatchSessionCheckpoint;
+          }
+        });
+        return updateQueue;
+      },
     });
-    const resumeState = {
-      ...state,
-      partUploadRequests: remainingRequests,
-      encryptedPartsBase64: remainingEncryptedParts,
-    };
-    const handle = await client.workflows.sessions.batch.resume(resumeState, { zipBytes });
-    await handle.uploadParts(parallelism);
-
-    for (let ordinal = 1; ordinal <= totalParts; ordinal += 1) {
-      uploaded.add(ordinal);
-    }
+    await updateQueue;
     checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
       stage: "uploaded",
       uploadedOrdinals: [...uploaded].sort((a, b) => a - b),
@@ -1001,6 +993,7 @@ async function runSessionBatch(
     const waitStatus = getBooleanOption(options, "wait-status");
     const waitUpo = getBooleanOption(options, "wait-upo");
     const saveUpo = getStringOption(options, "save-upo");
+    const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
     if (saveUpo && !waitUpo) {
       throw new CliError("Option --save-upo requires --wait-upo.");
     }
@@ -1017,13 +1010,12 @@ async function runSessionBatch(
       checkpoint.baseUrl,
       context,
     );
-    const zipBytes = await loadBatchPayloadSourceBytes(checkpoint.payloadSource, context.cwd);
-    const handle = await client.workflows.sessions.batch.resume(
-      deserializeBatchSessionState(checkpoint.sessionState),
-      { zipBytes },
-    );
-
     if (checkpoint.stage !== "closed") {
+      const zipBytes = await loadBatchPayloadSourceBytes(checkpoint.payloadSource, context.cwd);
+      const handle = await client.workflows.sessions.batch.resume(
+        deserializeBatchSessionState(checkpoint.sessionState),
+        { zipBytes },
+      );
       await handle.close();
       checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
         stage: "closed",
@@ -1035,7 +1027,11 @@ async function runSessionBatch(
     };
 
     if (waitStatus || waitUpo) {
-      const status = await waitForSessionStatus(handle, pollIntervalMs, maxAttempts);
+      const status = await waitForSessionStatus(
+        () => client.sessions.getSessionStatus(checkpoint.sessionState.referenceNumber),
+        pollIntervalMs,
+        maxAttempts,
+      );
       result.status = toJsonValue(status);
       result.statusCode = status.status?.code ?? null;
       const upoRef = status.upo?.pages?.[0]?.referenceNumber ?? "";
@@ -1056,7 +1052,7 @@ async function runSessionBatch(
             saveUpo,
             `upo-${checkpoint.sessionState.referenceNumber}-${upoRef}.xml`,
           );
-          await writeOutputFile(outputPath, upoXml, context.cwd);
+          await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
           result.upoPath = path.resolve(context.cwd, outputPath);
         } else {
           result.upoPath = "";
@@ -1481,12 +1477,12 @@ async function waitForInvoiceUpo(
 }
 
 async function waitForSessionStatus(
-  handle: Awaited<ReturnType<KsefClient["workflows"]["sessions"]["batch"]["resume"]>>,
+  fetchStatus: () => Promise<SessionStatusResponse>,
   pollIntervalMs: number,
   maxAttempts: number,
 ): Promise<SessionStatusResponse> {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const status = await handle.status();
+    const status = await fetchStatus();
     const code = status.status?.code;
     if (code === 200 || code === 400 || code === 410) {
       return status;
@@ -1799,6 +1795,27 @@ async function readJsonFile<T>(filePath: string, cwd: string): Promise<T> {
 async function writeOutputFile(filePath: string, content: string, cwd: string): Promise<void> {
   const absolute = path.resolve(cwd, filePath);
   await mkdir(path.dirname(absolute), { recursive: true });
+  await writeFile(absolute, content, "utf8");
+}
+
+async function saveOutputFile(
+  filePath: string,
+  content: string,
+  cwd: string,
+  options: { overwrite: boolean },
+): Promise<void> {
+  const absolute = path.resolve(cwd, filePath);
+  await mkdir(path.dirname(absolute), { recursive: true });
+  if (!options.overwrite) {
+    try {
+      await stat(absolute);
+      throw new CliError(`Output file already exists: ${absolute}. Use --save-upo-overwrite.`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
   await writeFile(absolute, content, "utf8");
 }
 

@@ -5,11 +5,11 @@ Biblioteka udostępnia typowane klienty endpointów, gotowe workflowy (auth/sesj
 
 ## Kompatybilność
 
-- KSeF API: `v2.4.0`
+- KSeF API: `v2.6.0`
 - Node.js: `>= 20`
 - Środowiska: `TEST`, `DEMO`, `PRD`
 
-KSeF `2.4.0` rozszerza obsługę błędów o `application/problem+json` oraz doprecyzowuje operacje
+KSeF `2.6.0` obejmuje obsługę `application/problem+json`, doprecyzowane operacje
 na tokenie użytym do bieżącego uwierzytelnienia. SDK zachowuje dotychczasowe metody klientów,
 a bogatszy format błędów możesz wymusić przez nagłówek
 `X-Error-Format: problem-details` ustawiony w `KsefClientOptions.headers`.
@@ -23,11 +23,12 @@ npm install ksef-client
 Opcjonalne zależności:
 
 ```bash
-npm install qrcode node-forge
+npm install qrcode node-forge libxmljs2
 ```
 
 - `qrcode` jest wymagane dla `client.qr`
 - `node-forge` jest wymagane dla `XadesKeyPair.fromPkcs12*`
+- `libxmljs2` jest wymagane tylko dla runtime walidacji `FA3Draft.toXml({ xsdValidate: true })`; schematy FA(3) są pakowane z biblioteką
 
 ## Quick Start
 

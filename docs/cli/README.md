@@ -36,6 +36,33 @@ Podstawowe uzycie CLI:
 node dist/cli/index.js --help
 ```
 
+## Session checkpoints (resume)
+
+CLI wspiera zapisywalne checkpointy sesji online/batch:
+
+```bash
+# online
+node dist/cli/index.js --json session online open --id demo-online --form-code FA3
+node dist/cli/index.js --json session online send --id demo-online --invoice-file ./invoice.xml --wait-status
+node dist/cli/index.js --json session online close --id demo-online
+
+# batch
+node dist/cli/index.js --json session batch open --id demo-batch --dir ./invoices
+node dist/cli/index.js --json session batch upload --id demo-batch --parallelism 4
+node dist/cli/index.js --json session batch close --id demo-batch --wait-status --wait-upo
+```
+
+Operacje na zapisanych checkpointach:
+
+```bash
+node dist/cli/index.js --json session list
+node dist/cli/index.js --json session show --id demo-online
+node dist/cli/index.js --json session status --id demo-online --invoice-ref INV-1
+node dist/cli/index.js --json session export --id demo-online --out ./artifacts/
+node dist/cli/index.js --json session import --in ./artifacts/session-demo-online.json --id demo-online-copy
+node dist/cli/index.js --json session drop --id demo-online
+```
+
 ## Wskazowki
 
 - `src/types/openapi.generated.ts` jest plikiem generowanym; nie edytuj go recznie.

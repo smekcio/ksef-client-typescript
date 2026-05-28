@@ -8,7 +8,7 @@ Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(.
 - gdy ustawisz `baseUrl` bez sufiksu `/v2`, biblioteka automatycznie doda `/v2` (chyba ze `appendV2: false`),
 - `KsefClient.connect(...)` rozszerza `KsefClientOptions` o opcje potrzebne do logowania tokenem KSeF,
 - `headers` są globalne i trafiają do wszystkich requestów klienta, także do requestów na pre-signed URL (upload/download), więc nie należy umieszczać tam `Authorization`.
-- dla KSeF `2.4.0` możesz przez `headers` włączyć `X-Error-Format: problem-details`, aby otrzymywać bogatsze odpowiedzi błędów dla `400` i `429`.
+- dla KSeF `2.6.0` możesz przez `headers` włączyć `X-Error-Format: problem-details`, aby otrzymywać bogatsze odpowiedzi błędów dla `400` i `429`.
 
 ## `KsefClientOptions`
 

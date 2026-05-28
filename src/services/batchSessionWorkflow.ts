@@ -47,6 +47,12 @@ export interface BatchSessionState {
   offlineMode?: boolean;
 }
 
+export interface BatchUploadOptions {
+  parallelism?: number;
+  skipOrdinals?: number[];
+  progressCallback?: (ordinalNumber: number) => void | Promise<void>;
+}
+
 export class BatchSessionHandle {
   readonly referenceNumber: string;
   readonly encryptionData: EncryptionData;
@@ -115,8 +121,16 @@ export class BatchSessionHandle {
     return await this.sessionsClient.getSessionStatus(this.referenceNumber);
   }
 
-  async uploadParts(parallelism = 1): Promise<void> {
-    await uploadParts(this.http, this.partUploadRequests, this.encryptedParts, parallelism);
+  async uploadParts(parallelismOrOptions: number | BatchUploadOptions = 1): Promise<void> {
+    const options =
+      typeof parallelismOrOptions === "number"
+        ? { parallelism: parallelismOrOptions }
+        : parallelismOrOptions;
+    await uploadParts(this.http, this.partUploadRequests, this.encryptedParts, {
+      parallelism: options.parallelism ?? 1,
+      skipOrdinals: options.skipOrdinals ?? [],
+      ...(options.progressCallback ? { progressCallback: options.progressCallback } : {}),
+    });
   }
 
   async close(): Promise<void> {
@@ -328,17 +342,32 @@ async function uploadParts(
   http: HttpClient,
   partUploadRequests: PartUploadRequest[],
   parts: Buffer[],
-  parallelism: number,
+  options: {
+    parallelism: number;
+    skipOrdinals: number[];
+    progressCallback?: (ordinalNumber: number) => void | Promise<void>;
+  },
 ): Promise<void> {
   const sortedRequests = [...partUploadRequests].sort((a, b) => a.ordinalNumber - b.ordinalNumber);
   if (sortedRequests.length !== parts.length) {
     throw new KsefValidationError("parts length must match partUploadRequests length.");
   }
 
-  const tasks = sortedRequests.map((request, index) => async () => {
+  const partByOrdinal = new Map<number, Buffer>();
+  for (const [index, request] of sortedRequests.entries()) {
     const part = parts[index];
     if (!part) {
       throw new KsefValidationError(`Missing batch part at index ${index}.`);
+    }
+    partByOrdinal.set(request.ordinalNumber, part);
+  }
+
+  const skip = new Set<number>(options.skipOrdinals);
+  const activeRequests = sortedRequests.filter((request) => !skip.has(request.ordinalNumber));
+  const tasks = activeRequests.map((request) => async () => {
+    const part = partByOrdinal.get(request.ordinalNumber);
+    if (!part) {
+      throw new KsefValidationError(`Missing batch part for ordinal ${request.ordinalNumber}.`);
     }
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(request.headers ?? {})) {
@@ -353,9 +382,12 @@ async function uploadParts(
       body: part,
       responseType: "text",
     });
+    if (options.progressCallback) {
+      await options.progressCallback(request.ordinalNumber);
+    }
   });
 
-  await runWithConcurrency(tasks, parallelism);
+  await runWithConcurrency(tasks, options.parallelism);
 }
 
 async function runWithConcurrency(

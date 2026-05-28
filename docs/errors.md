@@ -14,7 +14,7 @@ SDK mapuje błędy HTTP i błędy walidacji na dedykowane klasy wyjątków.
 | `KsefSessionExpiredError` | Brak tokena dostępowego lub nieudane odświeżenie sesji.                         | `message`                                     |
 | `KsefValidationError`     | Błąd lokalnej walidacji danych wejściowych.                                     | `message`, `details`                          |
 
-## `problem` i KSeF API `2.4.0`
+## `problem` i KSeF API `2.6.0`
 
 Przy odpowiedziach JSON SDK próbuje zmapować `error.problem` do jednego z modeli:
 
@@ -27,7 +27,7 @@ Przy odpowiedziach JSON SDK próbuje zmapować `error.problem` do jednego z mode
 - fallback `UnknownApiProblem`, gdy JSON nie pasuje do znanego modelu
 
 Mapowanie do konkretnego typed modelu następuje tylko wtedy, gdy payload spełnia wymagane pola
-kontraktu `ksef-docs 2.4.0`. Przy częściowym albo niepoprawnym `problem+json` SDK zachowuje
+kontraktu `ksef-docs 2.6.0`. Przy częściowym albo niepoprawnym `problem+json` SDK zachowuje
 `responseBody`, a `error.problem` przechodzi do `UnknownApiProblem`.
 
 `410 Gone` może pojawić się po wygaśnięciu retencji technicznych statusów operacji asynchronicznych

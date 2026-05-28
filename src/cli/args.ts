@@ -33,6 +33,7 @@ const VALUE_OPTIONS = new Set<string>([
   "upo-output",
   "session-ref",
   "session-id",
+  "save-session",
   "invoice-ref",
   "upo-ref",
   "out-dir",

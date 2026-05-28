@@ -29,7 +29,7 @@ Uwaga: CI wymaga 100% coverage (statement/branch/function/line).
 
 ## Kontrola zgodności z OpenAPI
 
-Aktualny target kompatybilności repo: **KSeF API `2.4.0`**.
+Aktualny target kompatybilności repo: **KSeF API `2.6.0`**.
 
 Regeneracja modeli:
 
