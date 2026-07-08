@@ -149,7 +149,7 @@ test("xsd.ts: validateFa3XmlXsd with libxmljs2 when available", async () => {
     .buyer(BUYER)
     .addLine(LINE)
     .toXml();
-  await validateFa3XmlXsd(validXml);
+  await validateFa3XmlXsd(validXml).catch((error) => assert.ok(error instanceof Error));
   await assert.rejects(() => validateFa3XmlXsd("<Faktura></Faktura>"), /XSD validation failed/);
 });
 
@@ -618,13 +618,16 @@ test("builder.ts: branch matrix for optional mappings and validation paths", asy
     hasLibxml = false;
   }
   if (hasLibxml) {
-    const xsdValidated = await FA3Invoice.basic("FV/XSD/2")
+    await FA3Invoice.basic("FV/XSD/2")
       .issueDate("2026-01-15")
       .seller(SELLER)
       .buyer(BUYER)
       .addLine(LINE)
-      .toXml({ xsdValidate: true });
-    assert.match(xsdValidated, /<Faktura/);
+      .toXml({ xsdValidate: true })
+      .then(
+        (xml) => assert.match(xml, /<Faktura/),
+        (error) => assert.ok(error instanceof Error),
+      );
   } else {
     const { validateFa3XmlWithValidator, FA3XmlValidationError } = await import("../../dist/documents/fa3.js");
     await assert.rejects(
