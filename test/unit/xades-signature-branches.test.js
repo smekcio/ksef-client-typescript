@@ -15,6 +15,20 @@ const fixtures = JSON.parse(fs.readFileSync(fixturesPath, "utf8"));
 const DS_NS = "http://www.w3.org/2000/09/xmldsig#";
 const ECDSA_SHA256_URI = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
 
+function withMockSignedXml(SignedXmlCtor, run) {
+  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
+  Object.defineProperty(xmlCrypto, "SignedXml", {
+    configurable: true,
+    enumerable: true,
+    get: () => SignedXmlCtor,
+  });
+  try {
+    return run();
+  } finally {
+    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
+  }
+}
+
 function createKeyPair() {
   return XadesKeyPair.fromPem({
     certificatePem: fixtures.ecCertPem,
@@ -59,19 +73,13 @@ function baseFakeSignedXml() {
 }
 
 test("XadesSignatureService throws when SignedInfo XML fragment cannot be parsed", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   class EmptySignedInfoSignedXml extends baseFakeSignedXml() {
     createSignedInfo() {
       return "";
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => EmptySignedInfoSignedXml,
-  });
-  try {
+  withMockSignedXml(EmptySignedInfoSignedXml, () => {
     const service = new XadesSignatureService();
     assert.throws(
       () =>
@@ -81,9 +89,7 @@ test("XadesSignatureService throws when SignedInfo XML fragment cannot be parsed
         }),
       /Failed to create SignedInfo node|Failed to parse XML fragment/,
     );
-  } finally {
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
-  }
+  });
 });
 
 test("XadesSignatureService throws when SignedInfo node import returns null", () => {
@@ -112,7 +118,6 @@ test("XadesSignatureService throws when SignedInfo node import returns null", ()
 });
 
 test("XadesSignatureService propagates patched createReferences xpath-not-found error", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
   class MissingXpathSignedXml extends baseFakeSignedXml() {
     createSignedInfo(doc) {
@@ -121,31 +126,26 @@ test("XadesSignatureService propagates patched createReferences xpath-not-found 
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => MissingXpathSignedXml,
-  });
   xpath.selectWithResolver = () => [];
 
   try {
-    const service = new XadesSignatureService();
-    assert.throws(
-      () =>
-        service.signXadesEnveloped({
-          xml: "<AuthTokenRequest/>",
-          keyPair: createKeyPair(),
-        }),
-      /cannot be signed because it was not found/,
-    );
+    withMockSignedXml(MissingXpathSignedXml, () => {
+      const service = new XadesSignatureService();
+      assert.throws(
+        () =>
+          service.signXadesEnveloped({
+            xml: "<AuthTokenRequest/>",
+            keyPair: createKeyPair(),
+          }),
+        /cannot be signed because it was not found/,
+      );
+    });
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
 test("XadesSignatureService covers custom references, inclusive namespaces and ECDSA verify path", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
   class FullFlowSignedXml extends baseFakeSignedXml() {
     addReference(reference) {
@@ -193,31 +193,26 @@ test("XadesSignatureService covers custom references, inclusive namespaces and E
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => FullFlowSignedXml,
-  });
   xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
 
   try {
-    const service = new XadesSignatureService();
-    const signedXml = service.signXadesEnveloped({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
-    });
+    withMockSignedXml(FullFlowSignedXml, () => {
+      const service = new XadesSignatureService();
+      const signedXml = service.signXadesEnveloped({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
 
-    assert.match(signedXml, /InclusiveNamespaces PrefixList="ds xades"/);
-    assert.match(signedXml, /<ds:KeyInfo/);
-    assert.match(signedXml, /<ds:SignatureValue/);
+      assert.match(signedXml, /InclusiveNamespaces PrefixList="ds xades"/);
+      assert.match(signedXml, /<ds:KeyInfo/);
+      assert.match(signedXml, /<ds:SignatureValue/);
+    });
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
 test("XadesSignatureService keeps preconfigured ECDSA algorithm without overriding it", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
 
   let preconfiguredUsed = false;
@@ -266,24 +261,20 @@ test("XadesSignatureService keeps preconfigured ECDSA algorithm without overridi
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => PreconfiguredSignedXml,
-  });
   xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
 
   try {
-    const service = new XadesSignatureService();
-    const signedXml = service.signXadesEnveloped({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
+    withMockSignedXml(PreconfiguredSignedXml, () => {
+      const service = new XadesSignatureService();
+      const signedXml = service.signXadesEnveloped({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
+      assert.equal(preconfiguredUsed, true);
+      assert.match(signedXml, /<ds:SignatureValue/);
     });
-    assert.equal(preconfiguredUsed, true);
-    assert.match(signedXml, /<ds:SignatureValue/);
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
@@ -414,7 +405,6 @@ test("XadesSignatureService supports environments without importNode in envelopi
 });
 
 test("XadesSignatureService rejects when xpath resolver returns non-array", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
   class NonArrayXpathSignedXml extends baseFakeSignedXml() {
     createSignedInfo(doc) {
@@ -423,31 +413,26 @@ test("XadesSignatureService rejects when xpath resolver returns non-array", () =
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => NonArrayXpathSignedXml,
-  });
   xpath.selectWithResolver = () => ({ not: "an-array" });
 
   try {
-    const service = new XadesSignatureService();
-    assert.throws(
-      () =>
-        service.signXadesEnveloped({
-          xml: "<AuthTokenRequest/>",
-          keyPair: createKeyPair(),
-        }),
-      /cannot be signed because it was not found/,
-    );
+    withMockSignedXml(NonArrayXpathSignedXml, () => {
+      const service = new XadesSignatureService();
+      assert.throws(
+        () =>
+          service.signXadesEnveloped({
+            xml: "<AuthTokenRequest/>",
+            keyPair: createKeyPair(),
+          }),
+        /cannot be signed because it was not found/,
+      );
+    });
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
 test("XadesSignatureService createReferences handles missing transforms array", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
   class NoTransformsSignedXml extends baseFakeSignedXml() {
     addReference(reference) {
@@ -477,28 +462,23 @@ test("XadesSignatureService createReferences handles missing transforms array", 
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => NoTransformsSignedXml,
-  });
   xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
 
   try {
-    const service = new XadesSignatureService();
-    const signedXml = service.signXadesEnveloped({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
+    withMockSignedXml(NoTransformsSignedXml, () => {
+      const service = new XadesSignatureService();
+      const signedXml = service.signXadesEnveloped({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
+      assert.match(signedXml, /<ds:SignatureValue/);
     });
-    assert.match(signedXml, /<ds:SignatureValue/);
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
 test("XadesSignatureService createReferences handles missing xpath by falling back to empty expression", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
   class MissingXpathFieldSignedXml extends baseFakeSignedXml() {
     addReference(reference) {
@@ -528,28 +508,23 @@ test("XadesSignatureService createReferences handles missing xpath by falling ba
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => MissingXpathFieldSignedXml,
-  });
   xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
 
   try {
-    const service = new XadesSignatureService();
-    const signedXml = service.signXadesEnveloped({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
+    withMockSignedXml(MissingXpathFieldSignedXml, () => {
+      const service = new XadesSignatureService();
+      const signedXml = service.signXadesEnveloped({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
+      assert.match(signedXml, /<ds:SignatureValue/);
     });
-    assert.match(signedXml, /<ds:SignatureValue/);
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
 
 test("XadesSignatureService executes namespace resolver callbacks in both signing modes", () => {
-  const signedXmlDescriptor = Object.getOwnPropertyDescriptor(xmlCrypto, "SignedXml");
   const originalSelect = xpath.selectWithResolver;
 
   let resolverCalls = 0;
@@ -577,26 +552,22 @@ test("XadesSignatureService executes namespace resolver callbacks in both signin
     }
   }
 
-  Object.defineProperty(xmlCrypto, "SignedXml", {
-    configurable: true,
-    enumerable: true,
-    get: () => ResolverProbeSignedXml,
-  });
   xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
 
   try {
-    const service = new XadesSignatureService();
-    service.signXadesEnveloped({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
+    withMockSignedXml(ResolverProbeSignedXml, () => {
+      const service = new XadesSignatureService();
+      service.signXadesEnveloped({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
+      service.signXadesEnveloping({
+        xml: "<AuthTokenRequest/>",
+        keyPair: createKeyPair(),
+      });
+      assert.equal(resolverCalls, 2);
     });
-    service.signXadesEnveloping({
-      xml: "<AuthTokenRequest/>",
-      keyPair: createKeyPair(),
-    });
-    assert.equal(resolverCalls, 2);
   } finally {
     xpath.selectWithResolver = originalSelect;
-    Object.defineProperty(xmlCrypto, "SignedXml", signedXmlDescriptor);
   }
 });
