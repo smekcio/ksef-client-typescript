@@ -8,29 +8,9 @@ export function bundledFa3SchemaPath() {
   return path.join(packageRoot, "src", "xml", "fa3-schemas", "schemat_FA(3)_v1-0E.xsd");
 }
 
-export function rewriteBundledFa3SchemaLocations(content, schemaDirectory) {
-  return content
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/StrukturyDanych_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "StrukturyDanych_v10-0E.xsd")).href}"`,
-    )
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/ElementarneTypyDanych_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "ElementarneTypyDanych_v10-0E.xsd")).href}"`,
-    )
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/KodyKrajow_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "KodyKrajow_v10-0E.xsd")).href}"`,
-    );
-}
-
-export function loadBundledFa3Xsd(libxmljs) {
-  const schemaPath = bundledFa3SchemaPath();
-  const schemaDirectory = path.dirname(schemaPath);
-  const schemaXml = rewriteBundledFa3SchemaLocations(
-    fs.readFileSync(schemaPath, "utf8"),
-    schemaDirectory,
-  );
+export function loadBundledFa3Xsd(libxmljs, schemaDirectory = path.dirname(bundledFa3SchemaPath())) {
+  const schemaPath = path.join(schemaDirectory, "schemat_FA(3)_v1-0E.xsd");
+  const schemaXml = fs.readFileSync(schemaPath, "utf8");
   return libxmljs.parseXml(schemaXml, {
     baseUrl: pathToFileURL(`${schemaDirectory}${path.sep}`).href,
   });

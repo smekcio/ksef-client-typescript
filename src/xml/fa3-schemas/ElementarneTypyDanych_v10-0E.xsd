@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsd:schema xmlns:etd="http://crd.gov.pl/xml/schematy/dziedzinowe/mf/2022/01/05/eD/DefinicjeTypy/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://crd.gov.pl/xml/schematy/dziedzinowe/mf/2022/01/05/eD/DefinicjeTypy/" elementFormDefault="qualified" attributeFormDefault="unqualified" version="1.0" xml:lang="pl">
-	<xsd:include schemaLocation="http://crd.gov.pl/xml/schematy/dziedzinowe/mf/2022/01/05/eD/DefinicjeTypy/KodyKrajow_v10-0E.xsd"/>
+	<xsd:include schemaLocation="KodyKrajow_v10-0E.xsd"/>
 	<xsd:annotation>
 		<xsd:documentation>Definicje podstawowych typów używanych w deklaracjach elektronicznych. Na podstawie poniższych typów można budować deklaracje</xsd:documentation>
 	</xsd:annotation>

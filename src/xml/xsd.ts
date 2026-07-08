@@ -35,7 +35,7 @@ export async function validateFa3XmlXsd(
   const libxmljs = await loadLibxml();
   const schemaPath = options.schemaPath ?? resolveFa3SchemaPath(options.schemaDirectory);
   const schemaDirectory = path.dirname(schemaPath);
-  const schemaXml = rewriteSchemaLocations(fs.readFileSync(schemaPath, "utf8"), schemaDirectory);
+  const schemaXml = fs.readFileSync(schemaPath, "utf8");
   const schema = libxmljs.parseXml(schemaXml, {
     baseUrl: pathToFileURL(`${schemaDirectory}${path.sep}`).href,
   });
@@ -72,22 +72,6 @@ async function loadLibxml(): Promise<LibxmlModule> {
       `FA(3) XSD validation requires optional dependency libxmljs2 with native bindings. ${detail}`,
     );
   }
-}
-
-function rewriteSchemaLocations(content: string, schemaDirectory: string): string {
-  return content
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/StrukturyDanych_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "StrukturyDanych_v10-0E.xsd")).href}"`,
-    )
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/ElementarneTypyDanych_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "ElementarneTypyDanych_v10-0E.xsd")).href}"`,
-    )
-    .replace(
-      /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/KodyKrajow_v10-0E\.xsd"/g,
-      `schemaLocation="${pathToFileURL(path.join(schemaDirectory, "KodyKrajow_v10-0E.xsd")).href}"`,
-    );
 }
 
 function formatValidationError(error: { message?: string; line?: number; column?: number }): string {

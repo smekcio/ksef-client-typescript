@@ -9,7 +9,6 @@ import {
   FA3TaxCategory,
   FA3TransportKind,
   KsefValidationError,
-  XsdValidationError,
   resolveFa3SchemaPath,
   serializeInvoiceXml,
 } from "../../dist/index.js";
@@ -383,16 +382,17 @@ test("FA3Invoice validated XML reports optional XSD dependency or schema errors"
     .addLine({ description: "XSD", quantity: "1", unitNetPrice: "10", tax: "23" })
     .build();
 
-  try {
-    await invoice.toXmlValidated();
-  } catch (error) {
-    assert.ok(error instanceof KsefValidationError);
-    assert.match(error.message, /libxmljs2|FA\(3\) XML validation failed/);
-    if (error.message.includes("FA(3) XML validation failed")) {
-      assert.ok(error instanceof XsdValidationError);
-      assert.ok(error.validationErrors.length > 0);
-    }
+  const libxmljs = await import("libxmljs2").catch(() => undefined);
+  if (!libxmljs) {
+    await assert.rejects(invoice.toXmlValidated(), (error) => {
+      assert.ok(error instanceof KsefValidationError);
+      assert.match(error.message, /libxmljs2/);
+      return true;
+    });
+    return;
   }
+
+  await assert.doesNotReject(invoice.toXmlValidated());
 });
 
 test("FA3Invoice builder validates required fields", () => {
