@@ -67,6 +67,23 @@
     "node": ">=20"
   },
   "sideEffects": false,
+  "c8": {
+    "excludeAfterRemap": true,
+    "exclude": [
+      "coverage/**",
+      "packages/*/test{,s}/**",
+      "**/*.d.ts",
+      "test{,s}/**",
+      "test{,-*}.{js,cjs,mjs,ts,tsx,jsx}",
+      "**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}",
+      "**/__tests__/**",
+      "**/{ava,babel,nyc}.config.{js,cjs,mjs}",
+      "**/jest.config.{js,cjs,mjs,ts}",
+      "**/{karma,rollup,webpack}.config.js",
+      "**/.{eslint,mocha}rc.{js,cjs}",
+      "**/documents/fa3/index.ts"
+    ]
+  },
   "dependencies": {
     "@xmldom/xmldom": "^0.8.11",
     "fast-xml-parser": "^4.4.1",

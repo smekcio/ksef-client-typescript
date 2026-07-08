@@ -158,7 +158,7 @@ function walkElement(
 
 export function parseFa3XsdElements(schemaText: string): XsdElement[] {
   const doc = new DOMParser().parseFromString(schemaText, "text/xml");
-  const root = doc.documentElement;
+  const root = doc?.documentElement;
   if (!root) {
     return [];
   }

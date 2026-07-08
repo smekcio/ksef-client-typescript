@@ -616,6 +616,42 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage returns empty result when 
   assert.deepEqual(result, { metadataSummaries: [], invoiceXmlFiles: {} });
 });
 
+test("InvoiceExportWorkflow.downloadAndProcessPackage returns empty result when package has no parts", async () => {
+  const workflow = new InvoiceExportWorkflow(
+    {},
+    {},
+    {
+      request: async () => {
+        throw new Error("request should not be called");
+      },
+    },
+    { requireExportPartHash: false },
+  );
+  const encryptionData = {
+    cipherKey: CryptographyService.generateAesKey(),
+    cipherIv: CryptographyService.generateIv(),
+    encryptionInfo: {},
+  };
+
+  const emptyPartsArray = await workflow.downloadAndProcessPackage(
+    {
+      status: { code: 200, description: "ok" },
+      package: { invoiceCount: 2, size: 0, parts: [], isTruncated: false },
+    },
+    encryptionData,
+  );
+  assert.deepEqual(emptyPartsArray, { metadataSummaries: [], invoiceXmlFiles: {} });
+
+  const missingParts = await workflow.downloadAndProcessPackage(
+    {
+      status: { code: 200, description: "ok" },
+      package: { invoiceCount: 1, size: 0, isTruncated: false },
+    },
+    encryptionData,
+  );
+  assert.deepEqual(missingParts, { metadataSummaries: [], invoiceXmlFiles: {} });
+});
+
 test("InvoiceExportWorkflow treats non-string encryptedPartHash as missing when hash verification is required", async () => {
   const encryptionData = {
     cipherKey: CryptographyService.generateAesKey(),
