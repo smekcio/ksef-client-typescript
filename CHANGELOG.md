@@ -6,6 +6,13 @@
 
 * **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.6.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.6.0...v0.6.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **xades:** repair CJS xml-crypto interop for certificate auth ([#37](https://github.com/smekcio/ksef-client-typescript/issues/37)) ([df48900](https://github.com/smekcio/ksef-client-typescript/commit/df489006dc5820c489c11ad6fff3039f0f214e1f))
+
 ## [0.6.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.5.2...v0.6.0) (2026-07-08)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "ksef-client",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "KSeF 2.0 client library for Node.js (TypeScript)",
   "license": "MIT",
   "repository": {
