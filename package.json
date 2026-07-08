@@ -50,7 +50,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup && node scripts/copy-fa3-schemas.mjs",
+    "build": "tsup && node scripts/copy-fa3-schemas.mjs && node scripts/fix-cjs-xml-crypto-interop.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
