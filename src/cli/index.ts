@@ -1,7 +1,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import {
+  CryptographyService,
   KsefApiError,
   KsefClient,
   KsefError,
@@ -14,6 +15,8 @@ import {
   type KsefLighthouseEnvironment,
   type InvoiceQueryFilters,
   type JsonValue,
+  type SessionStatusResponse,
+  createZip,
 } from "../index";
 import { getBooleanOption, getNumberOption, getStringOption, parseArgv } from "./args";
 import {
@@ -26,6 +29,26 @@ import {
   writeConfig,
 } from "./configStore";
 import { parseFormCode } from "./formCodes";
+import {
+  type BatchPayloadSource,
+  type BatchSessionCheckpoint,
+  type OnlineSessionCheckpoint,
+  type SessionCheckpoint,
+  SessionStoreError,
+  deleteCheckpoint,
+  deserializeBatchSessionState,
+  deserializeOnlineSessionState,
+  exportCheckpoint,
+  importCheckpoint,
+  listCheckpoints,
+  loadCheckpoint,
+  saveCheckpoint,
+  serializeBatchSessionState,
+  serializeOnlineSessionState,
+  summarizeCheckpoint,
+  updateCheckpoint,
+  validateSessionId,
+} from "./sessionStore";
 import {
   clearStoredTokens,
   formatTokenStoreWarning,
@@ -138,6 +161,11 @@ export async function runCli(argv: string[], options: RunCliOptions = {}): Promi
       case "send": {
         const result = await runSend(parsed.options, context);
         emit(context, result);
+        return EXIT_SUCCESS;
+      }
+      case "session": {
+        const result = await runSession(rest, parsed.options, context);
+        emit(context, toJsonValue(result));
         return EXIT_SUCCESS;
       }
       case "upo": {
@@ -518,14 +546,43 @@ async function runSend(
   const invoiceXml = await readFile(path.resolve(context.cwd, invoiceFile), "utf8");
   const formCode = parseFormCode(getStringOption(options, "form-code"));
   const waitForUpo = getBooleanOption(options, "wait-upo");
-  const pollIntervalMs = getNumberOption(options, "poll-interval-ms");
-  const maxAttempts = getNumberOption(options, "max-attempts");
+  const pollIntervalMs = waitForUpo ? resolvePollIntervalMs(options, 2000) : 2000;
+  const maxAttempts = waitForUpo ? resolveMaxAttempts(options, 60) : 60;
   const hashOfCorrectedInvoice = getStringOption(options, "hash-of-corrected-invoice");
+  const sessionId = getStringOption(options, "session-id") ?? getStringOption(options, "save-session");
+  const upoOutput = getStringOption(options, "upo-output") ?? getStringOption(options, "save-upo");
+  const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
+  if (upoOutput && !waitForUpo) {
+    throw new CliError("Option --save-upo/--upo-output requires --wait-upo.");
+  }
 
   const session = await client.workflows.sessions.online.open({
     formCode,
     upoV43: getBooleanOption(options, "upo-v43"),
   });
+  let checkpoint: OnlineSessionCheckpoint | null = null;
+  if (sessionId) {
+    const normalizedSessionId = validateSessionId(sessionId);
+    checkpoint = {
+      schemaVersion: 1,
+      id: normalizedSessionId,
+      profile: loaded.profileName,
+      baseUrl: resolveBaseUrl(loaded.profile),
+      kind: "online",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      stage: "opened",
+      sessionState: serializeOnlineSessionState(session.getState()),
+      lastInvoiceRef: null,
+      sentInvoiceRefs: [],
+    };
+    try {
+      await saveCheckpoint(context.cliHome, checkpoint, { overwrite: false });
+    } catch (error) {
+      await session.close().catch(() => undefined);
+      throw error;
+    }
+  }
   let closed = false;
   try {
     const sendResponse = await session.sendInvoice({
@@ -533,21 +590,29 @@ async function runSend(
       offlineMode: getBooleanOption(options, "offline"),
       ...(hashOfCorrectedInvoice ? { hashOfCorrectedInvoice } : {}),
     });
+    if (checkpoint) {
+      checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+        stage: "invoice_sent",
+        lastInvoiceRef: sendResponse.referenceNumber,
+        sentInvoiceRefs: [...checkpoint.sentInvoiceRefs, sendResponse.referenceNumber],
+      })) as OnlineSessionCheckpoint;
+    }
     await session.close();
     closed = true;
+    if (checkpoint) {
+      checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+        stage: "closed",
+      })) as OnlineSessionCheckpoint;
+    }
 
     let upoXml: string | null = null;
     let upo: JsonValue | null = null;
     if (waitForUpo) {
-      upoXml = await session.waitForUpo({
-        ...(pollIntervalMs !== undefined ? { pollIntervalMs } : {}),
-        ...(maxAttempts !== undefined ? { maxAttempts } : {}),
-      });
+      upoXml = await session.waitForUpo({ pollIntervalMs, maxAttempts });
       if (upoXml) {
         upo = toJsonValue(parseUpoXml(upoXml));
-        const upoOutput = getStringOption(options, "upo-output");
         if (upoOutput) {
-          await writeOutputFile(upoOutput, upoXml, context.cwd);
+          await saveOutputFile(upoOutput, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
         }
       }
     }
@@ -558,6 +623,7 @@ async function runSend(
       sessionReferenceNumber: session.referenceNumber,
       invoiceReferenceNumber: sendResponse.referenceNumber,
       waitForUpo,
+      ...(checkpoint ? { sessionId: checkpoint.id } : {}),
       ...(upoXml ? { upoXml } : {}),
       ...(upo ? { upo } : {}),
     };
@@ -566,6 +632,435 @@ async function runSend(
       await session.close().catch(() => undefined);
     }
   }
+}
+
+async function runSession(
+  positionals: string[],
+  options: Record<string, string | boolean>,
+  context: CommandContext,
+): Promise<unknown> {
+  const [subcommand, ...rest] = positionals;
+  if (!subcommand) {
+    throw new CliError("session requires subcommand: list | show | status | export | import | drop | online | batch.");
+  }
+
+  if (subcommand === "online") {
+    return runSessionOnline(rest, options, context);
+  }
+
+  if (subcommand === "batch") {
+    return runSessionBatch(rest, options, context);
+  }
+
+  const loaded = await loadProfileContext(options, context);
+  const profileName = loaded.profileName;
+
+  if (subcommand === "list") {
+    const checkpoints = await listCheckpoints(context.cliHome, profileName);
+    return {
+      count: checkpoints.length,
+      items: checkpoints.map((item) => summarizeCheckpoint(item)),
+    };
+  }
+
+  if (subcommand === "show") {
+    const sessionId = requireSessionId(options, rest[0]);
+    const checkpoint = await loadCheckpoint(context.cliHome, profileName, sessionId);
+    return {
+      ...summarizeCheckpoint(checkpoint),
+      checkpoint: toJsonValue(checkpoint),
+    };
+  }
+
+  if (subcommand === "status") {
+    const sessionId = requireSessionId(options, rest[0]);
+    const invoiceRef = getStringOption(options, "invoice-ref");
+    const checkpoint = await loadCheckpoint(context.cliHome, profileName, sessionId);
+    const client = await createAuthenticatedClientForBaseUrl(
+      profileName,
+      loaded.profile,
+      checkpoint.baseUrl,
+      context,
+    );
+    const sessionRef = checkpoint.sessionState.referenceNumber;
+    const status = await client.sessions.getSessionStatus(sessionRef);
+    const payload: Record<string, unknown> = {
+      id: checkpoint.id,
+      kind: checkpoint.kind,
+      stage: checkpoint.stage,
+      sessionRef,
+      status: toJsonValue(status),
+    };
+    if (invoiceRef) {
+      payload.invoiceStatus = toJsonValue(
+        await client.sessions.getSessionInvoiceStatus(sessionRef, invoiceRef),
+      );
+    }
+    return payload;
+  }
+
+  if (subcommand === "export") {
+    const sessionId = requireSessionId(options, rest[0]);
+    const out = getStringOption(options, "out");
+    if (!out) {
+      throw new CliError("session export requires --out.");
+    }
+    const exportedPath = await exportCheckpoint(context.cliHome, profileName, sessionId, out);
+    return {
+      id: sessionId,
+      profile: profileName,
+      path: exportedPath,
+    };
+  }
+
+  if (subcommand === "import") {
+    const sourcePath = getStringOption(options, "in");
+    if (!sourcePath) {
+      throw new CliError("session import requires --in.");
+    }
+    const sessionIdOverride = getStringOption(options, "id");
+    const imported = await importCheckpoint(context.cliHome, profileName, sourcePath, {
+      ...(sessionIdOverride ? { sessionId: sessionIdOverride } : {}),
+    });
+    return summarizeCheckpoint(imported);
+  }
+
+  if (subcommand === "drop") {
+    const sessionId = requireSessionId(options, rest[0]);
+    await deleteCheckpoint(context.cliHome, profileName, sessionId);
+    return {
+      id: sessionId,
+      profile: profileName,
+      deleted: true,
+    };
+  }
+
+  throw new CliError(`Unknown session subcommand "${subcommand}".`);
+}
+
+async function runSessionOnline(
+  positionals: string[],
+  options: Record<string, string | boolean>,
+  context: CommandContext,
+): Promise<unknown> {
+  const [subcommand] = positionals;
+  if (!subcommand) {
+    throw new CliError("session online requires subcommand: open | send | close.");
+  }
+  const loaded = await loadProfileContext(options, context);
+  const profileName = loaded.profileName;
+
+  if (subcommand === "open") {
+    const sessionId = requireSessionId(options);
+    const client = await createAuthenticatedClient(profileName, loaded.profile, context);
+    const formCode = parseSessionFormCode(options);
+    const handle = await client.workflows.sessions.online.open({
+      formCode: formCode as never,
+      upoV43: getBooleanOption(options, "upo-v43"),
+    });
+
+    const checkpoint: OnlineSessionCheckpoint = {
+      schemaVersion: 1,
+      id: sessionId,
+      profile: profileName,
+      baseUrl: resolveBaseUrl(loaded.profile),
+      kind: "online",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      stage: "opened",
+      sessionState: serializeOnlineSessionState(handle.getState()),
+      lastInvoiceRef: null,
+      sentInvoiceRefs: [],
+    };
+
+    try {
+      await saveCheckpoint(context.cliHome, checkpoint, { overwrite: false });
+    } catch (error) {
+      await handle.close().catch(() => undefined);
+      throw error;
+    }
+
+    return summarizeCheckpoint(checkpoint);
+  }
+
+  if (subcommand === "send") {
+    const sessionId = requireSessionId(options);
+    const invoiceFile = getStringOption(options, "invoice-file") ?? getStringOption(options, "invoice");
+    if (!invoiceFile) {
+      throw new CliError("session online send requires --invoice-file.");
+    }
+    const waitStatus = getBooleanOption(options, "wait-status");
+    const waitUpo = getBooleanOption(options, "wait-upo");
+    const saveUpo = getStringOption(options, "save-upo");
+    const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
+    if (saveUpo && !waitUpo) {
+      throw new CliError("Option --save-upo requires --wait-upo.");
+    }
+    const pollIntervalMs = resolvePollIntervalMs(options, 2000);
+    const maxAttempts = resolveMaxAttempts(options, 60);
+
+    const checkpoint = await requireOnlineCheckpoint(context, profileName, sessionId);
+    ensureCheckpointNotClosed(checkpoint, "ksef-ts session online send");
+    const client = await createAuthenticatedClientForBaseUrl(
+      profileName,
+      loaded.profile,
+      checkpoint.baseUrl,
+      context,
+    );
+    const handle = client.workflows.sessions.online.resume(
+      deserializeOnlineSessionState(checkpoint.sessionState),
+    );
+    const invoiceXml = await readFile(path.resolve(context.cwd, invoiceFile), "utf8");
+    const sendResponse = await handle.sendInvoice({ invoice: invoiceXml });
+    const invoiceRef = sendResponse.referenceNumber;
+    if (!invoiceRef) {
+      throw new CliError("Send response does not contain invoice reference number.", EXIT_REMOTE);
+    }
+
+    const sentInvoiceRefs = checkpoint.sentInvoiceRefs.includes(invoiceRef)
+      ? [...checkpoint.sentInvoiceRefs]
+      : [...checkpoint.sentInvoiceRefs, invoiceRef];
+    const updated = (await updateCheckpoint(context.cliHome, checkpoint, {
+      stage: "invoice_sent",
+      lastInvoiceRef: invoiceRef,
+      sentInvoiceRefs,
+    })) as OnlineSessionCheckpoint;
+
+    const result: Record<string, unknown> = {
+      id: updated.id,
+      sessionRef: updated.sessionState.referenceNumber,
+      invoiceRef,
+      stage: updated.stage,
+    };
+
+    if (waitStatus || waitUpo) {
+      const invoiceStatus = await waitForInvoiceStatus(handle, invoiceRef, pollIntervalMs, maxAttempts);
+      result.invoiceStatus = toJsonValue(invoiceStatus);
+      result.statusCode = extractStatusCode(invoiceStatus);
+      result.ksefNumber = extractKsefNumber(invoiceStatus) ?? "";
+    }
+
+    if (waitUpo) {
+      const upoXml = await waitForInvoiceUpo(handle, invoiceRef, pollIntervalMs, maxAttempts);
+      result.upoBytes = Buffer.byteLength(upoXml, "utf8");
+        if (saveUpo) {
+          const outputPath = resolveOutputPath(
+            saveUpo,
+            `upo-${updated.sessionState.referenceNumber}-${invoiceRef}.xml`,
+          );
+          await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
+          result.upoPath = path.resolve(context.cwd, outputPath);
+        } else {
+          result.upoPath = "";
+      }
+    }
+
+    return result;
+  }
+
+  if (subcommand === "close") {
+    const sessionId = requireSessionId(options);
+    const checkpoint = await requireOnlineCheckpoint(context, profileName, sessionId);
+    ensureCheckpointNotClosed(checkpoint, "ksef-ts session online close");
+    const client = await createAuthenticatedClientForBaseUrl(
+      profileName,
+      loaded.profile,
+      checkpoint.baseUrl,
+      context,
+    );
+    const handle = client.workflows.sessions.online.resume(
+      deserializeOnlineSessionState(checkpoint.sessionState),
+    );
+    await handle.close();
+    const updated = (await updateCheckpoint(context.cliHome, checkpoint, {
+      stage: "closed",
+    })) as OnlineSessionCheckpoint;
+    return summarizeCheckpoint(updated);
+  }
+
+  throw new CliError(`Unknown session online subcommand "${subcommand}".`);
+}
+
+async function runSessionBatch(
+  positionals: string[],
+  options: Record<string, string | boolean>,
+  context: CommandContext,
+): Promise<unknown> {
+  const [subcommand] = positionals;
+  if (!subcommand) {
+    throw new CliError("session batch requires subcommand: open | upload | close.");
+  }
+  const loaded = await loadProfileContext(options, context);
+  const profileName = loaded.profileName;
+
+  if (subcommand === "open") {
+    const sessionId = requireSessionId(options);
+    const formCode = parseSessionFormCode(options);
+    const { zipBytes, payloadSource } = await buildBatchPayloadSource(context.cwd, options);
+    const client = await createAuthenticatedClient(profileName, loaded.profile, context);
+    const handle = await client.workflows.sessions.batch.open({
+      formCode: formCode as never,
+      zipBytes,
+      upoV43: getBooleanOption(options, "upo-v43"),
+    });
+    const checkpoint: BatchSessionCheckpoint = {
+      schemaVersion: 1,
+      id: sessionId,
+      profile: profileName,
+      baseUrl: resolveBaseUrl(loaded.profile),
+      kind: "batch",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      stage: "opened",
+      sessionState: serializeBatchSessionState(handle.getState()),
+      payloadSource,
+      uploadedOrdinals: [],
+      lastUpoRef: null,
+    };
+
+    try {
+      await saveCheckpoint(context.cliHome, checkpoint, { overwrite: false });
+    } catch (error) {
+      await handle.close().catch(() => undefined);
+      throw error;
+    }
+
+    return summarizeCheckpoint(checkpoint);
+  }
+
+  if (subcommand === "upload") {
+    const sessionId = requireSessionId(options);
+    const parallelism = getNumberOption(options, "parallelism") ?? 4;
+    if (!Number.isInteger(parallelism) || parallelism <= 0) {
+      throw new CliError("Invalid --parallelism. It must be a positive integer.");
+    }
+    let checkpoint = await requireBatchCheckpoint(context, profileName, sessionId);
+    ensureCheckpointNotClosed(checkpoint, "ksef-ts session batch upload");
+
+    const client = await createAuthenticatedClientForBaseUrl(
+      profileName,
+      loaded.profile,
+      checkpoint.baseUrl,
+      context,
+    );
+    const zipBytes = await loadBatchPayloadSourceBytes(checkpoint.payloadSource, context.cwd);
+    const uploaded = new Set<number>(checkpoint.uploadedOrdinals);
+    const state = deserializeBatchSessionState(checkpoint.sessionState);
+    const totalParts = state.partUploadRequests.length;
+    if (uploaded.size >= totalParts && totalParts > 0) {
+      return {
+        ...summarizeCheckpoint(checkpoint),
+        uploadedCount: uploaded.size,
+        totalParts,
+      };
+    }
+    const handle = await client.workflows.sessions.batch.resume(state, { zipBytes });
+    let updateQueue = Promise.resolve();
+    await handle.uploadParts({
+      parallelism,
+      skipOrdinals: [...uploaded],
+      progressCallback: (ordinalNumber) => {
+        updateQueue = updateQueue.then(async () => {
+          if (!uploaded.has(ordinalNumber)) {
+            uploaded.add(ordinalNumber);
+            checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+              stage: "uploading",
+              uploadedOrdinals: [...uploaded].sort((a, b) => a - b),
+            })) as BatchSessionCheckpoint;
+          }
+        });
+        return updateQueue;
+      },
+    });
+    await updateQueue;
+    checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+      stage: "uploaded",
+      uploadedOrdinals: [...uploaded].sort((a, b) => a - b),
+    })) as BatchSessionCheckpoint;
+
+    return {
+      ...summarizeCheckpoint(checkpoint),
+      uploadedCount: checkpoint.uploadedOrdinals.length,
+      totalParts,
+    };
+  }
+
+  if (subcommand === "close") {
+    const sessionId = requireSessionId(options);
+    const waitStatus = getBooleanOption(options, "wait-status");
+    const waitUpo = getBooleanOption(options, "wait-upo");
+    const saveUpo = getStringOption(options, "save-upo");
+    const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
+    if (saveUpo && !waitUpo) {
+      throw new CliError("Option --save-upo requires --wait-upo.");
+    }
+    const pollIntervalMs = resolvePollIntervalMs(options, 2000);
+    const maxAttempts = resolveMaxAttempts(options, 120);
+
+    let checkpoint = await requireBatchCheckpoint(context, profileName, sessionId);
+    if (checkpoint.stage === "closed" && !waitStatus && !waitUpo) {
+      return summarizeCheckpoint(checkpoint);
+    }
+    const client = await createAuthenticatedClientForBaseUrl(
+      profileName,
+      loaded.profile,
+      checkpoint.baseUrl,
+      context,
+    );
+    if (checkpoint.stage !== "closed") {
+      const zipBytes = await loadBatchPayloadSourceBytes(checkpoint.payloadSource, context.cwd);
+      const handle = await client.workflows.sessions.batch.resume(
+        deserializeBatchSessionState(checkpoint.sessionState),
+        { zipBytes },
+      );
+      await handle.close();
+      checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+        stage: "closed",
+      })) as BatchSessionCheckpoint;
+    }
+
+    const result: Record<string, unknown> = {
+      ...summarizeCheckpoint(checkpoint),
+    };
+
+    if (waitStatus || waitUpo) {
+      const status = await waitForSessionStatus(
+        () => client.sessions.getSessionStatus(checkpoint.sessionState.referenceNumber),
+        pollIntervalMs,
+        maxAttempts,
+      );
+      result.status = toJsonValue(status);
+      result.statusCode = extractStatusCode(status);
+      const upoRef = status.upo?.pages?.[0]?.referenceNumber ?? "";
+      if (upoRef) {
+        checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
+          lastUpoRef: upoRef,
+        })) as BatchSessionCheckpoint;
+      }
+      result.upoRef = upoRef;
+      if (waitUpo) {
+        if (!upoRef) {
+          throw new CliError("UPO reference number is not available in session status.", EXIT_REMOTE);
+        }
+        const upoXml = await client.sessions.getSessionUpo(checkpoint.sessionState.referenceNumber, upoRef);
+        result.upoBytes = Buffer.byteLength(upoXml, "utf8");
+        if (saveUpo) {
+          const outputPath = resolveOutputPath(
+            saveUpo,
+            `upo-${checkpoint.sessionState.referenceNumber}-${upoRef}.xml`,
+          );
+          await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
+          result.upoPath = path.resolve(context.cwd, outputPath);
+        } else {
+          result.upoPath = "";
+        }
+      }
+    }
+
+    return result;
+  }
+
+  throw new CliError(`Unknown session batch subcommand "${subcommand}".`);
 }
 
 async function runUpo(
@@ -717,6 +1212,314 @@ async function runExport(
   };
 }
 
+function requireSessionId(options: Record<string, string | boolean>, fallback?: string): string {
+  const value = fallback ?? getStringOption(options, "id");
+  if (!value) {
+    throw new CliError("Missing session id. Use --id <SESSION_ID>.");
+  }
+  try {
+    return validateSessionId(value);
+  } catch (error) {
+    throw new CliError(formatSessionIdError(error), EXIT_USAGE);
+  }
+}
+
+function formatSessionIdError(error: unknown): string {
+  return error instanceof SessionStoreError ? error.message : String(error);
+}
+
+function parseSessionFormCode(
+  options: Record<string, string | boolean>,
+): { systemCode: string; schemaVersion: string; value: string } {
+  const formCodeAlias = getStringOption(options, "form-code");
+  if (formCodeAlias) {
+    return parseFormCode(formCodeAlias);
+  }
+  return {
+    systemCode: getStringOption(options, "system-code") ?? "FA (3)",
+    schemaVersion: getStringOption(options, "schema-version") ?? "1-0E",
+    value: getStringOption(options, "form-value") ?? "FA",
+  };
+}
+
+function resolvePollIntervalMs(
+  options: Record<string, string | boolean>,
+  defaultValue: number,
+): number {
+  const explicitMs = getNumberOption(options, "poll-interval-ms");
+  if (explicitMs !== undefined) {
+    if (!Number.isFinite(explicitMs) || explicitMs <= 0) {
+      throw new CliError("--poll-interval-ms must be greater than zero.");
+    }
+    return explicitMs;
+  }
+  const seconds = getNumberOption(options, "poll-interval");
+  if (seconds !== undefined) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new CliError("--poll-interval must be greater than zero.");
+    }
+    return Math.max(1, Math.round(seconds * 1000));
+  }
+  return defaultValue;
+}
+
+function resolveMaxAttempts(options: Record<string, string | boolean>, defaultValue: number): number {
+  const value = getNumberOption(options, "max-attempts");
+  if (value === undefined) {
+    return defaultValue;
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new CliError("--max-attempts must be a positive integer.");
+  }
+  return value;
+}
+
+function ensureCheckpointNotClosed(checkpoint: SessionCheckpoint, commandName: string): void {
+  if (checkpoint.stage === "closed") {
+    throw new CliError(
+      `Session checkpoint "${checkpoint.id}" is already closed. Open a new one before running "${commandName}".`,
+      EXIT_USAGE,
+    );
+  }
+}
+
+async function requireOnlineCheckpoint(
+  context: CommandContext,
+  profileName: string,
+  sessionId: string,
+): Promise<OnlineSessionCheckpoint> {
+  const checkpoint = await loadCheckpoint(context.cliHome, profileName, sessionId);
+  if (checkpoint.kind !== "online") {
+    throw new CliError(
+      `Session checkpoint "${sessionId}" is not an online session. Use "session batch" commands.`,
+      EXIT_USAGE,
+    );
+  }
+  return checkpoint;
+}
+
+async function requireBatchCheckpoint(
+  context: CommandContext,
+  profileName: string,
+  sessionId: string,
+): Promise<BatchSessionCheckpoint> {
+  const checkpoint = await loadCheckpoint(context.cliHome, profileName, sessionId);
+  if (checkpoint.kind !== "batch") {
+    throw new CliError(
+      `Session checkpoint "${sessionId}" is not a batch session. Use "session online" commands.`,
+      EXIT_USAGE,
+    );
+  }
+  return checkpoint;
+}
+
+async function createAuthenticatedClientForBaseUrl(
+  profileName: string,
+  profile: ProfileConfig,
+  baseUrl: string,
+  context: CommandContext,
+): Promise<KsefClient> {
+  const client = createClientForBaseUrl(baseUrl, profile);
+  const tokenStore = resolveTokenStore(profile, context.cliHome);
+  const tokens = await loadStoredTokens(profileName, tokenStore, context.env);
+  if (!tokens?.accessToken) {
+    throw new CliError(
+      `No access token found for profile "${profileName}". Run "ksef-ts auth login" first.`,
+      EXIT_AUTH,
+    );
+  }
+  applyTokens(client, tokens);
+  const warning = formatTokenStoreWarning(profileName, tokenStore);
+  if (warning) {
+    context.io.stderr(warning);
+  }
+  return client;
+}
+
+async function buildBatchPayloadSource(
+  cwd: string,
+  options: Record<string, string | boolean>,
+): Promise<{ zipBytes: Buffer; payloadSource: BatchPayloadSource }> {
+  const zipPath = getStringOption(options, "zip");
+  const directory = getStringOption(options, "dir");
+  const selected = [Boolean(zipPath), Boolean(directory)].filter(Boolean).length;
+  if (selected !== 1) {
+    throw new CliError("Select exactly one batch input source: --zip or --dir.");
+  }
+
+  if (zipPath) {
+    const normalizedPath = path.resolve(cwd, zipPath);
+    const zipBytes = await readFile(normalizedPath);
+    return {
+      zipBytes,
+      payloadSource: {
+        kind: "zip",
+        path: normalizedPath,
+        sourceSha256Base64: CryptographyService.sha256Base64(zipBytes),
+        sourceSize: zipBytes.length,
+      },
+    };
+  }
+
+  const normalizedDirectory = path.resolve(cwd, directory as string);
+  const zipBytes = await buildZipFromDirectory(normalizedDirectory);
+  return {
+    zipBytes,
+    payloadSource: {
+      kind: "directory",
+      path: normalizedDirectory,
+      sourceSha256Base64: CryptographyService.sha256Base64(zipBytes),
+      sourceSize: zipBytes.length,
+    },
+  };
+}
+
+async function loadBatchPayloadSourceBytes(source: BatchPayloadSource, cwd: string): Promise<Buffer> {
+  const sourcePath = path.isAbsolute(source.path) ? source.path : path.resolve(cwd, source.path);
+  const zipBytes =
+    source.kind === "zip"
+      ? await readFile(sourcePath)
+      : await buildZipFromDirectory(sourcePath);
+  const currentHash = CryptographyService.sha256Base64(zipBytes);
+  if (currentHash !== source.sourceSha256Base64 || zipBytes.length !== source.sourceSize) {
+    throw new CliError(
+      "Batch payload source changed since checkpoint creation. Restore original source or open new session.",
+      EXIT_USAGE,
+    );
+  }
+  return zipBytes;
+}
+
+async function buildZipFromDirectory(directoryPath: string): Promise<Buffer> {
+  const info = await stat(directoryPath);
+  if (!info.isDirectory()) {
+    throw new CliError(`--dir path is not a directory: ${directoryPath}`);
+  }
+  const xmlFiles = await listXmlFilesRecursive(directoryPath);
+  if (xmlFiles.length === 0) {
+    throw new CliError(`No .xml files found in directory: ${directoryPath}`);
+  }
+  const entries = await Promise.all(
+    xmlFiles.map(async (absolutePath) => {
+      const relative = path.relative(directoryPath, absolutePath).replace(/\\/g, "/");
+      return {
+        fileName: relative,
+        content: await readFile(absolutePath),
+      };
+    }),
+  );
+  return createZip(entries);
+}
+
+async function listXmlFilesRecursive(directoryPath: string): Promise<string[]> {
+  const out: string[] = [];
+  const entries = await readdir(directoryPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...(await listXmlFilesRecursive(fullPath)));
+      continue;
+    }
+    if (entry.isFile() && entry.name.toLowerCase().endsWith(".xml")) {
+      out.push(fullPath);
+    }
+  }
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+function resolveOutputPath(target: string, defaultFilename: string): string {
+  const normalized = target.replace(/\\/g, "/");
+  if (normalized.endsWith("/")) {
+    return path.join(target, defaultFilename);
+  }
+  return target;
+}
+
+async function waitForInvoiceStatus(
+  handle: ReturnType<KsefClient["workflows"]["sessions"]["online"]["resume"]>,
+  invoiceRef: string,
+  pollIntervalMs: number,
+  maxAttempts: number,
+): Promise<Record<string, unknown>> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const status = await handle.getInvoiceStatus(invoiceRef);
+    const code = extractStatusCode(status);
+    if (code === 200 || code === 400 || code === 410) {
+      return status;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  throw new CliError("Timed out while waiting for invoice status.", EXIT_REMOTE);
+}
+
+async function waitForInvoiceUpo(
+  handle: ReturnType<KsefClient["workflows"]["sessions"]["online"]["resume"]>,
+  invoiceRef: string,
+  pollIntervalMs: number,
+  maxAttempts: number,
+): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await handle.getInvoiceUpoByReference(invoiceRef);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+  }
+  if (lastError instanceof Error) {
+    throw new CliError(`Timed out while waiting for invoice UPO: ${lastError.message}`, EXIT_REMOTE);
+  }
+  throw new CliError("Timed out while waiting for invoice UPO.", EXIT_REMOTE);
+}
+
+async function waitForSessionStatus(
+  fetchStatus: () => Promise<SessionStatusResponse>,
+  pollIntervalMs: number,
+  maxAttempts: number,
+): Promise<SessionStatusResponse> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const status = await fetchStatus();
+    const code = status.status?.code;
+    if (code === 200 || code === 400 || code === 410) {
+      return status;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  throw new CliError("Timed out while waiting for session status.", EXIT_REMOTE);
+}
+
+function extractStatusCode(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const status = (payload as Record<string, unknown>).status;
+  if (!status || typeof status !== "object") {
+    return null;
+  }
+  const code = (status as Record<string, unknown>).code;
+  return typeof code === "number" ? code : null;
+}
+
+function extractKsefNumber(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const direct = (payload as Record<string, unknown>).ksefNumber;
+  if (typeof direct === "string" && direct) {
+    return direct;
+  }
+  const invoice = (payload as Record<string, unknown>).invoice;
+  if (invoice && typeof invoice === "object") {
+    const nested = (invoice as Record<string, unknown>).ksefNumber;
+    if (typeof nested === "string" && nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
 async function createAuthenticatedClient(
   profileName: string,
   profile: ProfileConfig,
@@ -762,8 +1565,15 @@ function createClient(profile: ProfileConfig): KsefClient {
     ? { baseUrl: profile.baseUrl }
     : { environment: profile.environment ?? "TEST" };
 
+  return createClientForBaseUrl(
+    "baseUrl" in baseOptions ? baseOptions.baseUrl : resolveBaseUrl(profile),
+    profile,
+  );
+}
+
+function createClientForBaseUrl(baseUrl: string, profile: ProfileConfig): KsefClient {
   return new KsefClient({
-    ...baseOptions,
+    baseUrl,
     ...(profile.strictPresignedUrlValidation !== undefined && {
       strictPresignedUrlValidation: profile.strictPresignedUrlValidation,
     }),
@@ -986,6 +1796,27 @@ async function writeOutputFile(filePath: string, content: string, cwd: string): 
   await writeFile(absolute, content, "utf8");
 }
 
+async function saveOutputFile(
+  filePath: string,
+  content: string,
+  cwd: string,
+  options: { overwrite: boolean },
+): Promise<void> {
+  const absolute = path.resolve(cwd, filePath);
+  await mkdir(path.dirname(absolute), { recursive: true });
+  if (!options.overwrite) {
+    try {
+      await stat(absolute);
+      throw new CliError(`Output file already exists: ${absolute}. Use --save-upo-overwrite.`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+  await writeFile(absolute, content, "utf8");
+}
+
 function normalizeError(error: unknown): { message: string; exitCode: number; name: string } {
   if (error instanceof CliError) {
     return {
@@ -1015,6 +1846,14 @@ function normalizeError(error: unknown): { message: string; exitCode: number; na
     return {
       message: error.message,
       exitCode: EXIT_REMOTE,
+      name: error.name,
+    };
+  }
+
+  if (error instanceof SessionStoreError) {
+    return {
+      message: error.message,
+      exitCode: error.kind === "validation" ? EXIT_USAGE : EXIT_CONFIG,
       name: error.name,
     };
   }
@@ -1080,6 +1919,7 @@ function helpText(): string {
     "  lighthouse  Query KSeF lighthouse status endpoint",
     "  invoice     Invoice operations (get, query)",
     "  send        Open session and send invoice XML",
+    "  session     Manage resumable session checkpoints",
     "  upo         Download UPO by session + invoice selector",
     "  export      Start/wait/download invoice export",
     "",
@@ -1088,6 +1928,7 @@ function helpText(): string {
     "  ksef-ts auth login --token <ksef-token>",
     "  ksef-ts health --with-auth",
     "  ksef-ts invoice get <ksef-number> --output invoice.xml",
+    "  ksef-ts session online open --id demo-online --form-code FA3",
     "  ksef-ts send --invoice-file ./invoice.xml --wait-upo --upo-output upo.xml",
     "  ksef-ts export --filters-file ./filters.json --only-metadata --out-dir ./exports",
   ].join("\n");

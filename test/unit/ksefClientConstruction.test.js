@@ -6,6 +6,8 @@ import {
   KsefClient,
   KSEF_ENV_URLS,
   KSEF_LIGHTHOUSE_URLS,
+  KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV,
+  KSEF_QR_URLS,
 } from "../../dist/index.js";
 
 function listen(server) {
@@ -129,4 +131,52 @@ test("KsefClient forwards optional header and retryOnTimeout flags to HttpClient
 
   assert.equal(client.http.defaultHeaders["X-Test"], "1");
   assert.equal(client.http.retryOnTimeout, false);
+});
+
+test("KsefClient derives base, QR and lighthouse URLs from environment", () => {
+  const client = new KsefClient({ environment: "DEMO", requireExportPartHash: false });
+  assert.equal(client.baseQrUrl, KSEF_QR_URLS.DEMO);
+  assert.equal(
+    client.lighthouse.baseUrl,
+    KSEF_LIGHTHOUSE_URLS[KSEF_LIGHTHOUSE_ENV_BY_KSEF_ENV.DEMO],
+  );
+});
+
+test("KsefClient honors explicit baseQrUrl override", () => {
+  const client = new KsefClient({
+    baseUrl: "https://api-test.ksef.mf.gov.pl/v2",
+    baseQrUrl: "https://qr.example.test/custom",
+  });
+  assert.equal(client.baseQrUrl, "https://qr.example.test/custom");
+});
+
+test("KsefClient.connect works with minimal options", async () => {
+  const originalAuthenticate = AuthCoordinator.prototype.authenticateWithKsefToken;
+  let receivedOptions = null;
+  AuthCoordinator.prototype.authenticateWithKsefToken = async function authenticateWithKsefToken(
+    options,
+  ) {
+    receivedOptions = options;
+    return {
+      accessToken: { token: "MIN-ACCESS", validUntil: "2099-01-01T00:00:00Z" },
+      refreshToken: { token: "MIN-REFRESH", validUntil: "2099-01-01T00:00:00Z" },
+    };
+  };
+
+  try {
+    const client = await KsefClient.connect({
+      baseUrl: "https://api-test.ksef.mf.gov.pl/v2",
+      token: "MIN-TOKEN",
+      context: { type: "Nip", value: "1111111111" },
+    });
+    assert.equal(await client.authManager.getAccessToken(), "MIN-ACCESS");
+    assert.ok(receivedOptions);
+    assert.equal(receivedOptions.token, "MIN-TOKEN");
+    assert.equal(receivedOptions.authorizationPolicy, undefined);
+    assert.equal(receivedOptions.maxAttempts, undefined);
+    assert.equal(receivedOptions.pollIntervalMs, undefined);
+    assert.equal(receivedOptions.publicCertificateBase64Der, undefined);
+  } finally {
+    AuthCoordinator.prototype.authenticateWithKsefToken = originalAuthenticate;
+  }
 });

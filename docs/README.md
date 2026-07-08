@@ -4,7 +4,7 @@ Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz goto
 
 Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w `ksef-docs/`.
 
-Kompatybilność SDK: **KSeF API `v2.4.0`**.
+Kompatybilność SDK: **KSeF API `v2.6.0`**.
 
 ## Status parity
 
@@ -16,6 +16,7 @@ Aktualny status zgodności SDK względem `ksef-docs` znajdziesz w raporcie:
 - Node.js `>= 20`
 - dostęp do środowiska KSeF (`TEST`, `DEMO`, `PRD`)
 - dane uwierzytelniające (token KSeF lub certyfikat/XAdES)
+- opcjonalnie `qrcode`, `node-forge` i `libxmljs2` dla QR, PKCS#12/XAdES i runtime walidacji XSD FA(3)
 
 ## Instalacja (lokalnie)
 

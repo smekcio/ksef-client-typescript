@@ -1,11 +1,11 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-docs`
 
-Data analizy: **2026-04-13**
+Data analizy: **2026-05-26**
 
 ## Zakres i źródła
 
-- Kontrakt API: `ksef-docs/open-api.json` (`2.4.0`)
-- Changelog: `ksef-docs/api-changelog.md` (wersje do `2.4.0`)
+- Kontrakt API: `ksef-docs/open-api.json` (`2.6.0`)
+- Changelog: `ksef-docs/api-changelog.md` (wersje do `2.6.0`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/client/*`, `docs/*`
 - Weryfikacja dodatkowa: `temp/openapi-test-v2.json` (`https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`)
 
@@ -16,10 +16,10 @@ Data analizy: **2026-04-13**
 - Nadmiarowe endpointy po stronie TS: **0**
 - Zgodność kontraktu `ksef-docs` vs `api-test`: **zgodna** (po odfiltrowaniu opisów/metadanych)
 
-## Zmiany uwzględnione po stronie SDK (2.4.0)
+## Zmiany uwzględnione po stronie SDK (2.6.0)
 
 1. Modele OpenAPI
-   - odświeżono `src/types/openapi.generated.ts` do `ksef-docs 2.4.0`;
+   - odświeżono `src/types/openapi.generated.ts` do kontraktu `ksef-docs 2.6.0`;
    - liczba schematów wzrosła do `287`;
    - modele obejmują nowe typy `ApiError`, `BadRequestProblemDetails`, `GoneProblemDetails`,
      `TooManyRequestsProblemDetails` oraz pola `timestamp` w `ForbiddenProblemDetails`
@@ -31,12 +31,12 @@ Data analizy: **2026-04-13**
    - `KsefRateLimitError` udostępnia również `retryAfterSeconds`, obok dotychczasowego `retryAfter`.
 
 3. Tokeny KSeF
-   - kontrakt i dokumentacja odzwierciedlają semantykę `2.4.0` dla operacji na bieżącym tokenie
+   - kontrakt i dokumentacja odzwierciedlają semantykę `2.6.0` dla operacji na bieżącym tokenie
      uwierzytelniającym przy `GET /tokens`, `GET /tokens/{referenceNumber}` i
      `DELETE /tokens/{referenceNumber}`.
 
 4. Dokumentacja SDK
-   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.4.0`;
+   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.6.0`;
    - dokumentacja opisuje `X-Error-Format: problem-details`, `410 Gone` oraz zaktualizowane
      zachowanie endpointów tokenów.
 
@@ -58,9 +58,9 @@ Data analizy: **2026-04-13**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została uaktualniona do spójności z KSeF `2.4.0`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.6.0`:
 
-- deklaracje kompatybilności API (`v2.4.0`) w README i docs,
+- deklaracje kompatybilności API (`v2.6.0`) w README i docs,
 - opis `problem+json` i `X-Error-Format` w dokumentacji błędów i konfiguracji,
 - opis self-token semantics w dokumentacji `tokens`,
 - zaktualizowany raport parity i wyniki walidacji.

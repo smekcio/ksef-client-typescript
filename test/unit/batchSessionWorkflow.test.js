@@ -425,3 +425,252 @@ test("BatchSessionWorkflow reports missing encrypted part when mapped parts arra
     CryptographyService.sha256Base64 = originalSha256Base64;
   }
 });
+
+test("BatchSessionWorkflow open/resume flows expose state and enforce zip identity", async () => {
+  const originalGetEncryptionData = CryptographyService.getEncryptionData;
+  const originalEncryptAes = CryptographyService.encryptAes256Cbc;
+  const originalSha256Base64 = CryptographyService.sha256Base64;
+
+  const uploaded = [];
+  const sessionsClient = {
+    openBatchSession: async () => ({
+      referenceNumber: "BATCH-RESUME-1",
+      partUploadRequests: [{ ordinalNumber: 1, method: "PUT", url: "https://upload/1", headers: {} }],
+    }),
+    closeBatchSession: async () => {},
+    getSessionStatus: async () => ({ status: { code: 100, description: "Processing" } }),
+    getSessionFailedInvoices: async () => ({ items: [] }),
+  };
+  const workflow = new BatchSessionWorkflow(
+    sessionsClient,
+    { getPublicKeyCertificates: async () => [{ usage: ["SymmetricKeyEncryption"], certificate: "CERT" }] },
+    { request: async (options) => uploaded.push(options) },
+  );
+
+  CryptographyService.getEncryptionData = () => ({
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: { encryptedSymmetricKey: "k", initializationVector: "i" },
+  });
+  CryptographyService.encryptAes256Cbc = (part) => Buffer.from(part);
+  CryptographyService.sha256Base64 = (value) => `sha:${Buffer.from(value).length}`;
+
+  try {
+    const handle = await workflow.open({
+      formCode: FORM_CODE,
+      zipBytes: Buffer.from("abc", "utf8"),
+      maxPartSizeBytes: 10,
+      upoV43: true,
+    });
+    await handle.uploadParts(1);
+    const state = handle.getState();
+    assert.equal(state.referenceNumber, "BATCH-RESUME-1");
+    assert.equal(state.upoV43, true);
+    assert.equal(uploaded.length, 1);
+
+    const resumed = await workflow.resume(state, { zipBytes: Buffer.from("abc", "utf8") });
+    assert.equal(resumed.referenceNumber, "BATCH-RESUME-1");
+
+    await assert.rejects(
+      () => workflow.resume(state, { zipBytes: Buffer.from("abcd", "utf8") }),
+      /hash does not match saved state|size does not match saved state/,
+    );
+  } finally {
+    CryptographyService.getEncryptionData = originalGetEncryptionData;
+    CryptographyService.encryptAes256Cbc = originalEncryptAes;
+    CryptographyService.sha256Base64 = originalSha256Base64;
+  }
+});
+
+test("BatchSessionHandle uploadParts accepts options object with progress and exposes state/failed invoices", async () => {
+  const uploads = [];
+  const progress = [];
+  const sessionsClient = {
+    getSessionFailedInvoices: async (ref, pageSize, continuationToken) => ({
+      ref,
+      pageSize,
+      continuationToken,
+      items: [{ id: "failed-1" }],
+    }),
+  };
+  const http = {
+    request: async (options) => {
+      uploads.push({ path: options.path, headers: options.headers });
+      return {};
+    },
+  };
+  const handle = new BatchSessionHandle(
+    "BATCH-OPTIONS",
+    { cipherKey: Buffer.alloc(32, 1), cipherIv: Buffer.alloc(16, 2), encryptionInfo: {} },
+    sessionsClient,
+    http,
+    { fileSize: 4, fileHash: "h", fileParts: [] },
+    [
+      { ordinalNumber: 1, method: "PUT", url: "https://upload/1" },
+      { ordinalNumber: 2, method: "PUT", url: "https://upload/2", headers: { a: "1", skip: "" } },
+    ],
+    [Buffer.from("part-1"), Buffer.from("part-2")],
+    true,
+    true,
+  );
+
+  const state = handle.getState();
+  assert.equal(state.offlineMode, true);
+  assert.deepEqual(state.partUploadRequests[0].headers, {});
+
+  await handle.uploadParts({
+    skipOrdinals: [1],
+    progressCallback: (ordinalNumber) => {
+      progress.push(ordinalNumber);
+    },
+  });
+
+  assert.deepEqual(
+    uploads.map((call) => call.path),
+    ["https://upload/2"],
+  );
+  assert.deepEqual(uploads[0].headers, { a: "1" });
+  assert.deepEqual(progress, [2]);
+
+  const failed = await handle.listFailedInvoices(7, "token-1");
+  assert.deepEqual(failed.items, [{ id: "failed-1" }]);
+  assert.equal(failed.pageSize, 7);
+  assert.equal(failed.continuationToken, "token-1");
+});
+
+test("BatchSessionHandle uploadParts throws when a mapped ordinal is missing", async () => {
+  const handle = new BatchSessionHandle(
+    "BATCH-MISSING-ORDINAL",
+    { cipherKey: Buffer.alloc(32, 1), cipherIv: Buffer.alloc(16, 2), encryptionInfo: {} },
+    {},
+    { request: async () => ({}) },
+    { fileSize: 1, fileHash: "h", fileParts: [] },
+    [{ ordinalNumber: 1, method: "PUT", url: "https://upload/1" }],
+    [Buffer.from("part-1")],
+  );
+
+  const originalGet = Map.prototype.get;
+  Map.prototype.get = function patchedGet() {
+    return undefined;
+  };
+  try {
+    await assert.rejects(
+      () => handle.uploadParts(1),
+      /Missing batch part for ordinal 1/,
+    );
+  } finally {
+    Map.prototype.get = originalGet;
+  }
+});
+
+test("BatchSessionWorkflow.resume validates state, encryption and re-encrypts missing parts", async () => {
+  const originalEncryptAes = CryptographyService.encryptAes256Cbc;
+  const originalSha256Base64 = CryptographyService.sha256Base64;
+
+  const workflow = new BatchSessionWorkflow(
+    { getSessionStatus: async () => ({}) },
+    { getPublicKeyCertificates: async () => [] },
+    { request: async () => ({}) },
+  );
+
+  const validEncryption = {
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: {},
+  };
+
+  await assert.rejects(
+    () =>
+      workflow.resume(
+        { referenceNumber: "   ", encryptionData: validEncryption },
+        { zipBytes: Buffer.from("ab") },
+      ),
+    /requires non-empty referenceNumber/,
+  );
+
+  await assert.rejects(
+    () =>
+      workflow.resume(
+        { referenceNumber: "R", encryptionData: validEncryption },
+        { zipBytes: Buffer.alloc(0) },
+      ),
+    /requires zipBytes/,
+  );
+
+  await assert.rejects(
+    () =>
+      workflow.resume(
+        {
+          referenceNumber: "R",
+          encryptionData: { cipherKey: Buffer.alloc(0), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+        },
+        { zipBytes: Buffer.from("ab") },
+      ),
+    /requires cipherKey and cipherIv/,
+  );
+
+  await assert.rejects(
+    () =>
+      workflow.resume(
+        { referenceNumber: "R", encryptionData: validEncryption },
+        { zipBytes: Buffer.from("ab") },
+      ),
+    /requires batchFile metadata/,
+  );
+
+  CryptographyService.sha256Base64 = () => "matching-hash";
+  CryptographyService.encryptAes256Cbc = (part) => Buffer.from(`enc:${Buffer.from(part).toString("utf8")}`);
+
+  try {
+    await assert.rejects(
+      () =>
+        workflow.resume(
+          {
+            referenceNumber: "R",
+            encryptionData: validEncryption,
+            batchFile: {
+              fileSize: 999,
+              fileHash: "matching-hash",
+              fileParts: [{ ordinalNumber: 1, fileSize: 2, fileHash: "ph" }],
+            },
+            encryptedPartsBase64: ["QUFB"],
+          },
+          { zipBytes: Buffer.from("ab") },
+        ),
+      /size does not match saved state/,
+    );
+
+    const reEncrypted = await workflow.resume(
+      {
+        referenceNumber: "BATCH-REENCRYPT",
+        encryptionData: validEncryption,
+        batchFile: {
+          fileSize: 2,
+          fileHash: "matching-hash",
+          fileParts: [{ ordinalNumber: 1, fileSize: 2, fileHash: "ph" }],
+        },
+        encryptedPartsBase64: [],
+        upoV43: true,
+      },
+      { zipBytes: Buffer.from("ab") },
+    );
+    assert.equal(reEncrypted.referenceNumber, "BATCH-REENCRYPT");
+    const state = reEncrypted.getState();
+    assert.deepEqual(state.partUploadRequests, []);
+    assert.equal(state.encryptedPartsBase64.length, 1);
+
+    const reEncryptedDefaultPartSize = await workflow.resume(
+      {
+        referenceNumber: "BATCH-REENCRYPT-DEFAULT",
+        encryptionData: validEncryption,
+        batchFile: { fileSize: 2, fileHash: "matching-hash", fileParts: [] },
+        encryptedPartsBase64: [],
+      },
+      { zipBytes: Buffer.from("ab") },
+    );
+    assert.equal(reEncryptedDefaultPartSize.referenceNumber, "BATCH-REENCRYPT-DEFAULT");
+  } finally {
+    CryptographyService.encryptAes256Cbc = originalEncryptAes;
+    CryptographyService.sha256Base64 = originalSha256Base64;
+  }
+});

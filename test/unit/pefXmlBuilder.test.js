@@ -3,9 +3,16 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
 import { buildPefXml, isPefUblDocumentInput, KsefValidationError } from "../../dist/index.js";
+
+let libxmljs;
+let skipLibxmljs = false;
+try {
+  libxmljs = await import("libxmljs2");
+} catch (error) {
+  skipLibxmljs = `libxmljs2 unavailable: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -31,6 +38,7 @@ const pefKor3TemplatePath = path.join(
 const requiredFixtures = [pef3XsdPath, pefKor3XsdPath, pef3TemplatePath, pefKor3TemplatePath];
 const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
 const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
+const skipXsdValidation = skipMissingFixture || skipLibxmljs;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -91,7 +99,7 @@ function stripRootAttributes(root) {
   return clone;
 }
 
-test("PEF(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("PEF(3) XML builder produces XSD-valid XML", { skip: skipXsdValidation }, () => {
   const templateXml = loadTemplateXml(pef3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   if (rootKey !== "Invoice") {
@@ -102,7 +110,7 @@ test("PEF(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, 
   validateXml(xml, xsd);
 });
 
-test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipXsdValidation }, () => {
   const templateXml = loadTemplateXml(pefKor3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   const localRoot = rootKey.includes(":") ? rootKey.split(":").at(-1) : rootKey;

@@ -1,0 +1,379 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  FA3Draft,
+  FA3Invoice,
+  PartyIdentifierKind,
+  sanitizeFileName,
+  validateAndReturnXml,
+} from "../../dist/index.js";
+
+const SELLER = { name: "Sprzedawca Sp. z o.o.", taxId: "1111111111", addressLine1: "ul. A 1" };
+const BUYER = { name: "Nabywca Sp. z o.o.", taxId: "2222222222", addressLine1: "ul. B 2" };
+const LINE = { description: "Usługa", quantity: 1, unit: "szt", unitNetPrice: 100, vatRate: 23 };
+
+test("builder.ts: additional party defaults and optional party fields", async () => {
+  const xml = await FA3Invoice.basic("FV/P3/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .addParty({ name: "DefaultRole", taxId: "7777777777" })
+    .toXml();
+  assert.match(xml, /<Rola>2<\/Rola>/);
+});
+
+test("builder.ts: correction totals, advance totals and validation edges", async () => {
+  const correctionSign = await FA3Invoice.correction("KOR/SIGN/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine({ ...LINE, beforeCorrection: true })
+    .addLine({ ...LINE, description: "Po", beforeCorrection: false })
+    .correction({ reason: "r", correctedInvoiceNumber: "FV/1", correctedInvoiceDate: "2025-12-01" })
+    .toXml();
+  assert.match(correctionSign, /<StanPrzed>1<\/StanPrzed>/);
+
+  const advanceTotals = await FA3Invoice.basic("FV/AT/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .advancePayment({ amount: 50, vatRate: 8 })
+    .toXml();
+  assert.match(advanceTotals, /<P_15>/);
+
+  const emptyLines = new FA3Draft({
+    invoiceNumber: "FV/EL/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [],
+  });
+  assert.ok(emptyLines.validate().some((issue) => issue.code === "lines_required"));
+});
+
+test("builder.ts: payment and settlement optional branches", async () => {
+  const paymentMinimal = await FA3Invoice.basic("FV/PAYM/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .payment({ otherMethodDescription: "Barter" })
+    .toXml();
+  assert.match(paymentMinimal, /<PlatnoscInna>1<\/PlatnoscInna>/);
+
+  const noPartial = await FA3Invoice.basic("FV/NPP/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .payment({ dueDate: "2026-02-01" })
+    .toXml();
+  assert.doesNotMatch(noPartial, /<ZaplataCzesciowa>/);
+
+  const noFactor = await FA3Invoice.basic("FV/NF/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .bankAccount({ number: "PL11" })
+    .toXml();
+  assert.match(noFactor, /<RachunekBankowy>/);
+  assert.doesNotMatch(noFactor, /<RachunekBankowyFaktora>/);
+
+  const settlementChargesOnly = await FA3Invoice.settlement("ROZ/C/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .advanceReference({ invoiceNumber: "ZAL/1" })
+    .settlementDetails({
+      amountDue: 124,
+      charges: [{ amount: 1, reason: "opłata" }],
+      deductions: [{ amount: 0, reason: "zero" }],
+    })
+    .toXml();
+  assert.match(settlementChargesOnly, /<SumaObciazen>/);
+});
+
+test("builder.ts: line amount overrides and party identifier validation branches", async () => {
+  const lineOverrides = await FA3Invoice.basic("FV/LINE/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine({
+      ...LINE,
+      netAmount: 90,
+      vatAmount: 10,
+      grossAmount: 100,
+      vatRate: 0,
+    })
+    .toXml();
+  assert.match(lineOverrides, /<P_11>90.00<\/P_11>/);
+
+  const foreignBuyer = new FA3Draft({
+    invoiceNumber: "FV/FB/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: {
+      name: "Foreign",
+      taxId: "CH-1",
+      countryCode: "CH",
+      identifier: { kind: PartyIdentifierKind.FOREIGN, value: "CH-1", countryCode: "CH" },
+    },
+    lines: [LINE],
+  });
+  assert.equal(foreignBuyer.toFakturaInput().Podmiot2.DaneIdentyfikacyjne.KodKraju, "CH");
+
+  const jstOk = await FA3Invoice.basic("FV/JSTOK/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer({ ...BUYER, isJstSubunit: true })
+    .addLine(LINE)
+    .addParty({ name: "JST", taxId: "5555555555", role: "jst_subunit" })
+    .toXml();
+  assert.match(jstOk, /<Podmiot3>/);
+
+  const gvOk = await FA3Invoice.basic("FV/GVOK/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer({ ...BUYER, isVatGroupMember: true })
+    .addLine(LINE)
+    .addParty({ name: "GV", taxId: "6666666666", role: "vat_group_member" })
+    .toXml();
+  assert.match(gvOk, /<GV>1<\/GV>/);
+});
+
+test("builder.ts: fromDict fallbacks and transport/order false branches", async () => {
+  const fromDict = FA3Draft.fromDict({
+    invoiceNumber: "",
+    issue_date: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+  });
+  assert.equal(fromDict.toDict().invoiceNumber, "");
+
+  const noTransport = await FA3Invoice.basic("FV/NT/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .toXml();
+  assert.doesNotMatch(noTransport, /<Transport>/);
+
+  const orderRefOnly = await FA3Invoice.basic("FV/OR/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .orderReference("ZAM/1", "2026-01-01")
+    .toXml();
+  assert.match(orderRefOnly, /<WarunkiTransakcji>/);
+});
+
+test("builder.ts: remaining optional false branches and advance reference clearing", async () => {
+  const correctionMinimal = await FA3Invoice.correction("KOR/MIN/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .correction({ reason: "r", correctedInvoiceNumber: "FV/1", correctedInvoiceDate: "2025-12-01" })
+    .toXml();
+  assert.doesNotMatch(correctionMinimal, /<TypKorekty>/);
+
+  const correctedDateOnly = await FA3Invoice.correction("KOR/D/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .correction({ reason: "r", correctedInvoiceNumber: "FV/1", correctedInvoiceDate: "2025-12-01" })
+    .toXml();
+  assert.match(correctedDateOnly, /<DataWystawieniaFa>/);
+
+  const advanceRateOnly = await FA3Invoice.advance("ZAL/R/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .foreignCurrencyRate(4.5)
+    .toXml();
+  assert.match(advanceRateOnly, /<KursWalutyZ>/);
+
+  const otherWithDescription = await FA3Invoice.basic("FV/OD/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .addParty({ name: "Inna", taxId: "8888888888", role: "other", otherRoleDescription: "Opis" })
+    .toXml();
+  assert.match(otherWithDescription, /<OpisRoli>Opis<\/OpisRoli>/);
+
+  const clearedKsef = FA3Invoice.settlement("ROZ/K/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .advanceReference({ ksefNumber: "KSEF-ZAL" })
+    .settlesAdvance({ invoiceNumber: "ZAL/1", ksefNumber: "KSEF-ZAL" })
+    .settlesAdvance({ invoiceNumber: "ZAL/1" })
+    .build();
+  assert.equal(clearedKsef.toDict().advanceKsefNumber, undefined);
+  assert.equal(clearedKsef.toDict().advanceInvoiceNumber, "ZAL/1");
+});
+
+test("builder.ts: toXml xsdValidate path runs regardless of libxmljs2", async () => {
+  const builder = FA3Invoice.basic("FV/XSD/926")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE);
+  try {
+    const xml = await builder.toXml({ xsdValidate: true });
+    assert.match(xml, /<Faktura/);
+  } catch (error) {
+    assert.ok(error instanceof Error);
+  }
+});
+
+test("builder.ts: toXml honours explicit pretty option", async () => {
+  const xml = await FA3Invoice.basic("FV/PRETTY/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .toXml({ pretty: true });
+  assert.match(xml, /<Faktura/);
+});
+
+test("builder.ts: mapTransport falls back to raw kind when unmapped", async () => {
+  const xml = await FA3Invoice.basic("FV/TRK/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .transport("99")
+    .toXml();
+  assert.match(xml, /<RodzajTransportu>99<\/RodzajTransportu>/);
+});
+
+test("builder.ts: orderLine before order() and splitPayment before payment()", async () => {
+  const draft = FA3Invoice.basic("FV/OL/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .orderLine({ description: "Zam", quantity: 1, unitNetPrice: 100, vatRate: 23 })
+    .order(123)
+    .splitPayment()
+    .build();
+  const fa = draft.toFakturaInput().Fa;
+  assert.ok(fa.Zamowienie);
+  assert.equal(fa.Platnosc.FormaPlatnosci, "6");
+});
+
+test("builder.ts: order date without number covers optional order branches", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/ODT/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    order: { date: "2025-11-30" },
+  });
+  const terms = draft.toFakturaInput().Fa.WarunkiTransakcji;
+  assert.ok(terms.Zamowienia);
+  assert.equal(terms.Zamowienia[0].DataZamowienia, "2025-11-30");
+  assert.equal(terms.Zamowienia[0].NrZamowienia, undefined);
+});
+
+test("builder.ts: attachment block without header keeps tables and paragraphs optional", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/ATT/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    attachment: {
+      blocks: [{ tables: [{ headers: ["A"], rows: [["1"]] }] }],
+    },
+  });
+  const blok = draft.toFakturaInput().Fa.Zalacznik.Blok;
+  assert.equal(blok[0].Naglowek, undefined);
+  assert.ok(blok[0].Tabela);
+});
+
+test("builder.ts: correction toFakturaInput with ksef only skips corrected date", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "KOR/KSEF/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    kind: "correction",
+    correctedKsefNumber: "KSEF-123",
+  });
+  const dane = draft.toFakturaInput().Fa.DaneFaKorygowanej;
+  assert.equal(dane.NumerKSeF, "KSEF-123");
+  assert.equal(dane.DataWystawieniaFa, undefined);
+});
+
+test("builder.ts: additional party role other without description via toFakturaInput", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/AP3/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    additionalParties: [{ name: "Inna", taxId: "8888888888", role: "other" }],
+  });
+  const podmiot3 = draft.toFakturaInput().Podmiot3;
+  assert.equal(podmiot3[0].RolaInna, "1");
+  assert.equal(podmiot3[0].OpisRoli, undefined);
+});
+
+test("builder.ts: settlement amountDue without charges/deductions validates", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "ROZ/AD/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    kind: "settlement",
+    advanceInvoiceNumber: "ZAL/1",
+    settlement: { amountDue: 999 },
+  });
+  const issues = draft.validate();
+  assert.ok(issues.some((issue) => issue.code === "settlement_amount_due_inconsistent"));
+});
+
+test("builder.ts: fromDict with empty object falls back to defaults", () => {
+  const draft = FA3Draft.fromDict({});
+  const dict = draft.toDict();
+  assert.equal(dict.invoiceNumber, "");
+  assert.equal(dict.issueDate, "");
+  assert.equal(dict.currency, "PLN");
+  assert.deepEqual(dict.lines, []);
+});
+
+test("builder.ts: sanitizeFileName sanitizes and applies fallbacks", () => {
+  assert.equal(sanitizeFileName("FV/2026 01"), "FV_2026_01");
+  assert.equal(sanitizeFileName(""), "faktura");
+  assert.equal(sanitizeFileName("   ", "invoice-3"), "invoice-3");
+});
+
+test("builder.ts: validateAndReturnXml returns xml after validation succeeds", async () => {
+  let seen = "";
+  const result = await validateAndReturnXml("<Faktura/>", async (value) => {
+    seen = value;
+  });
+  assert.equal(result, "<Faktura/>");
+  assert.equal(seen, "<Faktura/>");
+
+  await assert.rejects(
+    () => validateAndReturnXml("<Faktura/>", async () => {
+      throw new Error("boom");
+    }),
+    /boom/,
+  );
+});

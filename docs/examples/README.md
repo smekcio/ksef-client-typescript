@@ -245,3 +245,10 @@ await client.testdata.unblockContext({
 - Workflowy i scenariusze: [../workflows/README.md](../workflows/README.md)
 - API reference: [../api/README.md](../api/README.md)
 - Błędy i retry: [../errors.md](../errors.md)
+- FA(3) typed SDK examples: [./fa3-typed-sdk.md](./fa3-typed-sdk.md)
+
+## Kontrakt FA(3) typed SDK
+
+- Publiczne API FA(3) jest utrzymywane jako lokalny kontrakt TypeScript z testami jednostkowymi.
+- Runtime walidacji `xsdValidate` korzysta ze schematów pakowanych w `dist`; do samej walidacji XSD potrzebna jest opcjonalna zależność `libxmljs2`.
+- Przykłady FA(3) znajdują się w [`fa3-typed-sdk.md`](./fa3-typed-sdk.md).

@@ -296,3 +296,121 @@ test("OnlineSessionHandle waitForUpo uses defaults and handles missing status pa
     /Session failed: undefined undefined/,
   );
 });
+
+test("OnlineSessionWorkflow resume restores handle state and validates encryption data", async () => {
+  const workflow = new OnlineSessionWorkflow(
+    {
+      getSessionStatus: async () => ({ status: { code: 200, description: "Done" } }),
+      getSessionInvoiceStatus: async (_sessionRef, invoiceRef) => ({ invoiceRef }),
+      getSessionInvoices: async () => ({ items: [] }),
+      getSessionFailedInvoices: async () => ({ items: [] }),
+      getSessionInvoiceUpoByReferenceNumber: async () => "<upo/>",
+      getSessionInvoiceUpoByKsefNumber: async () => "<upo/>",
+      getSessionUpo: async () => "<upo/>",
+      closeOnlineSession: async () => {},
+      sendOnlineInvoice: async () => ({ referenceNumber: "INV-1" }),
+    },
+    { getPublicKeyCertificates: async () => [] },
+    { request: async () => "<upo/>" },
+  );
+
+  const state = {
+    referenceNumber: "SESSION-RESUME-1",
+    encryptionData: {
+      cipherKey: Buffer.alloc(32, 1),
+      cipherIv: Buffer.alloc(16, 2),
+      encryptionInfo: {},
+    },
+    upoV43: true,
+  };
+  const handle = workflow.resume(state);
+  assert.equal(handle.referenceNumber, "SESSION-RESUME-1");
+  assert.equal(handle.upoV43, true);
+  assert.deepEqual(handle.getState().referenceNumber, "SESSION-RESUME-1");
+  assert.deepEqual(await handle.getInvoiceStatus("INV-REF"), { invoiceRef: "INV-REF" });
+
+  assert.throws(
+    () =>
+      workflow.resume({
+        referenceNumber: "bad",
+        encryptionData: { cipherKey: Buffer.alloc(0), cipherIv: Buffer.alloc(16), encryptionInfo: {} },
+      }),
+    /requires cipherKey and cipherIv/,
+  );
+
+  assert.throws(
+    () =>
+      workflow.resume({
+        referenceNumber: "   ",
+        encryptionData: {
+          cipherKey: Buffer.alloc(32, 1),
+          cipherIv: Buffer.alloc(16, 2),
+          encryptionInfo: {},
+        },
+      }),
+    /requires non-empty referenceNumber/,
+  );
+});
+
+test("OnlineSessionHandle exposes close, status and invoice/upo lookups", async () => {
+  const calls = [];
+  const sessionsClient = {
+    closeOnlineSession: async (ref) => {
+      calls.push(["close", ref]);
+    },
+    getSessionStatus: async (ref) => {
+      calls.push(["status", ref]);
+      return { status: { code: 200, description: "Done" } };
+    },
+    getSessionInvoices: async (ref, pageOffset, pageSize, continuationToken) => {
+      calls.push(["invoices", ref, pageOffset, pageSize, continuationToken]);
+      return { items: [{ id: "inv-1" }] };
+    },
+    getSessionFailedInvoices: async (ref, pageSize, continuationToken) => {
+      calls.push(["failed", ref, pageSize, continuationToken]);
+      return { items: [{ id: "failed-1" }] };
+    },
+    getSessionInvoiceUpoByReferenceNumber: async (ref, invoiceRef) => {
+      calls.push(["upoByRef", ref, invoiceRef]);
+      return "<upo-by-ref/>";
+    },
+    getSessionInvoiceUpoByKsefNumber: async (ref, ksefNumber) => {
+      calls.push(["upoByKsef", ref, ksefNumber]);
+      return "<upo-by-ksef/>";
+    },
+    getSessionUpo: async (ref, upoRef) => {
+      calls.push(["sessionUpo", ref, upoRef]);
+      return "<session-upo/>";
+    },
+  };
+  const handle = new OnlineSessionHandle(
+    "SESSION-METHODS",
+    { cipherKey: Buffer.alloc(32, 1), cipherIv: Buffer.alloc(16, 2), encryptionInfo: {} },
+    sessionsClient,
+    { request: async () => "<upo/>" },
+  );
+
+  await handle.close();
+  const status = await handle.status();
+  assert.equal(status.status.code, 200);
+
+  const invoices = await handle.listInvoices(1, 5, "cont-token");
+  assert.deepEqual(invoices.items, [{ id: "inv-1" }]);
+
+  const failed = await handle.listFailedInvoices(10, "failed-token");
+  assert.deepEqual(failed.items, [{ id: "failed-1" }]);
+
+  assert.equal(await handle.getInvoiceUpoByReference("INV-REF-1"), "<upo-by-ref/>");
+  assert.equal(await handle.getInvoiceUpoByKsefNumber("KSEF-1"), "<upo-by-ksef/>");
+  assert.equal(await handle.getSessionUpo("UPO-REF-1"), "<session-upo/>");
+
+  assert.deepEqual(calls, [
+    ["close", "SESSION-METHODS"],
+    ["status", "SESSION-METHODS"],
+    ["invoices", "SESSION-METHODS", 1, 5, "cont-token"],
+    ["failed", "SESSION-METHODS", 10, "failed-token"],
+    ["upoByRef", "SESSION-METHODS", "INV-REF-1"],
+    ["upoByKsef", "SESSION-METHODS", "KSEF-1"],
+    ["sessionUpo", "SESSION-METHODS", "UPO-REF-1"],
+  ]);
+});

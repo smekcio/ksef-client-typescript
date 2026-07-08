@@ -2,9 +2,16 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
 import { buildFakturaXml } from "../../dist/index.js";
+
+let libxmljs;
+let skipLibxmljs = false;
+try {
+  libxmljs = await import("libxmljs2");
+} catch (error) {
+  skipLibxmljs = `libxmljs2 unavailable: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -28,6 +35,7 @@ const fa3TemplatePath = path.join(
 const requiredFixtures = [xsdFa2Path, xsdFa3Path, fa2TemplatePath, fa3TemplatePath];
 const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
 const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
+const skipXsdValidation = skipMissingFixture || skipLibxmljs;
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
@@ -91,7 +99,7 @@ function makeMultiRateFaktura(templatePath) {
   return faktura;
 }
 
-test("FA2 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("FA2 XML builder produces XSD-valid XML", { skip: skipXsdValidation }, () => {
   const templateXml = loadTemplateXml(fa2TemplatePath);
   const faktura = parseFaktura(templateXml);
   const xml = buildFakturaXml(faktura, { schema: "FA2" });
@@ -99,7 +107,7 @@ test("FA2 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () 
   validateXml(xml, xsd);
 });
 
-test("FA3 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("FA3 XML builder produces XSD-valid XML", { skip: skipXsdValidation }, () => {
   const templateXml = loadTemplateXml(fa3TemplatePath);
   const faktura = parseFaktura(templateXml);
   const xml = buildFakturaXml(faktura, { schema: "FA3" });
@@ -107,14 +115,14 @@ test("FA3 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () 
   validateXml(xml, xsd);
 });
 
-test("FA2 XML builder validates a multi-rate invoice against XSD", { skip: skipMissingFixture }, () => {
+test("FA2 XML builder validates a multi-rate invoice against XSD", { skip: skipXsdValidation }, () => {
   const faktura = makeMultiRateFaktura(fa2TemplatePath);
   const xml = buildFakturaXml(faktura, { schema: "FA2" });
   const xsd = loadXsd(xsdFa2Path);
   validateXml(xml, xsd);
 });
 
-test("FA3 XML builder validates a multi-rate invoice against XSD", { skip: skipMissingFixture }, () => {
+test("FA3 XML builder validates a multi-rate invoice against XSD", { skip: skipXsdValidation }, () => {
   const faktura = makeMultiRateFaktura(fa3TemplatePath);
   const xml = buildFakturaXml(faktura, { schema: "FA3" });
   const xsd = loadXsd(xsdFa3Path);

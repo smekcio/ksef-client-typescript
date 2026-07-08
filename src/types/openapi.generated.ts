@@ -2,7 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
-export const OPENAPI_SCHEMA_COUNT = 287 as const;
+export const OPENAPI_SCHEMA_COUNT = 289 as const;
 
 export type AllowedIps = {
   ip4Addresses?: Array<string> | null;
@@ -130,6 +130,7 @@ export type BadRequestProblemDetails = {
 };
 
 export type BatchFileInfo = {
+  compressionType?: CompressionType | null;
   fileHash: Sha256HashBase64;
   fileParts: Array<BatchFilePartInfo>;
   fileSize: number;
@@ -228,6 +229,8 @@ export type CheckAttachmentPermissionStatusResponse = {
 
 export type CommonSessionStatus = "Cancelled" | "Failed" | "InProgress" | "Succeeded";
 
+export type CompressionType = "TarGz" | "Zip";
+
 export type CurrencyCode = "AED" | "AFN" | "ALL" | "AMD" | "ANG" | "AOA" | "ARS" | "AUD" | "AWG" | "AZN" | "BAM" | "BBD" | "BDT" | "BGN" | "BHD" | "BIF" | "BMD" | "BND" | "BOB" | "BOV" | "BRL" | "BSD" | "BTN" | "BWP" | "BYN" | "BZD" | "CAD" | "CDF" | "CHE" | "CHF" | "CHW" | "CLF" | "CLP" | "CNY" | "COP" | "COU" | "CRC" | "CUC" | "CUP" | "CVE" | "CZK" | "DJF" | "DKK" | "DOP" | "DZD" | "EGP" | "ERN" | "ETB" | "EUR" | "FJD" | "FKP" | "GBP" | "GEL" | "GGP" | "GHS" | "GIP" | "GMD" | "GNF" | "GTQ" | "GYD" | "HKD" | "HNL" | "HRK" | "HTG" | "HUF" | "IDR" | "ILS" | "IMP" | "INR" | "IQD" | "IRR" | "ISK" | "JEP" | "JMD" | "JOD" | "JPY" | "KES" | "KGS" | "KHR" | "KMF" | "KPW" | "KRW" | "KWD" | "KYD" | "KZT" | "LAK" | "LBP" | "LKR" | "LRD" | "LSL" | "LYD" | "MAD" | "MDL" | "MGA" | "MKD" | "MMK" | "MNT" | "MOP" | "MRU" | "MUR" | "MVR" | "MWK" | "MXN" | "MXV" | "MYR" | "MZN" | "NAD" | "NGN" | "NIO" | "NOK" | "NPR" | "NZD" | "OMR" | "PAB" | "PEN" | "PGK" | "PHP" | "PKR" | "PLN" | "PYG" | "QAR" | "RON" | "RSD" | "RUB" | "RWF" | "SAR" | "SBD" | "SCR" | "SDG" | "SEK" | "SGD" | "SHP" | "SLL" | "SOS" | "SRD" | "SSP" | "STN" | "SVC" | "SYP" | "SZL" | "THB" | "TJS" | "TMT" | "TND" | "TOP" | "TRY" | "TTD" | "TWD" | "TZS" | "UAH" | "UGX" | "USD" | "USN" | "UYI" | "UYU" | "UYW" | "UZS" | "VES" | "VND" | "VUV" | "WST" | "XAF" | "XAG" | "XAU" | "XBA" | "XBB" | "XBC" | "XBD" | "XCD" | "XCG" | "XDR" | "XOF" | "XPD" | "XPF" | "XPT" | "XSU" | "XUA" | "XXX" | "YER" | "ZAR" | "ZMW" | "ZWL";
 
 export type EffectiveApiRateLimits = {
@@ -264,6 +267,7 @@ export type EffectiveSubjectLimits = {
 export type EncryptionInfo = {
   encryptedSymmetricKey: string;
   initializationVector: string;
+  publicKeyId?: string | null;
 };
 
 export type EnrollCertificateRequest = {
@@ -598,11 +602,13 @@ export type InitTokenAuthenticationRequest = {
   challenge: Challenge;
   contextIdentifier: AuthenticationContextIdentifier;
   encryptedToken: string;
+  publicKeyId?: string | null;
 };
 
 export type InternalId = string;
 
 export type InvoiceExportRequest = {
+  compressionType?: CompressionType | null;
   encryption: EncryptionInfo;
   filters: InvoiceQueryFilters;
   onlyMetadata?: boolean;
@@ -732,7 +738,7 @@ export type InvoiceQueryFilters = {
   subjectType: InvoiceQuerySubjectType;
 };
 
-export type InvoiceQueryFormType = "FA_RR" | "FA" | "PEF" | "RR";
+export type InvoiceQueryFormType = "FA_RR" | "FA" | "PEF";
 
 export type InvoiceQuerySubjectType = "Subject1" | "Subject2" | "Subject3" | "SubjectAuthorized";
 
@@ -1030,6 +1036,8 @@ export type Pesel = string;
 
 export type PublicKeyCertificate = {
   certificate: string;
+  certificateId: string;
+  publicKeyId: string;
   usage: Array<PublicKeyCertificateUsage>;
   validFrom: string;
   validTo: string;
@@ -1333,6 +1341,8 @@ export type SubunitPermissionsSubunitIdentifier = {
 
 export type SubunitPermissionsSubunitIdentifierType = "InternalId" | "Nip";
 
+export type SystemWarning = string;
+
 export type TestDataAuthenticationContextIdentifier = {
   type: TestDataAuthenticationContextIdentifierType;
   value: string;
@@ -1490,6 +1500,7 @@ export interface OpenApiGeneratedSchemaMap {
   Challenge: Challenge;
   CheckAttachmentPermissionStatusResponse: CheckAttachmentPermissionStatusResponse;
   CommonSessionStatus: CommonSessionStatus;
+  CompressionType: CompressionType;
   CurrencyCode: CurrencyCode;
   EffectiveApiRateLimits: EffectiveApiRateLimits;
   EffectiveApiRateLimitValues: EffectiveApiRateLimitValues;
@@ -1711,6 +1722,7 @@ export interface OpenApiGeneratedSchemaMap {
   SubunitPermissionsSubjectIdentifierType: SubunitPermissionsSubjectIdentifierType;
   SubunitPermissionsSubunitIdentifier: SubunitPermissionsSubunitIdentifier;
   SubunitPermissionsSubunitIdentifierType: SubunitPermissionsSubunitIdentifierType;
+  SystemWarning: SystemWarning;
   TestDataAuthenticationContextIdentifier: TestDataAuthenticationContextIdentifier;
   TestDataAuthenticationContextIdentifierType: TestDataAuthenticationContextIdentifierType;
   TestDataAuthorizedIdentifier: TestDataAuthorizedIdentifier;

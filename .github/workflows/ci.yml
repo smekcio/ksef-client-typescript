@@ -73,19 +73,24 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Install native build deps for optional libxmljs2
+        run: sudo apt-get update && sudo apt-get install -y libxml2-dev
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Install optional libxmljs2 for XSD coverage
+        run: npm install libxmljs2 --no-save
 
       - name: Build package
         run: npm run build
 
       - name: Run tests with coverage
         run: >
-          NODE_OPTIONS=--enable-source-maps npm exec -- c8 --reporter=text-summary --reporter=text --reporter=lcov --reporter=html
+          NODE_OPTIONS=--enable-source-maps npm exec -- c8 --exclude-after-remap
+          --check-coverage --lines 100 --branches 100 --functions 100 --statements 100
+          --reporter=text-summary --reporter=text --reporter=lcov --reporter=html
           sh -lc 'node --test $(find test/unit -name "*.test.js" ! -name "cliArgs.test.js" ! -name "cliTokenStore.test.js" -print) test/e2e/*.test.js'
-
-      - name: Enforce coverage threshold
-        run: npm exec -- c8 check-coverage --statements 100 --branches 100 --functions 100 --lines 100
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4

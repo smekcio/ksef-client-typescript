@@ -25,5 +25,6 @@ export * from "./xml/xml";
 export * from "./xml/invoice";
 export * from "./xml/pef";
 export * from "./xml/upo";
+export * from "./documents";
 export * from "./types";
 export * as OpenApiModels from "./types/openapi.generated";

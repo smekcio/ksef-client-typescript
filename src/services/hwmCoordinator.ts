@@ -10,7 +10,15 @@ export function updateContinuationPoint(
     lastPermanentStorageDate?: string | null;
     permanentStorageHwmDate?: string | null;
   },
+  options: {
+    dateType?: string;
+  } = {},
 ): void {
+  const dateType = options.dateType?.trim().toLowerCase();
+  if (dateType && dateType !== "permanentstorage") {
+    delete continuationPoints[subjectType];
+    return;
+  }
   const isTruncated = Boolean(packageInfo.isTruncated);
   const lastPermanentStorageDate = packageInfo.lastPermanentStorageDate ?? undefined;
   const hwmDate = packageInfo.permanentStorageHwmDate ?? undefined;
