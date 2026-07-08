@@ -6,6 +6,13 @@
 
 * **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.6.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.5.2...v0.6.0) (2026-07-08)
+
+
+### Features
+
+* FA(3) typed SDK, CLI session checkpoints, and workflow extensions ([#34](https://github.com/smekcio/ksef-client-typescript/issues/34)) ([d731f14](https://github.com/smekcio/ksef-client-typescript/commit/d731f14815184a33f5e027969770f78e210f756b))
+
 ## [0.5.2](https://github.com/smekcio/ksef-client-typescript/compare/v0.5.1...v0.5.2) (2026-04-20)
 
 
