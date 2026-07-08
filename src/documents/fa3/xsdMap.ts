@@ -126,15 +126,15 @@ function walkElement(
   out: XsdElement[],
   enums: Map<string, string[]>,
 ): void {
-  const typeName = node.getAttribute("type") ?? undefined;
+  const typeName = node.getAttribute("type") || undefined;
   const localTypeName = typeName ? localName(typeName) : undefined;
   out.push(
     new XsdElement({
       path,
-      name: node.getAttribute("name") ?? path.slice(path.lastIndexOf("/") + 1),
+      name: path.slice(path.lastIndexOf("/") + 1),
       ...(typeName ? { typeName } : {}),
-      minOccurs: node.getAttribute("minOccurs") ?? "1",
-      maxOccurs: node.getAttribute("maxOccurs") ?? "1",
+      minOccurs: node.getAttribute("minOccurs") || "1",
+      maxOccurs: node.getAttribute("maxOccurs") || "1",
       choices: countChoices(node),
       enumValues: localTypeName ? enums.get(localTypeName) ?? [] : [],
     }),

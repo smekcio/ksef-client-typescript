@@ -47,7 +47,7 @@ const EU_COUNTRY_CODES = new Set([
   "SK",
 ]);
 
-function normalizeParty(party: FA3Party): FA3Party {
+function normalizeParty(party: FA3Party): FA3Party & { countryCode: string } {
   return {
     ...party,
     countryCode: (party.countryCode ?? "PL").toUpperCase(),
@@ -68,7 +68,7 @@ export function resolvePartyIdentifier(party: FA3Party): ResolvedPartyIdentifier
 
   const normalized = normalizeParty(party);
   const taxId = normalized.taxId.trim();
-  const countryCode = normalized.countryCode ?? "PL";
+  const countryCode = normalized.countryCode;
 
   if (normalized.internalId?.trim()) {
     return {

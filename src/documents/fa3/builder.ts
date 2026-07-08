@@ -30,6 +30,16 @@ interface FA3XmlOptions {
   xsdValidate?: boolean;
 }
 
+type NormalizedFA3Draft = FA3DraftInput & {
+  kind: FA3InvoiceKind;
+  lines: FA3Line[];
+  issuePlace: string;
+  advancePayments: FA3AdvancePayment[];
+  additionalParties: FA3Party[];
+  rawExtensions: NonNullable<FA3DraftInput["rawExtensions"]>;
+  additionalDescriptions: NonNullable<FA3DraftInput["additionalDescriptions"]>;
+};
+
 const KIND_CODE: Record<FA3InvoiceKind, string> = {
   basic: "VAT",
   simplified: "UPR",
@@ -257,11 +267,11 @@ function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat
   return { net, vat, gross };
 }
 
-function extractTotals(input: FA3DraftInput): { net: number; vat: number; gross: number } {
+function extractTotals(input: NormalizedFA3Draft): { net: number; vat: number; gross: number } {
   const linesTotals = input.lines.reduce(
     (acc, line) => {
       const amounts = computeLineAmounts(line);
-      const sign = CORRECTION_KINDS.has(input.kind ?? "basic") && line.beforeCorrection ? -1 : 1;
+      const sign = CORRECTION_KINDS.has(input.kind) && line.beforeCorrection ? -1 : 1;
       acc.net += sign * amounts.net;
       acc.vat += sign * amounts.vat;
       acc.gross += sign * amounts.gross;
@@ -269,7 +279,7 @@ function extractTotals(input: FA3DraftInput): { net: number; vat: number; gross:
     },
     { net: 0, vat: 0, gross: 0 },
   );
-  const advanceTotals = computeAdvanceNetVat(input.advancePayments ?? []);
+  const advanceTotals = computeAdvanceNetVat(input.advancePayments);
   return {
     net: linesTotals.net + advanceTotals.net,
     vat: linesTotals.vat + advanceTotals.vat,
@@ -277,8 +287,8 @@ function extractTotals(input: FA3DraftInput): { net: number; vat: number; gross:
   };
 }
 
-function mapKindSpecificFields(input: FA3DraftInput): XmlObject {
-  const kind = input.kind ?? "basic";
+function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
+  const kind = input.kind;
   const payload: XmlObject = { RodzajFaktury: KIND_CODE[kind] };
 
   if (CORRECTION_KINDS.has(kind)) {
@@ -320,8 +330,8 @@ function mapKindSpecificFields(input: FA3DraftInput): XmlObject {
   }
 
   if (kind === "advance" || kind === "advance_correction") {
-    if ((input.advancePayments ?? []).length > 0) {
-      payload.ZaliczkaCzesciowa = (input.advancePayments ?? []).map((payment) => ({
+    if (input.advancePayments.length > 0) {
+      payload.ZaliczkaCzesciowa = input.advancePayments.map((payment) => ({
         P_15Z: money(payment.amount),
         ...(payment.currencyRate !== undefined ? { KursWalutyZW: String(payment.currencyRate) } : {}),
       }));
@@ -334,11 +344,11 @@ function mapKindSpecificFields(input: FA3DraftInput): XmlObject {
   return payload;
 }
 
-function validateBusinessRules(input: FA3DraftInput): FA3ValidationIssue[] {
+function validateBusinessRules(input: NormalizedFA3Draft): FA3ValidationIssue[] {
   const issues: FA3ValidationIssue[] = [];
-  const kind = input.kind ?? "basic";
+  const kind = input.kind;
   const currency = normalizeCurrency(input.currency);
-  const lines = input.lines ?? [];
+  const lines = input.lines;
 
   if (!input.invoiceNumber?.trim()) {
     issues.push({ code: "invoice_number_required", path: "invoice.invoiceNumber", message: "Numer faktury jest wymagany." });
@@ -478,7 +488,7 @@ function validateBusinessRules(input: FA3DraftInput): FA3ValidationIssue[] {
     }
   }
 
-  if ((input.rawExtensions ?? []).length > 0) {
+  if (input.rawExtensions.length > 0) {
     issues.push({
       code: "raw_extension_unsupported",
       path: "invoice.rawExtensions",
@@ -504,7 +514,7 @@ function validateBusinessRules(input: FA3DraftInput): FA3ValidationIssue[] {
     }
   }
 
-  for (const [index, party] of (input.additionalParties ?? []).entries()) {
+  for (const [index, party] of input.additionalParties.entries()) {
     const partyPath = `invoice.additionalParties[${index + 1}]`;
     if (party.role === "other" && !party.otherRoleDescription?.trim()) {
       issues.push({
@@ -517,7 +527,7 @@ function validateBusinessRules(input: FA3DraftInput): FA3ValidationIssue[] {
   }
 
   if (input.buyer?.isJstSubunit) {
-    const hasJst = (input.additionalParties ?? []).some((party) => party.role === "jst_subunit");
+    const hasJst = input.additionalParties.some((party) => party.role === "jst_subunit");
     if (!hasJst) {
       issues.push({
         code: "jst_subunit_missing_party3",
@@ -528,7 +538,7 @@ function validateBusinessRules(input: FA3DraftInput): FA3ValidationIssue[] {
   }
 
   if (input.buyer?.isVatGroupMember) {
-    const hasGv = (input.additionalParties ?? []).some((party) => party.role === "vat_group_member");
+    const hasGv = input.additionalParties.some((party) => party.role === "vat_group_member");
     if (!hasGv) {
       issues.push({
         code: "vat_group_missing_party3",
@@ -592,12 +602,15 @@ function mapPaymentTerms(paymentTerms?: FA3PaymentTerms): XmlObject | undefined 
   const dueDescription = paymentTerms.dueDescriptionParts ?? (
     paymentTerms.dueDescription ? parseDueDescription(paymentTerms.dueDescription) : undefined
   );
+  const partialPayments = paymentTerms.partialPayments ?? [];
+  const bankAccounts = paymentTerms.bankAccounts ?? [];
+  const factorBankAccounts = paymentTerms.factorBankAccounts ?? [];
   return {
     ...(paymentTerms.paidDate ? { Zaplacono: "1", DataZaplaty: paymentTerms.paidDate } : {}),
-    ...((paymentTerms.partialPayments ?? []).length > 0
+    ...(partialPayments.length > 0
       ? {
           ZnacznikZaplatyCzesciowej: "1",
-          ZaplataCzesciowa: (paymentTerms.partialPayments ?? []).map((partial) => ({
+          ZaplataCzesciowa: partialPayments.map((partial) => ({
             KwotaZaplatyCzesciowej: money(partial.amount),
             DataZaplatyCzesciowej: partial.paidOn,
             ...mapPaymentChoice(partial.method, partial.otherMethodDescription),
@@ -613,18 +626,18 @@ function mapPaymentTerms(paymentTerms?: FA3PaymentTerms): XmlObject | undefined 
         }
       : {}),
     ...mapPaymentChoice(paymentTerms.method, paymentTerms.otherMethodDescription),
-    ...((paymentTerms.bankAccounts ?? []).length > 0
-      ? { RachunekBankowy: (paymentTerms.bankAccounts ?? []).map(mapBankAccount) }
+    ...(bankAccounts.length > 0
+      ? { RachunekBankowy: bankAccounts.map(mapBankAccount) }
       : {}),
-    ...((paymentTerms.factorBankAccounts ?? []).length > 0
-      ? { RachunekBankowyFaktora: (paymentTerms.factorBankAccounts ?? []).map(mapBankAccount) }
+    ...(factorBankAccounts.length > 0
+      ? { RachunekBankowyFaktora: factorBankAccounts.map(mapBankAccount) }
       : {}),
     ...(paymentTerms.paymentLink ? { LinkDoPlatnosci: paymentTerms.paymentLink } : {}),
     ...(paymentTerms.ipksef ? { IPKSeF: paymentTerms.ipksef } : {}),
   };
 }
 
-function mapSettlement(input: FA3DraftInput): XmlObject | undefined {
+function mapSettlement(input: NormalizedFA3Draft): XmlObject | undefined {
   const settlement = input.settlement;
   if (!settlement && input.settlementAmount === undefined) {
     return undefined;
@@ -660,14 +673,15 @@ function mapSettlement(input: FA3DraftInput): XmlObject | undefined {
   };
 }
 
-function mapOrder(input: FA3DraftInput): XmlObject | undefined {
+function mapOrder(input: NormalizedFA3Draft): XmlObject | undefined {
   const order = input.order;
-  if (!order || order.totalGross === undefined || (order.lines ?? []).length === 0) {
+  const orderLines = order?.lines ?? [];
+  if (!order || order.totalGross === undefined || orderLines.length === 0) {
     return undefined;
   }
   return {
     WartoscZamowienia: money(order.totalGross),
-    ZamowienieWiersz: (order.lines ?? []).map((line, index) => {
+    ZamowienieWiersz: orderLines.map((line, index) => {
       const net = toNumber(line.quantity) * toNumber(line.unitNetPrice);
       const vatRate = isZeroVat(line.vatRate) ? 0 : toNumber(line.vatRate as number | string);
       const vat = vatRate === 0 ? 0 : (net * vatRate) / 100;
@@ -685,7 +699,7 @@ function mapOrder(input: FA3DraftInput): XmlObject | undefined {
   };
 }
 
-function mapTransport(input: FA3DraftInput): XmlObject | undefined {
+function mapTransport(input: NormalizedFA3Draft): XmlObject | undefined {
   const transport = input.transport;
   if (!transport) {
     return undefined;
@@ -702,7 +716,7 @@ function mapTransport(input: FA3DraftInput): XmlObject | undefined {
 }
 
 export class FA3Draft {
-  private readonly value: FA3DraftInput;
+  private readonly value: NormalizedFA3Draft;
 
   constructor(value: FA3DraftInput) {
     this.value = {
@@ -710,7 +724,7 @@ export class FA3Draft {
       kind: value.kind ?? "basic",
       currency: normalizeCurrency(value.currency),
       issuePlace: value.issuePlace ?? "",
-      lines: (value.lines ?? []).map((line) => ({ ...line })),
+      lines: value.lines.map((line) => ({ ...line })),
       advancePayments: (value.advancePayments ?? []).map((row) => ({ ...row })),
       additionalParties: (value.additionalParties ?? []).map((row) => ({ ...row })),
       rawExtensions: (value.rawExtensions ?? []).map((row) => ({ ...row })),
@@ -771,13 +785,13 @@ export class FA3Draft {
   }
 
   toFakturaInput(): FakturaInput {
-    const kind = this.value.kind ?? "basic";
+    const kind = this.value.kind;
     const lines = this.value.lines.map((line, index) => mapLine(line, index));
     const totals = extractTotals(this.value);
     const faPayload: XmlObject = {
       KodWaluty: normalizeCurrency(this.value.currency),
       P_1: toDateOnly(this.value.issueDate),
-      P_1M: this.value.issuePlace ?? "",
+      P_1M: this.value.issuePlace,
       P_2: this.value.invoiceNumber,
       P_13_1: money(totals.net),
       P_14_1: money(totals.vat),
@@ -810,8 +824,8 @@ export class FA3Draft {
         Opis: this.value.attachmentText,
       };
     }
-    if ((this.value.additionalDescriptions ?? []).length > 0) {
-      faPayload.DodatkowyOpis = (this.value.additionalDescriptions ?? []).map((item) => ({
+    if (this.value.additionalDescriptions.length > 0) {
+      faPayload.DodatkowyOpis = this.value.additionalDescriptions.map((item) => ({
         Klucz: item.key,
         Wartosc: item.value,
       }));
@@ -859,23 +873,26 @@ export class FA3Draft {
     }
     if (this.value.attachment && this.value.attachment.blocks.length > 0) {
       faPayload.Zalacznik = {
-        Blok: this.value.attachment.blocks.map((block) => ({
-          ...(block.header ? { Naglowek: block.header } : {}),
-          ...(block.paragraphs ? { Akapit: [...block.paragraphs] } : {}),
-          ...((block.tables ?? []).length > 0
-            ? {
-                Tabela: (block.tables ?? []).map((table) => ({
-                  Naglowki: table.headers,
-                  Wiersze: table.rows,
-                })),
-              }
-            : {}),
-        })),
+        Blok: this.value.attachment.blocks.map((block) => {
+          const blockTables = block.tables ?? [];
+          return {
+            ...(block.header ? { Naglowek: block.header } : {}),
+            ...(block.paragraphs ? { Akapit: [...block.paragraphs] } : {}),
+            ...(blockTables.length > 0
+              ? {
+                  Tabela: blockTables.map((table) => ({
+                    Naglowki: table.headers,
+                    Wiersze: table.rows,
+                  })),
+                }
+              : {}),
+          };
+        }),
       };
     }
     if (kind === "advance" || kind === "advance_correction") {
-      if ((this.value.advancePayments ?? []).length > 0) {
-        faPayload.ZaliczkaCzesciowa = (this.value.advancePayments ?? []).map((row) => ({
+      if (this.value.advancePayments.length > 0) {
+        faPayload.ZaliczkaCzesciowa = this.value.advancePayments.map((row) => ({
           P_15Z: money(row.amount),
           ...(row.currencyRate !== undefined ? { KursWalutyZW: String(row.currencyRate) } : {}),
         }));
@@ -903,8 +920,8 @@ export class FA3Draft {
       Podmiot2: mapBuyer(this.value.buyer),
       Fa: faPayload,
     };
-    if ((this.value.additionalParties ?? []).length > 0) {
-      root.Podmiot3 = (this.value.additionalParties ?? []).map(mapAdditionalParty);
+    if (this.value.additionalParties.length > 0) {
+      root.Podmiot3 = this.value.additionalParties.map(mapAdditionalParty);
     }
     return {
       ...root,
@@ -921,11 +938,16 @@ export class FA3Draft {
       schema: "FA3",
       ...(options.pretty !== undefined ? { pretty: options.pretty } : {}),
     });
-    if (options.xsdValidate) {
-      await validateFa3Xml(xml);
-    }
-    return xml;
+    return options.xsdValidate ? validateAndReturnXml(xml) : xml;
   }
+}
+
+export async function validateAndReturnXml(
+  xml: string,
+  validate: (value: string) => Promise<void> = validateFa3Xml,
+): Promise<string> {
+  await validate(xml);
+  return xml;
 }
 
 export class FA3InvoiceBuilder {
@@ -1441,8 +1463,7 @@ export class FA3BatchDraft {
         continue;
       }
       const xml = await draft.toXml(options);
-      const invoiceNumber = draft.toDict().invoiceNumber || `invoice-${i + 1}`;
-      const fileName = `${sanitizeFileName(invoiceNumber)}.xml`;
+      const fileName = `${sanitizeFileName(draft.toDict().invoiceNumber, `invoice-${i + 1}`)}.xml`;
       const target = path.join(output, fileName);
       await writeFile(target, xml, "utf8");
       files.push(target);
@@ -1458,9 +1479,8 @@ export class FA3BatchDraft {
         continue;
       }
       const xml = await draft.toXml(options);
-      const invoiceNumber = draft.toDict().invoiceNumber || `invoice-${i + 1}`;
       entries.push({
-        fileName: `${sanitizeFileName(invoiceNumber)}.xml`,
+        fileName: `${sanitizeFileName(draft.toDict().invoiceNumber, `invoice-${i + 1}`)}.xml`,
         content: Buffer.from(xml, "utf8"),
       });
     }
@@ -1472,9 +1492,9 @@ export class FA3BatchDraft {
   }
 }
 
-function sanitizeFileName(value: string): string {
+export function sanitizeFileName(value: string, fallback = "faktura"): string {
   const candidate = value.trim().replace(/[^A-Za-z0-9_.-]+/g, "_");
-  return candidate || "faktura";
+  return candidate || fallback;
 }
 
 export const BaseFA3Builder = FA3InvoiceBuilder;

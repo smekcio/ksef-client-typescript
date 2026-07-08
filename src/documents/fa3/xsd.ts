@@ -12,15 +12,15 @@ function moduleDir(): string {
 
 export function resolveFa3SchemaEntryPath(candidates?: string[]): string {
   const localDir = moduleDir();
-  const defaultCandidates = [
+  const searchPaths = candidates ?? [
     path.join(localDir, "schemas", SCHEMA_FILE),
     path.join(localDir, "documents", "fa3", "schemas", SCHEMA_FILE),
     path.resolve(process.cwd(), "dist", "documents", "fa3", "schemas", SCHEMA_FILE),
     path.resolve(process.cwd(), "src", "documents", "fa3", "schemas", SCHEMA_FILE),
   ];
-  const schemaPath = (candidates ?? defaultCandidates).find((candidate) => fs.existsSync(candidate));
+  const schemaPath = searchPaths.find((candidate) => fs.existsSync(candidate));
   if (!schemaPath) {
-    throw new KsefError(`Missing FA(3) schema file. Checked: ${(candidates ?? defaultCandidates).join(", ")}`);
+    throw new KsefError(`Missing FA(3) schema file. Checked: ${searchPaths.join(", ")}`);
   }
   return schemaPath;
 }
@@ -65,17 +65,23 @@ export async function validateFa3XmlWithParser(xml: string, parseXml: Fa3XmlPars
   }
 }
 
-export async function validateFa3XmlXsd(xml: string): Promise<void> {
-  type LibxmlModule = {
-    parseXml: Fa3XmlParser;
-  };
+export type Libxml = { parseXml: Fa3XmlParser };
+
+export async function loadLibxml(): Promise<Libxml> {
+  // Indirect specifier keeps `libxmljs2` a runtime-only optional dependency:
+  // it must not be resolved at compile time (typecheck / dts build) because
+  // the native module is frequently absent (skipped optional install).
+  const moduleName: string = "libxmljs2";
+  return (await import(moduleName)) as unknown as Libxml;
+}
+
+export async function validateFa3XmlXsd(
+  xml: string,
+  loadModule: () => Promise<Libxml> = loadLibxml,
+): Promise<void> {
   let parseXml: Fa3XmlParser;
   try {
-    // Indirect specifier keeps `libxmljs2` a runtime-only optional dependency:
-    // it must not be resolved at compile time (typecheck / dts build) because
-    // the native module is frequently absent (skipped optional install).
-    const moduleName: string = "libxmljs2";
-    const imported = (await import(moduleName)) as unknown as LibxmlModule;
+    const imported = await loadModule();
     parseXml = imported.parseXml;
   } catch {
     throw new KsefError(

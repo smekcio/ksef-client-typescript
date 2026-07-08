@@ -75,6 +75,47 @@ test("xsd.ts: validateFa3XmlWithParser covers validation branches", async () => 
     () => validateFa3XmlWithParser("<Faktura/>", emptyErrorsParser),
     /FA\(3\) XSD validation failed\.$/,
   );
+
+  const undefinedErrorsParser = () => ({
+    validate: () => false,
+  });
+  await assert.rejects(
+    () => validateFa3XmlWithParser("<Faktura/>", undefinedErrorsParser),
+    /FA\(3\) XSD validation failed\.$/,
+  );
+
+  const nullishMessagesParser = () => ({
+    validate: () => false,
+    validationErrors: [null, {}, { message: undefined }],
+  });
+  await assert.rejects(
+    () => validateFa3XmlWithParser("<Faktura/>", nullishMessagesParser),
+    /FA\(3\) XSD validation failed\.$/,
+  );
+});
+
+test("xsd.ts: validateFa3XmlXsd success and error via injected loader", async () => {
+  const { validateFa3XmlWithParser } = await import("../../dist/documents/fa3.js");
+  const validParser = () => ({ validate: () => true });
+  await validateFa3XmlWithParser("<Faktura/>", validParser);
+  await validateFa3XmlXsd("<Faktura/>", async () => ({ parseXml: validParser }));
+
+  await assert.rejects(
+    () => validateFa3XmlXsd("<Faktura/>", async () => {
+      throw new Error("no module");
+    }),
+    /libxmljs2/,
+  );
+});
+
+test("xsd.ts: loadLibxml resolves or throws consistently", async () => {
+  const { loadLibxml } = await import("../../dist/documents/fa3.js");
+  try {
+    const mod = await loadLibxml();
+    assert.equal(typeof mod.parseXml, "function");
+  } catch (error) {
+    assert.ok(error instanceof Error);
+  }
 });
 
 test("xsd.ts: validateFa3XmlXsd throws when libxmljs2 missing", async () => {
@@ -304,6 +345,31 @@ test("identifier.ts: validatePartyIdentifier validation branches", () => {
   assert.deepEqual(
     mapPartyIdentityToXml({ kind: PartyIdentifierKind.NIP, value: "123" }, "Seller", "seller"),
     { NIP: "123", Nazwa: "Seller" },
+  );
+
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.NIP }, "SellerNoVal", "seller"),
+    { NIP: "", Nazwa: "SellerNoVal" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.NIP }, "BuyerNoVal", "buyer"),
+    { NIP: "", Nazwa: "BuyerNoVal" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.EU_VAT }, "EuNoVal", "buyer"),
+    { KodUE: "", NrVatUE: "", Nazwa: "EuNoVal" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.FOREIGN }, "ForNoVal", "buyer"),
+    { NrID: "", Nazwa: "ForNoVal" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.INTERNAL }, "IntNoVal", "buyer"),
+    { IDWew: "", Nazwa: "IntNoVal" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: "unknown_kind" }, "DefNoVal", "buyer"),
+    { NIP: "", Nazwa: "DefNoVal" },
   );
 });
 

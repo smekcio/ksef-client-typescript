@@ -546,8 +546,8 @@ async function runSend(
   const invoiceXml = await readFile(path.resolve(context.cwd, invoiceFile), "utf8");
   const formCode = parseFormCode(getStringOption(options, "form-code"));
   const waitForUpo = getBooleanOption(options, "wait-upo");
-  const pollIntervalMs = waitForUpo ? resolvePollIntervalMs(options, 2000) : undefined;
-  const maxAttempts = waitForUpo ? resolveMaxAttempts(options, 60) : undefined;
+  const pollIntervalMs = waitForUpo ? resolvePollIntervalMs(options, 2000) : 2000;
+  const maxAttempts = waitForUpo ? resolveMaxAttempts(options, 60) : 60;
   const hashOfCorrectedInvoice = getStringOption(options, "hash-of-corrected-invoice");
   const sessionId = getStringOption(options, "session-id") ?? getStringOption(options, "save-session");
   const upoOutput = getStringOption(options, "upo-output") ?? getStringOption(options, "save-upo");
@@ -608,10 +608,7 @@ async function runSend(
     let upoXml: string | null = null;
     let upo: JsonValue | null = null;
     if (waitForUpo) {
-      upoXml = await session.waitForUpo({
-        pollIntervalMs: pollIntervalMs ?? 2000,
-        maxAttempts: maxAttempts ?? 60,
-      });
+      upoXml = await session.waitForUpo({ pollIntervalMs, maxAttempts });
       if (upoXml) {
         upo = toJsonValue(parseUpoXml(upoXml));
         if (upoOutput) {

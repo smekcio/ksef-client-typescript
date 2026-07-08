@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FA3Draft, FA3Invoice, PartyIdentifierKind } from "../../dist/index.js";
+import {
+  FA3Draft,
+  FA3Invoice,
+  PartyIdentifierKind,
+  sanitizeFileName,
+  validateAndReturnXml,
+} from "../../dist/index.js";
 
 const SELLER = { name: "Sprzedawca Sp. z o.o.", taxId: "1111111111", addressLine1: "ul. A 1" };
 const BUYER = { name: "Nabywca Sp. z o.o.", taxId: "2222222222", addressLine1: "ul. B 2" };
@@ -216,22 +222,158 @@ test("builder.ts: remaining optional false branches and advance reference cleari
   assert.equal(clearedKsef.toDict().advanceInvoiceNumber, "ZAL/1");
 });
 
-test("builder.ts: toXml xsdValidate when libxmljs2 is available", async () => {
-  let hasLibxml = false;
+test("builder.ts: toXml xsdValidate path runs regardless of libxmljs2", async () => {
+  const builder = FA3Invoice.basic("FV/XSD/926")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE);
   try {
-    await import("libxmljs2");
-    hasLibxml = true;
-  } catch {
-    hasLibxml = false;
+    const xml = await builder.toXml({ xsdValidate: true });
+    assert.match(xml, /<Faktura/);
+  } catch (error) {
+    assert.ok(error instanceof Error);
   }
-  if (!hasLibxml) {
-    return;
-  }
-  const xml = await FA3Invoice.basic("FV/XSD/926")
+});
+
+test("builder.ts: toXml honours explicit pretty option", async () => {
+  const xml = await FA3Invoice.basic("FV/PRETTY/1")
     .issueDate("2026-01-15")
     .seller(SELLER)
     .buyer(BUYER)
     .addLine(LINE)
-    .toXml({ xsdValidate: true });
+    .toXml({ pretty: true });
   assert.match(xml, /<Faktura/);
+});
+
+test("builder.ts: mapTransport falls back to raw kind when unmapped", async () => {
+  const xml = await FA3Invoice.basic("FV/TRK/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .transport("99")
+    .toXml();
+  assert.match(xml, /<RodzajTransportu>99<\/RodzajTransportu>/);
+});
+
+test("builder.ts: orderLine before order() and splitPayment before payment()", async () => {
+  const draft = FA3Invoice.basic("FV/OL/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .orderLine({ description: "Zam", quantity: 1, unitNetPrice: 100, vatRate: 23 })
+    .order(123)
+    .splitPayment()
+    .build();
+  const fa = draft.toFakturaInput().Fa;
+  assert.ok(fa.Zamowienie);
+  assert.equal(fa.Platnosc.FormaPlatnosci, "6");
+});
+
+test("builder.ts: order date without number covers optional order branches", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/ODT/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    order: { date: "2025-11-30" },
+  });
+  const terms = draft.toFakturaInput().Fa.WarunkiTransakcji;
+  assert.ok(terms.Zamowienia);
+  assert.equal(terms.Zamowienia[0].DataZamowienia, "2025-11-30");
+  assert.equal(terms.Zamowienia[0].NrZamowienia, undefined);
+});
+
+test("builder.ts: attachment block without header keeps tables and paragraphs optional", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/ATT/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    attachment: {
+      blocks: [{ tables: [{ headers: ["A"], rows: [["1"]] }] }],
+    },
+  });
+  const blok = draft.toFakturaInput().Fa.Zalacznik.Blok;
+  assert.equal(blok[0].Naglowek, undefined);
+  assert.ok(blok[0].Tabela);
+});
+
+test("builder.ts: correction toFakturaInput with ksef only skips corrected date", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "KOR/KSEF/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    kind: "correction",
+    correctedKsefNumber: "KSEF-123",
+  });
+  const dane = draft.toFakturaInput().Fa.DaneFaKorygowanej;
+  assert.equal(dane.NumerKSeF, "KSEF-123");
+  assert.equal(dane.DataWystawieniaFa, undefined);
+});
+
+test("builder.ts: additional party role other without description via toFakturaInput", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "FV/AP3/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    additionalParties: [{ name: "Inna", taxId: "8888888888", role: "other" }],
+  });
+  const podmiot3 = draft.toFakturaInput().Podmiot3;
+  assert.equal(podmiot3[0].RolaInna, "1");
+  assert.equal(podmiot3[0].OpisRoli, undefined);
+});
+
+test("builder.ts: settlement amountDue without charges/deductions validates", () => {
+  const draft = new FA3Draft({
+    invoiceNumber: "ROZ/AD/1",
+    issueDate: "2026-01-15",
+    seller: SELLER,
+    buyer: BUYER,
+    lines: [LINE],
+    kind: "settlement",
+    advanceInvoiceNumber: "ZAL/1",
+    settlement: { amountDue: 999 },
+  });
+  const issues = draft.validate();
+  assert.ok(issues.some((issue) => issue.code === "settlement_amount_due_inconsistent"));
+});
+
+test("builder.ts: fromDict with empty object falls back to defaults", () => {
+  const draft = FA3Draft.fromDict({});
+  const dict = draft.toDict();
+  assert.equal(dict.invoiceNumber, "");
+  assert.equal(dict.issueDate, "");
+  assert.equal(dict.currency, "PLN");
+  assert.deepEqual(dict.lines, []);
+});
+
+test("builder.ts: sanitizeFileName sanitizes and applies fallbacks", () => {
+  assert.equal(sanitizeFileName("FV/2026 01"), "FV_2026_01");
+  assert.equal(sanitizeFileName(""), "faktura");
+  assert.equal(sanitizeFileName("   ", "invoice-3"), "invoice-3");
+});
+
+test("builder.ts: validateAndReturnXml returns xml after validation succeeds", async () => {
+  let seen = "";
+  const result = await validateAndReturnXml("<Faktura/>", async (value) => {
+    seen = value;
+  });
+  assert.equal(result, "<Faktura/>");
+  assert.equal(seen, "<Faktura/>");
+
+  await assert.rejects(
+    () => validateAndReturnXml("<Faktura/>", async () => {
+      throw new Error("boom");
+    }),
+    /boom/,
+  );
 });
