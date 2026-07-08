@@ -9,6 +9,7 @@ export type InvoiceXmlInput =
   | XmlDocument
   | XmlObject
   | FakturaInput
+  | { toFakturaInput: () => FakturaInput }
   | PefUblDocumentInput;
 
 export type FakturaSchema = "FA2" | "FA3";
@@ -39,7 +40,16 @@ const DEFAULT_ETD_NAMESPACE: Record<FakturaSchema, string> = {
 };
 
 const ORDER_MAP: Record<string, string[]> = {
-  Faktura: ["Naglowek", "Podmiot1", "Podmiot2", "Podmiot3", "Fa", "Stopka"],
+  Faktura: [
+    "Naglowek",
+    "Podmiot1",
+    "Podmiot2",
+    "Podmiot3",
+    "PodmiotUpowazniony",
+    "Fa",
+    "Stopka",
+    "Zalacznik",
+  ],
   Naglowek: ["KodFormularza", "WariantFormularza", "DataWytworzeniaFa", "SystemInfo"],
   Podmiot1: [
     "PrefiksPodatnika",
@@ -128,6 +138,8 @@ const ORDER_MAP: Record<string, string[]> = {
     "Podmiot2K",
     "Podmiot3K",
     "ZaliczkaCzesciowa",
+    "P_15ZK",
+    "KursWalutyZK",
     "FP",
     "TP",
     "DodatkowyOpis",
@@ -137,7 +149,10 @@ const ORDER_MAP: Record<string, string[]> = {
     "FaWiersze",
     "Rozliczenie",
     "Platnosc",
+    "WarunkiTransakcji",
+    "Zamowienie",
   ],
+  ZaliczkaCzesciowa: ["P_6Z", "P_15Z", "KursWalutyZW"],
   Adnotacje: [
     "P_16",
     "P_17",
@@ -147,6 +162,26 @@ const ORDER_MAP: Record<string, string[]> = {
     "NoweSrodkiTransportu",
     "P_23",
     "PMarzy",
+  ],
+  NoweSrodkiTransportu: ["P_22", "P_42_5", "NowySrodekTransportu", "P_22N"],
+  NowySrodekTransportu: [
+    "P_22A",
+    "P_NrWierszaNST",
+    "P_22BMK",
+    "P_22BMD",
+    "P_22BK",
+    "P_22BNR",
+    "P_22BRP",
+    "P_22B",
+    "P_22B1",
+    "P_22B2",
+    "P_22B3",
+    "P_22B4",
+    "P_22BT",
+    "P_22C",
+    "P_22C1",
+    "P_22D",
+    "P_22D1",
   ],
   OkresFa: ["P_6_Od", "P_6_Do"],
   FaWiersz: [
@@ -176,6 +211,113 @@ const ORDER_MAP: Record<string, string[]> = {
     "KursWaluty",
     "StanPrzed",
   ],
+  Zamowienie: ["WartoscZamowienia", "ZamowienieWiersz"],
+  ZamowienieWiersz: [
+    "NrWierszaZam",
+    "UU_IDZ",
+    "P_7Z",
+    "IndeksZ",
+    "GTINZ",
+    "PKWiUZ",
+    "CNZ",
+    "PKOBZ",
+    "P_8AZ",
+    "P_8BZ",
+    "P_9AZ",
+    "P_10Z",
+    "P_11NettoZ",
+    "P_11VatZ",
+    "P_12Z",
+    "P_12Z_XII",
+    "P_12Z_Zal_15",
+    "GTUZ",
+    "ProceduraZ",
+    "KwotaAkcyzyZ",
+    "StanPrzedZ",
+  ],
+  Rozliczenie: [
+    "Obciazenia",
+    "SumaObciazen",
+    "Odliczenia",
+    "SumaOdliczen",
+    "DoZaplaty",
+    "DoRozliczenia",
+  ],
+  Obciazenia: ["Kwota", "Powod"],
+  Odliczenia: ["Kwota", "Powod"],
+  Platnosc: [
+    "Zaplacono",
+    "DataZaplaty",
+    "ZnacznikZaplatyCzesciowej",
+    "ZaplataCzesciowa",
+    "TerminPlatnosci",
+    "FormaPlatnosci",
+    "PlatnoscInna",
+    "OpisPlatnosci",
+    "RachunekBankowy",
+    "RachunekBankowyFaktora",
+    "Skonto",
+    "LinkDoPlatnosci",
+    "IPKSeF",
+  ],
+  ZaplataCzesciowa: [
+    "KwotaZaplatyCzesciowej",
+    "DataZaplatyCzesciowej",
+    "FormaPlatnosci",
+    "PlatnoscInna",
+    "OpisPlatnosci",
+  ],
+  TerminPlatnosci: ["Termin", "TerminOpis"],
+  TerminOpis: ["Ilosc", "Jednostka", "ZdarzeniePoczatkowe"],
+  RachunekBankowy: ["NrRB", "SWIFT", "RachunekWlasnyBanku", "NazwaBanku", "OpisRachunku"],
+  RachunekBankowyFaktora: ["NrRB", "SWIFT", "RachunekWlasnyBanku", "NazwaBanku", "OpisRachunku"],
+  Skonto: ["WarunkiSkonta", "WysokoscSkonta"],
+  WarunkiTransakcji: [
+    "Umowy",
+    "Zamowienia",
+    "NrPartiiTowaru",
+    "WarunkiDostawy",
+    "KursUmowny",
+    "WalutaUmowna",
+    "Transport",
+    "PodmiotPosredniczacy",
+  ],
+  Umowy: ["DataUmowy", "NrUmowy"],
+  Zamowienia: ["DataZamowienia", "NrZamowienia"],
+  Transport: [
+    "TransportInny",
+    "OpisInnegoTransportu",
+    "RodzajTransportu",
+    "Przewoznik",
+    "NrZleceniaTransportu",
+    "LadunekInny",
+    "OpisInnegoLadunku",
+    "OpisLadunku",
+    "JednostkaOpakowania",
+    "DataGodzRozpTransportu",
+    "DataGodzZakTransportu",
+    "WysylkaZ",
+    "WysylkaPrzez",
+    "WysylkaDo",
+  ],
+  Przewoznik: ["DaneIdentyfikacyjne", "AdresPrzewoznika"],
+  AdresPrzewoznika: ["KodKraju", "AdresL1", "AdresL2", "AdresL3"],
+  WysylkaZ: ["KodKraju", "AdresL1", "AdresL2", "AdresL3"],
+  WysylkaPrzez: ["KodKraju", "AdresL1", "AdresL2", "AdresL3"],
+  WysylkaDo: ["KodKraju", "AdresL1", "AdresL2", "AdresL3"],
+  Stopka: ["Informacje", "Rejestry"],
+  Informacje: ["StopkaFaktury"],
+  Rejestry: ["PelnaNazwa", "KRS", "REGON", "BDO"],
+  Zalacznik: ["BlokDanych"],
+  BlokDanych: ["ZNaglowek", "MetaDane", "Tekst", "Tabela"],
+  MetaDane: ["ZKlucz", "ZWartosc"],
+  Tekst: ["Akapit"],
+  Tabela: ["TMetaDane", "Opis", "TNaglowek", "Wiersz", "Suma"],
+  TMetaDane: ["TKlucz", "TWartosc"],
+  TNaglowek: ["Kol"],
+  Kol: ["NKom"],
+  Wiersz: ["WKom"],
+  Suma: ["SKom"],
 };
 
 function stripBom(input: string): string {
@@ -200,6 +342,11 @@ export function serializeInvoiceXml(input: InvoiceXmlInput, options?: FakturaXml
   }
   if (isPefUblDocumentInput(input)) {
     const xml = buildPefXml(input);
+    const cleaned = stripBom(xml);
+    return Buffer.from(cleaned, "utf8");
+  }
+  if (isFA3InvoiceLike(input)) {
+    const xml = buildFakturaXml(input.toFakturaInput(), options);
     const cleaned = stripBom(xml);
     return Buffer.from(cleaned, "utf8");
   }
@@ -393,6 +540,14 @@ function isFakturaInput(input: unknown): input is FakturaInput {
   return (
     Object.prototype.hasOwnProperty.call(input, "Naglowek") &&
     Object.prototype.hasOwnProperty.call(input, "Fa")
+  );
+}
+
+function isFA3InvoiceLike(input: unknown): input is { toFakturaInput: () => FakturaInput } {
+  return (
+    Boolean(input) &&
+    typeof input === "object" &&
+    typeof (input as { toFakturaInput?: unknown }).toFakturaInput === "function"
   );
 }
 

@@ -2,16 +2,15 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
 import fc from "fast-check";
-import { buildFakturaXml } from "../../dist/index.js";
+import { buildFakturaXml, FA3Invoice, FA3Party } from "../../dist/index.js";
+import { loadBundledFa3Xsd, skipUnlessLibxml, validateXml } from "../helpers/fa3Xsd.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
 const xsdBaseDir = path.join(workspaceRoot, "ksef-docs", "faktury", "schemy", "FA");
 const xsdFa2Path = path.join(xsdBaseDir, "schemat_FA(2)_v1-0E.xsd");
-const xsdFa3Path = path.join(xsdBaseDir, "schemat_FA(3)_v1-0E.xsd");
 const fa2TemplatePath = path.join(
   workspaceRoot,
   "ksef-client-csharp",
@@ -19,16 +18,13 @@ const fa2TemplatePath = path.join(
   "Templates",
   "invoice-template-fa-2.xml",
 );
-const fa3TemplatePath = path.join(
-  workspaceRoot,
-  "ksef-client-csharp",
-  "KSeF.Client.Tests",
-  "Templates",
-  "invoice-template-fa-3.xml",
-);
-const requiredFixtures = [xsdFa2Path, xsdFa3Path, fa2TemplatePath, fa3TemplatePath];
-const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
-const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
+const requiredFa2Fixtures = [xsdFa2Path, fa2TemplatePath];
+const missingFa2Fixture = requiredFa2Fixtures.find((fixturePath) => !fs.existsSync(fixturePath));
+const libxmljs = await loadLibxml();
+const skipFa2XsdTest =
+  (missingFa2Fixture ? `Missing fixture: ${missingFa2Fixture}` : false) ||
+  (libxmljs ? false : "Missing optional libxmljs2 native binding.");
+const skipFa3XsdTest = skipUnlessLibxml(libxmljs);
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -36,6 +32,14 @@ const xmlParser = new XMLParser({
   parseTagValue: false,
   parseAttributeValue: false,
 });
+
+async function loadLibxml() {
+  try {
+    return await import("libxmljs2");
+  } catch {
+    return undefined;
+  }
+}
 
 function loadTemplateXml(templatePath) {
   const xml = fs.readFileSync(templatePath, "utf8");
@@ -68,15 +72,6 @@ function loadXsd(schemaPath) {
   return libxmljs.parseXml(content, {
     baseUrl: pathToFileURL(baseDir + path.sep).href,
   });
-}
-
-function validateXml(xml, xsdDoc) {
-  const doc = libxmljs.parseXml(xml);
-  const valid = doc.validate(xsdDoc);
-  if (!valid) {
-    const errors = doc.validationErrors.map((err) => err.message.trim()).join("\n");
-    throw new Error(`XML validation failed:\n${errors}`);
-  }
 }
 
 function asArray(value) {
@@ -117,7 +112,38 @@ function makeVariant(template, variant) {
   return faktura;
 }
 
-function propertyTest(schema, templatePath, xsdPath) {
+function makeFa3Variant(variant) {
+  const seller = FA3Party.polishCompany({
+    nip: "1111111111",
+    name: "Sprzedawca Sp. z o.o.",
+    address: "Prosta 1",
+  });
+  const buyer = FA3Party.polishCompany({
+    nip: "2222222222",
+    name: "Nabywca S.A.",
+    address: "Jasna 2",
+  });
+  const builder = FA3Invoice.basic(`FA/PROP/${variant.invoiceNo}/01/2026`)
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-05-16")
+    .saleDate("2026-05-15");
+
+  for (const row of variant.rows) {
+    builder.addLine({
+      description: row.name,
+      quantity: String(row.qty),
+      unitNetPrice: row.unitNet.toFixed(2),
+      tax: "23",
+      identifiers: { uniqueId: row.uuid },
+      netAmount: row.lineNet.toFixed(2),
+    });
+  }
+
+  return builder.build().toFakturaInput();
+}
+
+function propertyTest(schema, templatePath, xsdPath, skipReason) {
   const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
   const rowNameArb = fc
     .stringOf(
@@ -150,7 +176,7 @@ function propertyTest(schema, templatePath, xsdPath) {
 
   test(
     `property: ${schema} builder produces XSD-valid XML for many variants`,
-    { skip: skipMissingFixture },
+    { skip: skipReason },
     async () => {
       const template = parseFaktura(loadTemplateXml(templatePath));
       const xsd = loadXsd(xsdPath);
@@ -158,7 +184,7 @@ function propertyTest(schema, templatePath, xsdPath) {
         fc.asyncProperty(variantArb, async (variant) => {
           const faktura = makeVariant(template, variant);
           const xml = buildFakturaXml(faktura, { schema });
-          validateXml(xml, xsd);
+          validateXml(libxmljs, xml, xsd);
         }),
         { numRuns: 25 },
       );
@@ -166,5 +192,53 @@ function propertyTest(schema, templatePath, xsdPath) {
   );
 }
 
-propertyTest("FA2", fa2TemplatePath, xsdFa2Path);
-propertyTest("FA3", fa3TemplatePath, xsdFa3Path);
+function propertyTestFa3(skipReason) {
+  const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
+  const rowNameArb = fc
+    .stringOf(
+      fc.constantFrom(
+        ..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_./()".split(""),
+      ),
+      {
+        minLength: 1,
+        maxLength: 40,
+      },
+    )
+    .map((s) => s.trim() || "Usluga");
+
+  const variantArb = fc.record({
+    invoiceNo: fc.integer({ min: 1, max: 999_999 }),
+    net: moneyArb,
+    vat: moneyArb,
+    gross: moneyArb,
+    rows: fc.array(
+      fc.record({
+        uuid: fc.uuid(),
+        name: rowNameArb,
+        qty: fc.integer({ min: 1, max: 100 }),
+        unitNet: moneyArb,
+        lineNet: moneyArb,
+      }),
+      { minLength: 1, maxLength: 5 },
+    ),
+  });
+
+  test(
+    "property: FA3 builder produces XSD-valid XML for many variants",
+    { skip: skipReason },
+    async () => {
+      const xsd = loadBundledFa3Xsd(libxmljs);
+      await fc.assert(
+        fc.asyncProperty(variantArb, async (variant) => {
+          const faktura = makeFa3Variant(variant);
+          const xml = buildFakturaXml(faktura, { schema: "FA3" });
+          validateXml(libxmljs, xml, xsd);
+        }),
+        { numRuns: 25 },
+      );
+    },
+  );
+}
+
+propertyTest("FA2", fa2TemplatePath, xsdFa2Path, skipFa2XsdTest);
+propertyTestFa3(skipFa3XsdTest);

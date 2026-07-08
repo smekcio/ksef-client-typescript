@@ -2,15 +2,18 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
 import { buildFakturaXml } from "../../dist/index.js";
+import {
+  buildMultiRateFa3FakturaInput,
+  buildSampleFa3FakturaInput,
+} from "../helpers/fa3InvoiceFixture.js";
+import { loadBundledFa3Xsd, skipUnlessLibxml, validateXml } from "../helpers/fa3Xsd.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
 const xsdBaseDir = path.join(workspaceRoot, "ksef-docs", "faktury", "schemy", "FA");
 const xsdFa2Path = path.join(xsdBaseDir, "schemat_FA(2)_v1-0E.xsd");
-const xsdFa3Path = path.join(xsdBaseDir, "schemat_FA(3)_v1-0E.xsd");
 const fa2TemplatePath = path.join(
   workspaceRoot,
   "ksef-client-csharp",
@@ -18,22 +21,27 @@ const fa2TemplatePath = path.join(
   "Templates",
   "invoice-template-fa-2.xml",
 );
-const fa3TemplatePath = path.join(
-  workspaceRoot,
-  "ksef-client-csharp",
-  "KSeF.Client.Tests",
-  "Templates",
-  "invoice-template-fa-3.xml",
-);
-const requiredFixtures = [xsdFa2Path, xsdFa3Path, fa2TemplatePath, fa3TemplatePath];
-const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
-const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
+const requiredFa2Fixtures = [xsdFa2Path, fa2TemplatePath];
+const missingFa2Fixture = requiredFa2Fixtures.find((fixturePath) => !fs.existsSync(fixturePath));
+const libxmljs = await loadLibxml();
+const skipFa2XsdTest =
+  (missingFa2Fixture ? `Missing fixture: ${missingFa2Fixture}` : false) ||
+  (libxmljs ? false : "Missing optional libxmljs2 native binding.");
+const skipFa3XsdTest = skipUnlessLibxml(libxmljs);
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   parseTagValue: false,
   parseAttributeValue: false,
 });
+
+async function loadLibxml() {
+  try {
+    return await import("libxmljs2");
+  } catch {
+    return undefined;
+  }
+}
 
 function loadTemplateXml(templatePath) {
   const xml = fs.readFileSync(templatePath, "utf8");
@@ -68,15 +76,6 @@ function loadXsd(schemaPath) {
   });
 }
 
-function validateXml(xml, xsdDoc) {
-  const doc = libxmljs.parseXml(xml);
-  const valid = doc.validate(xsdDoc);
-  if (!valid) {
-    const errors = doc.validationErrors.map((err) => err.message.trim()).join("\n");
-    throw new Error(`XML validation failed:\n${errors}`);
-  }
-}
-
 function makeMultiRateFaktura(templatePath) {
   const faktura = parseFaktura(loadTemplateXml(templatePath));
   faktura.Fa = {
@@ -91,32 +90,31 @@ function makeMultiRateFaktura(templatePath) {
   return faktura;
 }
 
-test("FA2 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("FA2 XML builder produces XSD-valid XML", { skip: skipFa2XsdTest }, () => {
   const templateXml = loadTemplateXml(fa2TemplatePath);
   const faktura = parseFaktura(templateXml);
   const xml = buildFakturaXml(faktura, { schema: "FA2" });
   const xsd = loadXsd(xsdFa2Path);
-  validateXml(xml, xsd);
+  validateXml(libxmljs, xml, xsd);
 });
 
-test("FA3 XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
-  const templateXml = loadTemplateXml(fa3TemplatePath);
-  const faktura = parseFaktura(templateXml);
+test("FA3 XML builder produces XSD-valid XML", { skip: skipFa3XsdTest }, () => {
+  const faktura = buildSampleFa3FakturaInput();
   const xml = buildFakturaXml(faktura, { schema: "FA3" });
-  const xsd = loadXsd(xsdFa3Path);
-  validateXml(xml, xsd);
+  const xsd = loadBundledFa3Xsd(libxmljs);
+  validateXml(libxmljs, xml, xsd);
 });
 
-test("FA2 XML builder validates a multi-rate invoice against XSD", { skip: skipMissingFixture }, () => {
+test("FA2 XML builder validates a multi-rate invoice against XSD", { skip: skipFa2XsdTest }, () => {
   const faktura = makeMultiRateFaktura(fa2TemplatePath);
   const xml = buildFakturaXml(faktura, { schema: "FA2" });
   const xsd = loadXsd(xsdFa2Path);
-  validateXml(xml, xsd);
+  validateXml(libxmljs, xml, xsd);
 });
 
-test("FA3 XML builder validates a multi-rate invoice against XSD", { skip: skipMissingFixture }, () => {
-  const faktura = makeMultiRateFaktura(fa3TemplatePath);
+test("FA3 XML builder validates a multi-rate invoice against XSD", { skip: skipFa3XsdTest }, () => {
+  const faktura = buildMultiRateFa3FakturaInput();
   const xml = buildFakturaXml(faktura, { schema: "FA3" });
-  const xsd = loadXsd(xsdFa3Path);
-  validateXml(xml, xsd);
+  const xsd = loadBundledFa3Xsd(libxmljs);
+  validateXml(libxmljs, xml, xsd);
 });

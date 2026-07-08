@@ -10,7 +10,7 @@ export default defineConfig([
     treeshake: true,
     target: "node20",
     platform: "node",
-    external: ["node-forge", "qrcode"],
+    external: ["libxmljs2", "node-forge", "qrcode"],
   },
   {
     entry: {
@@ -23,7 +23,7 @@ export default defineConfig([
     treeshake: true,
     target: "node20",
     platform: "node",
-    external: ["node-forge", "qrcode"],
+    external: ["libxmljs2", "node-forge", "qrcode"],
     banner: {
       js: "#!/usr/bin/env node",
     },

@@ -3,7 +3,6 @@ import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as libxmljs from "libxmljs2";
 import { XMLParser } from "fast-xml-parser";
 import { buildPefXml, isPefUblDocumentInput, KsefValidationError } from "../../dist/index.js";
 
@@ -30,7 +29,10 @@ const pefKor3TemplatePath = path.join(
 );
 const requiredFixtures = [pef3XsdPath, pefKor3XsdPath, pef3TemplatePath, pefKor3TemplatePath];
 const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
-const skipMissingFixture = missingFixture ? `Missing fixture: ${missingFixture}` : false;
+const libxmljs = await loadLibxml();
+const skipXsdTest =
+  (missingFixture ? `Missing fixture: ${missingFixture}` : false) ||
+  (libxmljs ? false : "Missing optional libxmljs2 native binding.");
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -38,6 +40,14 @@ const xmlParser = new XMLParser({
   parseTagValue: false,
   parseAttributeValue: false,
 });
+
+async function loadLibxml() {
+  try {
+    return await import("libxmljs2");
+  } catch {
+    return undefined;
+  }
+}
 
 function loadXsd(schemaPath) {
   const baseDir = path.dirname(schemaPath);
@@ -91,7 +101,7 @@ function stripRootAttributes(root) {
   return clone;
 }
 
-test("PEF(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("PEF(3) XML builder produces XSD-valid XML", { skip: skipXsdTest }, () => {
   const templateXml = loadTemplateXml(pef3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   if (rootKey !== "Invoice") {
@@ -102,7 +112,7 @@ test("PEF(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, 
   validateXml(xml, xsd);
 });
 
-test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipMissingFixture }, () => {
+test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipXsdTest }, () => {
   const templateXml = loadTemplateXml(pefKor3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   const localRoot = rootKey.includes(":") ? rootKey.split(":").at(-1) : rootKey;

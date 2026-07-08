@@ -23,11 +23,31 @@ npm install ksef-client
 Opcjonalne zależności:
 
 ```bash
-npm install qrcode node-forge
+npm install qrcode node-forge libxmljs2
 ```
 
 - `qrcode` jest wymagane dla `client.qr`
 - `node-forge` jest wymagane dla `XadesKeyPair.fromPkcs12*`
+- `libxmljs2` jest wymagane dla walidacji XSD FA(3) (`validateFa3XmlXsd`, `FA3Invoice.toXmlValidated`)
+
+## Budowanie faktur FA(3)
+
+SDK udostępnia typed builder `FA3Invoice` do generowania XML zgodnego ze schematem FA(3):
+
+```ts
+import { FA3Invoice, FA3Party, FA3TaxCategory } from "ksef-client";
+
+const invoice = FA3Invoice.basic("FV/001/2026")
+  .seller(FA3Party.polishCompany({ nip: "1111111111", name: "Sprzedawca", address: "ul. Test 1" }))
+  .buyer(FA3Party.polishCompany({ nip: "2222222222", name: "Nabywca", address: "ul. Test 2" }))
+  .issueDate("2026-01-07")
+  .addServiceLine("Usluga", { quantity: "1", unitNetPrice: "100", tax: FA3TaxCategory.standard23() })
+  .build();
+
+const xml = invoice.toXml();
+```
+
+Szczegoly API, korekty, zaliczki i walidacja XSD: [`docs/xml/invoice.md`](docs/xml/invoice.md).
 
 ## Quick Start
 
