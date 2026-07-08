@@ -10,17 +10,17 @@ function moduleDir(): string {
   return path.dirname(fileURLToPath(import.meta.url));
 }
 
-export function resolveFa3SchemaEntryPath(): string {
+export function resolveFa3SchemaEntryPath(candidates?: string[]): string {
   const localDir = moduleDir();
-  const candidates = [
+  const defaultCandidates = [
     path.join(localDir, "schemas", SCHEMA_FILE),
     path.join(localDir, "documents", "fa3", "schemas", SCHEMA_FILE),
     path.resolve(process.cwd(), "dist", "documents", "fa3", "schemas", SCHEMA_FILE),
     path.resolve(process.cwd(), "src", "documents", "fa3", "schemas", SCHEMA_FILE),
   ];
-  const schemaPath = candidates.find((candidate) => fs.existsSync(candidate));
+  const schemaPath = (candidates ?? defaultCandidates).find((candidate) => fs.existsSync(candidate));
   if (!schemaPath) {
-    throw new KsefError(`Missing FA(3) schema file. Checked: ${candidates.join(", ")}`);
+    throw new KsefError(`Missing FA(3) schema file. Checked: ${(candidates ?? defaultCandidates).join(", ")}`);
   }
   return schemaPath;
 }
@@ -42,15 +42,34 @@ export function loadFa3SchemaWithLocalImports(): { schemaContent: string; schema
   };
 }
 
+type Fa3XmlParser = (
+  value: string,
+  options?: { baseUrl?: string },
+) => {
+  validate: (schema: unknown) => boolean;
+  validationErrors?: Array<{ message?: string }>;
+};
+
+export async function validateFa3XmlWithParser(xml: string, parseXml: Fa3XmlParser): Promise<void> {
+  const { schemaContent, schemaBaseUrl } = loadFa3SchemaWithLocalImports();
+  const schemaDoc = parseXml(schemaContent, { baseUrl: schemaBaseUrl });
+  const xmlDoc = parseXml(xml);
+  const valid = xmlDoc.validate(schemaDoc);
+  if (!valid) {
+    const errors = (xmlDoc.validationErrors ?? [])
+      .map((err: { message?: string }) => String(err?.message ?? "").trim())
+      .filter(Boolean);
+    throw new KsefError(
+      errors.length > 0 ? `FA(3) XSD validation failed: ${errors.join(" | ")}` : "FA(3) XSD validation failed.",
+    );
+  }
+}
+
 export async function validateFa3XmlXsd(xml: string): Promise<void> {
-  type ParsedXml = {
-    validate: (schema: ParsedXml) => boolean;
-    validationErrors?: Array<{ message?: string }>;
-  };
   type LibxmlModule = {
-    parseXml: (value: string, options?: { baseUrl?: string }) => ParsedXml;
+    parseXml: Fa3XmlParser;
   };
-  let parseXml: LibxmlModule["parseXml"];
+  let parseXml: Fa3XmlParser;
   try {
     // Indirect specifier keeps `libxmljs2` a runtime-only optional dependency:
     // it must not be resolved at compile time (typecheck / dts build) because
@@ -64,16 +83,5 @@ export async function validateFa3XmlXsd(xml: string): Promise<void> {
     );
   }
 
-  const { schemaContent, schemaBaseUrl } = loadFa3SchemaWithLocalImports();
-  const schemaDoc = parseXml(schemaContent, { baseUrl: schemaBaseUrl });
-  const xmlDoc = parseXml(xml);
-  const valid = xmlDoc.validate(schemaDoc);
-  if (!valid) {
-    const errors = (xmlDoc.validationErrors ?? [])
-      .map((err: { message?: string }) => String(err?.message ?? "").trim())
-      .filter(Boolean);
-    throw new KsefError(
-      errors.length > 0 ? `FA(3) XSD validation failed: ${errors.join(" | ")}` : "FA(3) XSD validation failed.",
-    );
-  }
+  await validateFa3XmlWithParser(xml, parseXml);
 }

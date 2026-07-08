@@ -53,6 +53,7 @@ export {
   exportCheckpoint,
   importCheckpoint,
   SessionStoreError,
+  formatPersistenceError,
 };
 //# sourceMappingURL=index.js.map
 `;
@@ -777,6 +778,17 @@ test("sessionStore: loadCheckpoint validates batch payloadSource and ordinals", 
     );
   } finally {
     await rm(cliHome, { recursive: true, force: true });
+    await loaded.dispose();
+  }
+});
+
+test("sessionStore: formatPersistenceError stringifies non-Error values", async () => {
+  const loaded = await loadSessionStoreModule();
+  try {
+    const { formatPersistenceError } = loaded.module;
+    assert.equal(formatPersistenceError(new Error("boom")), "boom");
+    assert.equal(formatPersistenceError("string-boom"), "string-boom");
+  } finally {
     await loaded.dispose();
   }
 });

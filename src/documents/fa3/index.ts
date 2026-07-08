@@ -1,5 +1,5 @@
 export * from "./types";
-export { PartyIdentifierKind } from "./identifier";
+export { PartyIdentifierKind, validatePartyIdentifier, mapPartyIdentityToXml, resolvePartyIdentifier } from "./identifier";
 export type { PartyIdentifierKindValue, ResolvedPartyIdentifier } from "./identifier";
 export * from "./builder";
 export * from "./domain";

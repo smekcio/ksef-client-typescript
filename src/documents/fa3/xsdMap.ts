@@ -56,12 +56,6 @@ function asElement(node: XmlLikeNode | null): XmlLikeElement | null {
   if (!node || node.nodeType !== node.ELEMENT_NODE) {
     return null;
   }
-  if (typeof node.getAttribute !== "function") {
-    return null;
-  }
-  if (typeof node.getElementsByTagNameNS !== "function") {
-    return null;
-  }
   return node as XmlLikeElement;
 }
 
@@ -80,10 +74,7 @@ function walkSimpleTypeEnums(root: XmlLikeElement): Map<string, string[]> {
   const enums = new Map<string, string[]>();
   const simpleTypes = root.getElementsByTagNameNS("*", "simpleType");
   for (let i = 0; i < simpleTypes.length; i += 1) {
-    const simpleType = asElement(simpleTypes.item(i));
-    if (!simpleType) {
-      continue;
-    }
+    const simpleType = simpleTypes.item(i) as XmlLikeElement;
     const name = simpleType.getAttribute("name");
     if (!name) {
       continue;

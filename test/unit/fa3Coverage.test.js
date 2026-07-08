@@ -360,6 +360,7 @@ test("domain.ts helpers cover all branches", () => {
   assert.deepEqual(Discount.amount(10, "promo"), { kind: "amount", value: 10, reason: "promo" });
   assert.deepEqual(Discount.amount(10), { kind: "amount", value: 10 });
   assert.deepEqual(Discount.percent(5, "promo"), { kind: "percent", value: 5, reason: "promo" });
+  assert.deepEqual(Discount.percent(5), { kind: "percent", value: 5 });
 
   const goods = InvoiceLine.goods("g", {
     quantity: 1,

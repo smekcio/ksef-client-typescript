@@ -609,8 +609,8 @@ async function runSend(
     let upo: JsonValue | null = null;
     if (waitForUpo) {
       upoXml = await session.waitForUpo({
-        ...(pollIntervalMs !== undefined ? { pollIntervalMs } : {}),
-        ...(maxAttempts !== undefined ? { maxAttempts } : {}),
+        pollIntervalMs: pollIntervalMs ?? 2000,
+        maxAttempts: maxAttempts ?? 60,
       });
       if (upoXml) {
         upo = toJsonValue(parseUpoXml(upoXml));
@@ -1033,7 +1033,7 @@ async function runSessionBatch(
         maxAttempts,
       );
       result.status = toJsonValue(status);
-      result.statusCode = status.status?.code ?? null;
+      result.statusCode = extractStatusCode(status);
       const upoRef = status.upo?.pages?.[0]?.referenceNumber ?? "";
       if (upoRef) {
         checkpoint = (await updateCheckpoint(context.cliHome, checkpoint, {
@@ -1223,11 +1223,12 @@ function requireSessionId(options: Record<string, string | boolean>, fallback?: 
   try {
     return validateSessionId(value);
   } catch (error) {
-    if (error instanceof SessionStoreError) {
-      throw new CliError(error.message, EXIT_USAGE);
-    }
-    throw error;
+    throw new CliError(formatSessionIdError(error), EXIT_USAGE);
   }
+}
+
+function formatSessionIdError(error: unknown): string {
+  return error instanceof SessionStoreError ? error.message : String(error);
 }
 
 function parseSessionFormCode(

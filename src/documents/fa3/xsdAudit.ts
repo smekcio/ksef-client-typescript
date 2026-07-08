@@ -169,8 +169,10 @@ function domainField(pathValue: string): string {
   return `invoice.${pathValue.replace(/^\/Faktura\/?/, "").replaceAll("/", ".")}`;
 }
 
-export function auditFa3XsdCoverage(): XsdCoverageReport {
-  const elements = parseFa3XsdElements(loadFa3SchemaWithLocalImports().schemaContent);
+export function auditFa3XsdCoverage(options: { elements?: XsdElement[] } = {}): XsdCoverageReport {
+  const elements =
+    options.elements ??
+    parseFa3XsdElements(loadFa3SchemaWithLocalImports().schemaContent);
   const coverage = elements.map((element) => {
     const status = coverageStatus(element.path);
     const handler = handlerName(element.path, status);

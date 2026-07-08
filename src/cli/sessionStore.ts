@@ -7,6 +7,10 @@ import { OnlineSessionState } from "../services/onlineSessionWorkflow";
 const CHECKPOINT_SCHEMA_VERSION = 1;
 const SESSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+export function formatPersistenceError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 type SessionStoreErrorKind = "validation" | "config" | "io";
 
 export class SessionStoreError extends Error {
@@ -229,7 +233,7 @@ async function writeJsonAtomic(targetPath: string, payload: unknown): Promise<vo
     await rename(tempPath, targetPath);
   } catch (error) {
     await unlink(tempPath).catch(() => undefined);
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatPersistenceError(error);
     throw new SessionStoreError(`Cannot persist session checkpoint: ${message}`, "config");
   }
 }
@@ -339,7 +343,7 @@ async function readCheckpointFile(filePath: string): Promise<SessionCheckpoint> 
   try {
     rawText = await readFile(filePath, "utf8");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatPersistenceError(error);
     throw new SessionStoreError(`Cannot read session checkpoint: ${message}`, "config");
   }
 
@@ -434,7 +438,7 @@ export async function deleteCheckpoint(
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new SessionStoreError(`Session checkpoint "${sessionId}" does not exist.`, "config");
     }
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatPersistenceError(error);
     throw new SessionStoreError(`Cannot delete session checkpoint: ${message}`, "config");
   }
 }

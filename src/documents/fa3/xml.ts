@@ -9,13 +9,23 @@ export class FA3XmlValidationError extends KsefError {
   }
 }
 
-export async function validateFa3Xml(xml: string): Promise<void> {
+export function toFa3XmlValidationMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function validateFa3XmlWithValidator(
+  xml: string,
+  validator: (value: string) => Promise<void>,
+): Promise<void> {
   try {
-    await validateFa3XmlXsd(xml);
+    await validator(xml);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new FA3XmlValidationError(message);
+    throw new FA3XmlValidationError(toFa3XmlValidationMessage(error));
   }
+}
+
+export async function validateFa3Xml(xml: string): Promise<void> {
+  return validateFa3XmlWithValidator(xml, validateFa3XmlXsd);
 }
 
 export async function invoiceToXml(

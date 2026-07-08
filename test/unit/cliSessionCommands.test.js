@@ -1119,6 +1119,26 @@ test("top-level send persists a session checkpoint and enforces UPO options", as
     assert.equal(payload.sessionId, "s1");
     assert.match(await readFile(upoOut, "utf8"), /<Potwierdzenie>/);
 
+    // Default poll settings when --wait-upo is used without explicit poll flags.
+    const upoDefault = path.join(tempDir, "send-upo-default.xml");
+    result = await run([
+      "--json",
+      "send",
+      "--profile",
+      "default",
+      "--invoice-file",
+      invoiceFile,
+      "--form-code",
+      "FA3",
+      "--save-session",
+      "s-default-poll",
+      "--wait-upo",
+      "--save-upo",
+      upoDefault,
+    ]);
+    assert.equal(result.exitCode, 0, result.capture.stderr.join("\n"));
+    assert.match(await readFile(upoDefault, "utf8"), /<Potwierdzenie>/);
+
     // Re-using the same session id fails because the checkpoint already exists.
     result = await run([
       "--json",

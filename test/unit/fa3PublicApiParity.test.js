@@ -96,6 +96,12 @@ const ACCEPTED_TS_FA3_SYMBOLS = new Set([
   "ValidationContext",
   "VatClass",
   "VatRateCode",
+  "mapPartyIdentityToXml",
+  "resolvePartyIdentifier",
+  "toFa3XmlValidationMessage",
+  "validateFa3XmlWithParser",
+  "validateFa3XmlWithValidator",
+  "validatePartyIdentifier",
 ]);
 
 test("FA(3) public runtime API exposes the local TypeScript contract", () => {

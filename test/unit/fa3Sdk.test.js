@@ -8,6 +8,7 @@ import {
   FA3Draft,
   FA3Importer,
   FA3Invoice,
+  FA3XmlValidationError,
   ImportMode,
   InvoiceParty,
   KsefError,
@@ -113,7 +114,7 @@ test("FA3 SDK XSD validation branch is reachable", async () => {
     const xml = await draft.toXml({ xsdValidate: true });
     assert.match(xml, /<Faktura/);
   } catch (error) {
-    assert.ok(error instanceof KsefError);
+    assert.ok(error instanceof FA3XmlValidationError || error instanceof KsefError);
     assert.match(error.message, /libxmljs2|XSD validation failed/i);
   }
 });

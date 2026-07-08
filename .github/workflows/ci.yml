@@ -79,6 +79,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install optional libxmljs2 for XSD coverage
+        run: npm install libxmljs2 --no-save
+
       - name: Build package
         run: npm run build
 
