@@ -209,9 +209,29 @@ test("builder.ts: remaining optional false branches and advance reference cleari
     .buyer(BUYER)
     .addLine(LINE)
     .advanceReference({ ksefNumber: "KSEF-ZAL" })
+    .settlesAdvance({ invoiceNumber: "ZAL/1", ksefNumber: "KSEF-ZAL" })
     .settlesAdvance({ invoiceNumber: "ZAL/1" })
-    .settlesAdvance({ ksefNumber: undefined })
     .build();
   assert.equal(clearedKsef.toDict().advanceKsefNumber, undefined);
   assert.equal(clearedKsef.toDict().advanceInvoiceNumber, "ZAL/1");
+});
+
+test("builder.ts: toXml xsdValidate when libxmljs2 is available", async () => {
+  let hasLibxml = false;
+  try {
+    await import("libxmljs2");
+    hasLibxml = true;
+  } catch {
+    hasLibxml = false;
+  }
+  if (!hasLibxml) {
+    return;
+  }
+  const xml = await FA3Invoice.basic("FV/XSD/926")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .toXml({ xsdValidate: true });
+  assert.match(xml, /<Faktura/);
 });

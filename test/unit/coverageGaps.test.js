@@ -146,6 +146,19 @@ test("xsdMap.ts: synthetic schema fragments cover parser branches", () => {
     </schema>`;
   const enumParsed = parseFa3XsdElements(enumWithoutValue);
   assert.deepEqual(enumParsed.find((entry) => entry.path === "/Faktura/X")?.enumValues, []);
+
+  const unnamedElement = `
+    <schema xmlns="http://www.w3.org/2001/XMLSchema">
+      <element name="Faktura">
+        <complexType>
+          <sequence>
+            <element><complexType><sequence/></complexType></element>
+          </sequence>
+        </complexType>
+      </element>
+    </schema>`;
+  const unnamedParsed = parseFa3XsdElements(unnamedElement);
+  assert.ok(unnamedParsed.some((entry) => entry.path.includes("/Faktura/")));
 });
 
 // ---------------------------------------------------------------------------
@@ -295,6 +308,15 @@ test("identifier.ts: validatePartyIdentifier validation branches", () => {
     validatePartyIdentifier({ kind: PartyIdentifierKind.EU_VAT, value: undefined, countryCode: "DE" }, "party").some(
       (issue) => issue.code === "identifier_required",
     ),
+  );
+
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.EU_VAT, value: "1" }, "EU", "buyer"),
+    { KodUE: "", NrVatUE: "1", Nazwa: "EU" },
+  );
+  assert.deepEqual(
+    mapPartyIdentityToXml({ kind: PartyIdentifierKind.NIP, value: "123" }, "Seller", "seller"),
+    { NIP: "123", Nazwa: "Seller" },
   );
 });
 
