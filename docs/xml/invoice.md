@@ -6,8 +6,7 @@ Narzędzia z tej sekcji służą do przygotowania dokumentów XML przekazywanych
 
 - `buildFakturaXml(faktura: FakturaInput, options?: FakturaXmlOptions): string`
 - `FA3Invoice.basic(number)` / `correction(number)` / `advance(number)` / `settlement(number)`
-- `validateFa3XmlWellFormed(xml, options?): Promise<void>` — sprawdza poprawność składniową XML (well-formedness)
-- `validateFa3XmlXsd(xml, options?): Promise<void>` — alias przestarzały; patrz `validateFa3XmlWellFormed`
+- `validateFa3XmlWellFormed(xml, options?): void` — sprawdza poprawność składniową XML (well-formedness)
 - `serializeInvoiceXml(input: InvoiceXmlInput, options?: FakturaXmlOptions): Buffer`
 - `buildPefXml(input: PefUblDocumentInput, options?: { pretty?: boolean }): string`
 
@@ -90,8 +89,6 @@ Walidacja poprawności składniowej XML FA(3) jest dostępna przez `invoice.toXm
 well-formedness przy użyciu `fast-xml-parser` — **nie** weryfikuje zgodności ze schematem XSD.
 Pliki `.xsd` w paczce służą jako referencja; `resolveFa3SchemaPath()` lokalizuje je w `src/xml/fa3-schemas/`.
 
-Metody `toXmlValidated()`, `toBufferValidated()` i `validateFa3XmlXsd()` pozostają jako przestarzałe aliasy.
-
 Najważniejsze różnice względem buildera Python:
 
 - brak draftowego `FA3BatchDraft` z JSON round-trip; paczki ZIP można nadal budować przez istniejący batch workflow,
@@ -159,7 +156,19 @@ const pefXml = buildPefXml({
 ## Przykład 4: `serializeInvoiceXml(...)`
 
 ```ts
-import { FA3Invoice, serializeInvoiceXml } from "ksef-client";
+import { FA3Invoice, FA3Party, serializeInvoiceXml } from "ksef-client";
+
+const seller = FA3Party.polishCompany({
+  nip: "1111111111",
+  name: "Sprzedawca Sp. z o.o.",
+  address: "ul. Test 1",
+});
+
+const buyer = FA3Party.polishCompany({
+  nip: "2222222222",
+  name: "Nabywca S.A.",
+  address: "ul. Test 2",
+});
 
 const fromString = serializeInvoiceXml("<Faktura>...</Faktura>");
 const fromObject = serializeInvoiceXml({

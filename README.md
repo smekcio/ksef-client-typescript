@@ -31,7 +31,7 @@ npm install qrcode node-forge
 
 ## Budowanie faktur FA(3)
 
-SDK udostępnia typed builder `FA3Invoice` do generowania XML zgodnego ze schematem FA(3):
+SDK udostępnia typed builder `FA3Invoice` do generowania poprawnie sformatowanego XML FA(3):
 
 ```ts
 import { FA3Invoice, FA3Party, FA3TaxCategory } from "ksef-client";
@@ -44,7 +44,7 @@ const invoice = FA3Invoice.basic("FV/001/2026")
   .build();
 
 const xml = invoice.toXml();
-const wellFormedXml = await invoice.toXmlWellFormed();
+const wellFormedXml = invoice.toXmlWellFormed();
 ```
 
 Szczegoly API, korekty, zaliczki i walidacja XML: [`docs/xml/invoice.md`](docs/xml/invoice.md).

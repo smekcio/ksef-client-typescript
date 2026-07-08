@@ -16,25 +16,14 @@ export class XmlWellFormedError extends KsefValidationError {
   }
 }
 
-/** @deprecated Use {@link XmlWellFormedError} instead. */
-export class XsdValidationError extends XmlWellFormedError {
-  constructor(message: string, validationErrors: string[] = []) {
-    super(message, validationErrors);
-    this.name = "XsdValidationError";
-  }
-}
-
 export interface XmlWellFormedOptions {
   allowBooleanAttributes?: boolean;
 }
 
-/** @deprecated Use {@link XmlWellFormedOptions} instead. */
-export type XsdValidationOptions = XmlWellFormedOptions;
-
-export async function validateFa3XmlWellFormed(
+export function validateFa3XmlWellFormed(
   xml: string | Buffer,
   options: XmlWellFormedOptions = {},
-): Promise<void> {
+): void {
   const text = Buffer.isBuffer(xml) ? xml.toString("utf8") : xml;
   const result = XMLValidator.validate(text, {
     allowBooleanAttributes: options.allowBooleanAttributes ?? true,
@@ -45,14 +34,6 @@ export async function validateFa3XmlWellFormed(
   }
 }
 
-/** @deprecated Use {@link validateFa3XmlWellFormed} instead. Checks XML well-formedness only, not XSD schema conformance. */
-export async function validateFa3XmlXsd(
-  xml: string | Buffer,
-  options: XmlWellFormedOptions = {},
-): Promise<void> {
-  return validateFa3XmlWellFormed(xml, options);
-}
-
 export function resolveFa3SchemaPath(schemaDirectory?: string): string {
   if (schemaDirectory) {
     return path.join(schemaDirectory, "schemat_FA(3)_v1-0E.xsd");
@@ -60,7 +41,7 @@ export function resolveFa3SchemaPath(schemaDirectory?: string): string {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
     path.join(moduleDir, "fa3-schemas", "schemat_FA(3)_v1-0E.xsd"),
-    path.join(moduleDir, "..", "src", "xml", "fa3-schemas", "schemat_FA(3)_v1-0E.xsd"),
+    path.join(moduleDir, "..", "..", "src", "xml", "fa3-schemas", "schemat_FA(3)_v1-0E.xsd"),
     path.join(process.cwd(), "src", "xml", "fa3-schemas", "schemat_FA(3)_v1-0E.xsd"),
   ];
   const found = candidates.find((candidate) => fs.existsSync(candidate));

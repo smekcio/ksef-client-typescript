@@ -88,9 +88,11 @@ test("FA3Invoice builder creates complex FA(3) XML", () => {
   assert.match(xml, /<WarunkiTransakcji>/);
   assert.match(xml, /<Transport>/);
   assert.match(xml, /<Przewoznik>/);
+  assert.doesNotMatch(xml, /<OpisLadunku>/);
   assert.match(xml, /<Skonto><WarunkiSkonta>2% przy platnosci do 7 dni<\/WarunkiSkonta><WysokoscSkonta>20.00<\/WysokoscSkonta><\/Skonto>/);
   assert.match(xml, /<Stopka>/);
   assert.match(xml, /<Informacje><StopkaFaktury>Kapital zakladowy 5000 PLN<\/StopkaFaktury><\/Informacje>/);
+  assert.match(xml, /<Klucz>projekt<\/Klucz><Wartosc>FA3 TypeScript<\/Wartosc>/);
   assert.match(xml, /<Klucz>raw<\/Klucz><Wartosc>tak<\/Wartosc>/);
 });
 
@@ -314,11 +316,15 @@ test("FA3Invoice builder supports simplified, advance correction and settlement 
 });
 
 test("FA3Invoice builder supports settlement charges and corrected additional parties", () => {
-  const thirdParty = FA3Party.internalEntity({
-    id: "INT-1",
-    name: "Podmiot dodatkowy",
-    address: "Dodatkowa 1",
-  });
+  const thirdParty = {
+    ...FA3Party.polishCompany({
+      nip: "3333333333",
+      name: "Podmiot dodatkowy",
+      address: "Dodatkowa 1",
+    }),
+    role: "4",
+    buyerId: "ADD-1",
+  };
 
   const invoice = FA3Invoice.settlement("ROZ/CHARGE/1")
     .seller(seller)
@@ -352,10 +358,12 @@ test("FA3Invoice builder supports settlement charges and corrected additional pa
   const correctionXml = correction.toXml();
   assert.match(correctionXml, /<Podmiot3>/);
   assert.match(correctionXml, /<Podmiot2K>/);
-  assert.match(correctionXml, /<IDWew>INT-1<\/IDWew>/);
+  assert.match(correctionXml, /<Podmiot2K>[\s\S]*<NIP>3333333333<\/NIP>/);
+  assert.match(correctionXml, /<Podmiot2K>[\s\S]*<IDNabywcy>ADD-1<\/IDNabywcy>/);
+  assert.doesNotMatch(correctionXml, /<Podmiot2K>[\s\S]*<JST>/);
 });
 
-test("FA3Invoice toXmlWellFormed returns well-formed XML", async () => {
+test("FA3Invoice toXmlWellFormed returns well-formed XML", () => {
   const invoice = FA3Invoice.basic("FV/XSD/2")
     .seller(seller)
     .buyer(buyer)
@@ -363,12 +371,12 @@ test("FA3Invoice toXmlWellFormed returns well-formed XML", async () => {
     .addLine({ description: "XSD", quantity: "1", unitNetPrice: "10", tax: "23" })
     .build();
 
-  const xml = await invoice.toXmlWellFormed();
+  const xml = invoice.toXmlWellFormed();
   assert.match(xml, /<Faktura/);
 });
 
-test("validateFa3XmlWellFormed rejects malformed XML", async () => {
-  await assert.rejects(
+test("validateFa3XmlWellFormed rejects malformed XML", () => {
+  assert.throws(
     () => validateFa3XmlWellFormed("<Faktura><unclosed>"),
     (error) => {
       assert.ok(error instanceof XmlWellFormedError);
@@ -378,20 +386,150 @@ test("validateFa3XmlWellFormed rejects malformed XML", async () => {
   );
 });
 
+test("FA3Invoice builder formats local calendar dates from Date objects", () => {
+  const invoice = FA3Invoice.basic("FV/DATE/LOCAL/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate(new Date(2026, 0, 15))
+    .saleDate(new Date(2026, 0, 14))
+    .addLine({ description: "Usluga", quantity: "1", unitNetPrice: "100", tax: "23" })
+    .build();
+
+  const xml = invoice.toXml();
+  assert.match(xml, /<P_1>2026-01-15<\/P_1>/);
+  assert.match(xml, /<P_6>2026-01-14<\/P_6>/);
+});
+
+test("FA3Invoice builder normalizes ISO date strings to YYYY-MM-DD", () => {
+  const invoice = FA3Invoice.basic("FV/DATE/ISO/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-01-07T00:00:00Z")
+    .saleDate("2026-01-06T23:59:59Z")
+    .addLine({ description: "Usluga", quantity: "1", unitNetPrice: "100", tax: "23" })
+    .build();
+
+  const xml = invoice.toXml();
+  assert.match(xml, /<P_1>2026-01-07<\/P_1>/);
+  assert.match(xml, /<P_6>2026-01-06<\/P_6>/);
+});
+
+test("FA3Invoice builder formats UTC date-only Date objects consistently", () => {
+  const invoice = FA3Invoice.basic("FV/DATE/UTC/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate(new Date("2026-01-15"))
+    .addLine({ description: "Usluga", quantity: "1", unitNetPrice: "100", tax: "23" })
+    .build();
+
+  const xml = invoice.toXml();
+  assert.match(xml, /<P_1>2026-01-15<\/P_1>/);
+});
+
+test("FA3Invoice builder rejects newTransport without transport means", () => {
+  assert.throws(
+    () =>
+      FA3Invoice.basic("FV/NST/INVALID")
+        .seller(seller)
+        .buyer(buyer)
+        .issueDate("2026-08-01")
+        .newTransport()
+        .addLine({ description: "Towar", quantity: "1", unitNetPrice: "100", tax: "23" })
+        .build(),
+    KsefValidationError,
+  );
+});
+
+test("FA3Invoice builder supports corrected seller in Podmiot1K", () => {
+  const correction = FA3Invoice.correction("KOR/SELLER/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-07-10")
+    .correctsInvoice({
+      invoiceNumber: "FV/1/2026",
+      issueDate: "2026-07-01",
+      reason: "Korekta sprzedawcy",
+    })
+    .correctedSeller({
+      ...seller,
+      address: { line1: "Stary adres 1", line2: "00-001 Warszawa" },
+    })
+    .addLine({ description: "Korekta", quantity: "1", unitNetPrice: "10", tax: "23" })
+    .build();
+
+  const xml = correction.toXml();
+  assert.match(xml, /<Podmiot1K>/);
+  assert.match(xml, /<Podmiot1K>[\s\S]*<NIP>1111111111<\/NIP>/);
+  assert.match(xml, /<Podmiot1K>[\s\S]*<AdresL1>Stary adres 1<\/AdresL1>/);
+  assert.doesNotMatch(xml, /<Podmiot1K>[\s\S]*<NrEORI>/);
+  assert.doesNotMatch(xml, /<Podmiot1K>[\s\S]*<DaneKontaktowe>/);
+});
+
+test("FA3Invoice builder rejects corrected seller without address", () => {
+  assert.throws(
+    () =>
+      FA3Invoice.correction("KOR/SELLER/INVALID")
+        .seller(seller)
+        .buyer(buyer)
+        .correctsInvoice({
+          invoiceNumber: "FV/1/2026",
+          issueDate: "2026-07-01",
+          reason: "Korekta sprzedawcy",
+        })
+        .correctedSeller(FA3Party.polishCompany({ nip: "1111111111", name: "Sprzedawca" }))
+        .addLine({ description: "Korekta", quantity: "1", unitNetPrice: "10", tax: "23" })
+        .build(),
+    KsefValidationError,
+  );
+});
+
+test("FA3Invoice builder merges managed and raw Platnosc sections", () => {
+  const invoice = FA3Invoice.basic("FV/PAY/RAW/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-10-01")
+    .paymentDue("2026-10-15")
+    .withRawFa({
+      Platnosc: {
+        Zaplacono: "1",
+        DataZaplaty: "2026-10-02",
+      },
+    })
+    .addLine({ description: "Usluga", quantity: "1", unitNetPrice: "100", tax: "23" })
+    .build();
+
+  const xml = invoice.toXml();
+  assert.match(xml, /<Termin>2026-10-15<\/Termin>/);
+  assert.match(xml, /<Zaplacono>1<\/Zaplacono>/);
+  assert.match(xml, /<DataZaplaty>2026-10-02<\/DataZaplaty>/);
+});
+
+test("FA3Invoice builder rejects corrected parties with internal identifiers", () => {
+  assert.throws(
+    () =>
+      FA3Invoice.correction("KOR/INTERNAL")
+        .seller(seller)
+        .buyer(buyer)
+        .correctsInvoice({
+          invoiceNumber: "FV/1/2026",
+          issueDate: "2026-07-01",
+          reason: "Korekta",
+        })
+        .correctedAdditionalParty(
+          FA3Party.internalEntity({
+            id: "INT-1",
+            name: "Podmiot dodatkowy",
+          }),
+        )
+        .addLine({ description: "Korekta", quantity: "1", unitNetPrice: "10", tax: "23" })
+        .build(),
+    KsefValidationError,
+  );
+});
+
 test("resolveFa3SchemaPath locates bundled FA(3) reference schema", () => {
   assert.doesNotThrow(() => resolveFa3SchemaPath());
   assert.match(resolveFa3SchemaPath(), /schemat_FA\(3\)_v1-0E\.xsd$/);
-});
-
-test("deprecated toXmlValidated delegates to toXmlWellFormed", async () => {
-  const invoice = FA3Invoice.basic("FV/XSD/1")
-    .seller(seller)
-    .buyer(buyer)
-    .issueDate("2026-11-01")
-    .addLine({ description: "XSD", quantity: "1", unitNetPrice: "10", tax: "23" })
-    .build();
-
-  await assert.doesNotReject(invoice.toXmlValidated());
 });
 
 test("FA3Invoice builder validates required fields", () => {

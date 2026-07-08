@@ -595,28 +595,18 @@ export class FA3Invoice {
     return buildFakturaXml(this.toFakturaInput(), { schema: "FA3", ...options });
   }
 
-  async toXmlWellFormed(options?: FakturaXmlOptions): Promise<string> {
+  toXmlWellFormed(options?: FakturaXmlOptions): string {
     const xml = this.toXml(options);
-    await validateFa3XmlWellFormed(xml);
+    validateFa3XmlWellFormed(xml);
     return xml;
-  }
-
-  /** @deprecated Use {@link toXmlWellFormed} instead. */
-  async toXmlValidated(options?: FakturaXmlOptions): Promise<string> {
-    return this.toXmlWellFormed(options);
   }
 
   toBuffer(options?: FakturaXmlOptions): Buffer {
     return Buffer.from(this.toXml(options), "utf8");
   }
 
-  async toBufferWellFormed(options?: FakturaXmlOptions): Promise<Buffer> {
-    return Buffer.from(await this.toXmlWellFormed(options), "utf8");
-  }
-
-  /** @deprecated Use {@link toBufferWellFormed} instead. */
-  async toBufferValidated(options?: FakturaXmlOptions): Promise<Buffer> {
-    return this.toBufferWellFormed(options);
+  toBufferWellFormed(options?: FakturaXmlOptions): Buffer {
+    return Buffer.from(this.toXmlWellFormed(options), "utf8");
   }
 }
 
@@ -1205,9 +1195,79 @@ function buildFa(data: FA3InvoiceBuildData): XmlObject {
     ...(data.paymentTerms ? { Platnosc: paymentToXml(data.paymentTerms, decimalFromSummaryTotal(summary)) } : {}),
     ...(data.transactionTerms ? { WarunkiTransakcji: transactionTermsToXml(data.transactionTerms) } : {}),
     ...(data.order ? { Zamowienie: orderToXml(data.order) } : {}),
-    ...(data.rawFa ?? {}),
   };
-  return fa;
+  return mergeFaWithRawFa(fa, data.rawFa);
+}
+
+const FA_MERGE_ARRAY_KEYS = [
+  "DodatkowyOpis",
+  "FaWiersz",
+  "ZaliczkaCzesciowa",
+  "FakturaZaliczkowa",
+  "Podmiot2K",
+] as const;
+
+const FA_MERGE_OBJECT_KEYS = [
+  "Platnosc",
+  "Rozliczenie",
+  "WarunkiTransakcji",
+  "Zamowienie",
+] as const;
+
+function asXmlObjectArray(value: XmlValue | XmlValue[] | undefined): XmlObject[] {
+  if (value === undefined) {
+    return [];
+  }
+  return (Array.isArray(value) ? value : [value]).filter(
+    (item): item is XmlObject => typeof item === "object" && item !== null && !Array.isArray(item),
+  );
+}
+
+function shallowMergeObjects(
+  managed: XmlValue | undefined,
+  raw: XmlValue | undefined,
+): XmlObject {
+  const managedObject =
+    typeof managed === "object" && managed !== null && !Array.isArray(managed) ? managed : {};
+  const rawObject = typeof raw === "object" && raw !== null && !Array.isArray(raw) ? raw : {};
+  return { ...managedObject, ...rawObject };
+}
+
+function mergeFaWithRawFa(fa: XmlObject, rawFa: XmlObject | undefined): XmlObject {
+  if (!rawFa) {
+    return fa;
+  }
+
+  const result: XmlObject = { ...fa };
+  const handledKeys = new Set<string>();
+
+  for (const key of FA_MERGE_ARRAY_KEYS) {
+    const managed = fa[key];
+    const raw = rawFa[key];
+    if (managed === undefined && raw === undefined) {
+      continue;
+    }
+    result[key] = [...asXmlObjectArray(managed), ...asXmlObjectArray(raw)];
+    handledKeys.add(key);
+  }
+
+  for (const key of FA_MERGE_OBJECT_KEYS) {
+    const managed = fa[key];
+    const raw = rawFa[key];
+    if (managed === undefined && raw === undefined) {
+      continue;
+    }
+    result[key] = shallowMergeObjects(managed, raw);
+    handledKeys.add(key);
+  }
+
+  for (const [key, value] of Object.entries(rawFa)) {
+    if (!handledKeys.has(key)) {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 function partyToXml(
@@ -1267,6 +1327,58 @@ function partyToXml(
     result.RolaPU = party.authorizedRole ?? "3";
   }
   return { ...result, ...(party.raw ?? {}) };
+}
+
+function correctedSellerToXml(party: FA3PartyInput): XmlObject {
+  if (!party.address) {
+    throw new KsefValidationError("correctedSeller.address is required for Podmiot1K.");
+  }
+  const result: XmlObject = {
+    DaneIdentyfikacyjne: partyIdentityToXml(party, true),
+    Adres: addressToXml(party.address),
+  };
+  if (party.taxpayerPrefix) {
+    result.PrefiksPodatnika = party.taxpayerPrefix;
+  }
+  return { ...result, ...(party.raw ?? {}) };
+}
+
+function correctedPartyToXml(party: FA3PartyInput): XmlObject {
+  const result: XmlObject = {
+    DaneIdentyfikacyjne: buyerIdentityToXml(party),
+  };
+  if (party.address) {
+    result.Adres = addressToXml(party.address);
+  }
+  if (party.buyerId) {
+    result.IDNabywcy = party.buyerId;
+  }
+  return { ...result, ...(party.raw ?? {}) };
+}
+
+function buyerIdentityToXml(party: FA3PartyInput): XmlObject {
+  const id = party.identifier;
+  if (id.kind === "internal") {
+    throw new KsefValidationError(
+      "Podmiot2K does not support internal (IDWew) identifiers; use NIP, EU VAT, foreign ID, or BrakID.",
+    );
+  }
+  const result: XmlObject = {};
+  if (id.kind === "nip") {
+    result.NIP = id.value;
+  } else if (id.kind === "euVat") {
+    result.KodUE = id.countryCode.toUpperCase();
+    result.NrVatUE = id.value;
+  } else if (id.kind === "foreign") {
+    if (id.countryCode) {
+      result.KodKraju = id.countryCode.toUpperCase();
+    }
+    result.NrID = id.value;
+  } else {
+    result.BrakID = "1";
+  }
+  result.Nazwa = party.name;
+  return result;
 }
 
 function partyIdentityToXml(party: FA3PartyInput, requiresNip: boolean): XmlObject {
@@ -1483,12 +1595,12 @@ function correctionToXml(data: FA3InvoiceBuildData): XmlObject {
     ...(data.correctedInvoiceNumberOverride
       ? { NrFaKorygowany: data.correctedInvoiceNumberOverride }
       : {}),
-    ...(data.correctedSeller ? { Podmiot1K: partyToXml(data.correctedSeller, { seller: true }) } : {}),
+    ...(data.correctedSeller ? { Podmiot1K: correctedSellerToXml(data.correctedSeller) } : {}),
     ...(data.correctedBuyers?.length || data.correctedAdditionalParties?.length
       ? {
           Podmiot2K: [
-            ...(data.correctedBuyers ?? []).map((party) => partyToXml(party, { buyer: true })),
-            ...(data.correctedAdditionalParties ?? []).map((party) => partyToXml(party, { thirdParty: true })),
+            ...(data.correctedBuyers ?? []).map(correctedPartyToXml),
+            ...(data.correctedAdditionalParties ?? []).map(correctedPartyToXml),
           ],
         }
       : {}),
@@ -1787,7 +1899,9 @@ function transportToXml(input: FA3TransportInput | XmlObject): XmlObject {
     ...(input.orderNumber ? { NrZleceniaTransportu: input.orderNumber } : {}),
     ...(input.otherCargoDescription
       ? { LadunekInny: "1", OpisInnegoLadunku: input.otherCargoDescription }
-      : { OpisLadunku: input.cargoDescription ?? "1" }),
+      : input.cargoDescription !== undefined
+        ? { OpisLadunku: input.cargoDescription }
+        : {}),
     ...(input.packageUnit ? { JednostkaOpakowania: input.packageUnit } : {}),
     ...(input.startedAt ? { DataGodzRozpTransportu: dateTimeToString(input.startedAt) } : {}),
     ...(input.finishedAt ? { DataGodzZakTransportu: dateTimeToString(input.finishedAt) } : {}),
@@ -1980,6 +2094,19 @@ function validateBuildData(data: FA3InvoiceBuildData): void {
   if (data.kind === "settlement" && !data.advanceInvoices?.length) {
     errors.push("advanceInvoices are required for settlement invoices.");
   }
+  if (data.annotations?.newTransport && !data.annotations?.newTransportMeans?.length) {
+    errors.push("newTransport requires at least one newTransportMeans entry.");
+  }
+  if (data.correctedSeller && !data.correctedSeller.address) {
+    errors.push("correctedSeller.address is required for Podmiot1K.");
+  }
+  [...(data.correctedBuyers ?? []), ...(data.correctedAdditionalParties ?? [])].forEach((party, index) => {
+    if (party.identifier.kind === "internal") {
+      errors.push(
+        `correctedParties[${index}] cannot use internal (IDWew) identifier in Podmiot2K.`,
+      );
+    }
+  });
   if (data.simplifiedReceiptLike) {
     const totalGross = data.lines.reduce((sum, input) => sum + normalizeLine(input).grossAmount, 0);
     if (data.currency.toUpperCase() !== "PLN") {
@@ -2019,11 +2146,36 @@ function normalizeAddress(input: FA3Address | string | undefined, countryCode = 
   return { countryCode: input.countryCode ?? countryCode, ...input };
 }
 
+function isUtcMidnight(value: Date): boolean {
+  return (
+    value.getUTCHours() === 0 &&
+    value.getUTCMinutes() === 0 &&
+    value.getUTCSeconds() === 0 &&
+    value.getUTCMilliseconds() === 0
+  );
+}
+
+function formatCalendarDate(value: Date, useUtc: boolean): string {
+  const year = useUtc ? value.getUTCFullYear() : value.getFullYear();
+  const month = String((useUtc ? value.getUTCMonth() : value.getMonth()) + 1).padStart(2, "0");
+  const day = String(useUtc ? value.getUTCDate() : value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function dateToString(value: Date | string): string {
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const datePrefix = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (datePrefix?.[1]) {
+      return datePrefix[1];
+    }
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new KsefValidationError(`Invalid date value: ${value}`);
+    }
+    return dateToString(parsed);
   }
-  return value;
+  return formatCalendarDate(value, isUtcMidnight(value));
 }
 
 function dateTimeToString(value: Date | string): string {
