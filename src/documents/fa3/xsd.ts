@@ -52,8 +52,12 @@ export async function validateFa3XmlXsd(xml: string): Promise<void> {
   };
   let parseXml: LibxmlModule["parseXml"];
   try {
-    const imported = await import("libxmljs2");
-    parseXml = (imported as unknown as LibxmlModule).parseXml;
+    // Indirect specifier keeps `libxmljs2` a runtime-only optional dependency:
+    // it must not be resolved at compile time (typecheck / dts build) because
+    // the native module is frequently absent (skipped optional install).
+    const moduleName: string = "libxmljs2";
+    const imported = (await import(moduleName)) as unknown as LibxmlModule;
+    parseXml = imported.parseXml;
   } catch {
     throw new KsefError(
       "FA(3) XSD validation requires optional dependency `libxmljs2`. Install with `npm install libxmljs2` and retry.",

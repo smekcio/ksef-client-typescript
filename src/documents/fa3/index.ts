@@ -1,5 +1,6 @@
 export * from "./types";
-export * from "./identifier";
+export { PartyIdentifierKind } from "./identifier";
+export type { PartyIdentifierKindValue, ResolvedPartyIdentifier } from "./identifier";
 export * from "./builder";
 export * from "./domain";
 export * from "./sections";
