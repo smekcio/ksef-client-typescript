@@ -440,6 +440,96 @@ test("FA3Invoice builder rejects newTransport without transport means", () => {
   );
 });
 
+test("FA3Invoice builder preserves intra-EU transport flag across transport means", () => {
+  const invoice = FA3Invoice.basic("FV/NST/INTRA/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-08-01")
+    .addLine({ description: "Samochod", quantity: "1", unitNetPrice: "300", tax: "23" })
+    .newTransportMeans(
+      {
+        allowedDate: "2026-08-01",
+        rowNumber: 1,
+        kind: "land",
+        mileage: "10",
+        serialNumber: "VIN123",
+        make: "Demo",
+        model: "Model",
+        taxRate: "23",
+      },
+      true,
+    )
+    .newTransportMeans({
+      allowedDate: "2026-08-02",
+      rowNumber: 2,
+      kind: "land",
+      mileage: "20",
+      serialNumber: "VIN456",
+      make: "Demo",
+      model: "Model2",
+      taxRate: "23",
+    })
+    .build();
+
+  const xml = invoice.toXml();
+  assert.match(xml, /<NoweSrodkiTransportu>[\s\S]*<P_42_5>1<\/P_42_5>/);
+});
+
+test("FA3Invoice builder merges managed and raw DaneFaKorygowanej entries", () => {
+  const correction = FA3Invoice.correction("KOR/RAW/FA/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-07-11")
+    .correctsInvoice({
+      invoiceNumber: "FV/1/2026",
+      issueDate: "2026-07-01",
+      reason: "Korekta",
+    })
+    .withRawFa({
+      DaneFaKorygowanej: [
+        {
+          DataWystFaKorygowanej: "2026-06-15",
+          NrFaKorygowanej: "FV/RAW/2",
+          NrKSeFN: "1",
+        },
+      ],
+    })
+    .addLine({ description: "Korekta", quantity: "1", unitNetPrice: "10", tax: "23" })
+    .build();
+
+  const xml = correction.toXml();
+  assert.match(xml, /<NrFaKorygowanej>FV\/1\/2026<\/NrFaKorygowanej>/);
+  assert.match(xml, /<NrFaKorygowanej>FV\/RAW\/2<\/NrFaKorygowanej>/);
+});
+
+test("FA3Invoice builder merges managed and raw Podmiot1K sections", () => {
+  const correction = FA3Invoice.correction("KOR/RAW/P1K/1")
+    .seller(seller)
+    .buyer(buyer)
+    .issueDate("2026-07-12")
+    .correctsInvoice({
+      invoiceNumber: "FV/1/2026",
+      issueDate: "2026-07-01",
+      reason: "Korekta sprzedawcy",
+    })
+    .correctedSeller({
+      ...seller,
+      address: { line1: "Stary adres 1", line2: "00-001 Warszawa" },
+    })
+    .withRawFa({
+      Podmiot1K: {
+        PrefiksPodatnika: "DE",
+      },
+    })
+    .addLine({ description: "Korekta", quantity: "1", unitNetPrice: "10", tax: "23" })
+    .build();
+
+  const xml = correction.toXml();
+  assert.match(xml, /<Podmiot1K>[\s\S]*<PrefiksPodatnika>DE<\/PrefiksPodatnika>/);
+  assert.match(xml, /<Podmiot1K>[\s\S]*<NIP>1111111111<\/NIP>/);
+  assert.match(xml, /<Podmiot1K>[\s\S]*<AdresL1>Stary adres 1<\/AdresL1>/);
+});
+
 test("FA3Invoice builder supports corrected seller in Podmiot1K", () => {
   const correction = FA3Invoice.correction("KOR/SELLER/1")
     .seller(seller)

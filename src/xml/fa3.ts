@@ -739,16 +739,16 @@ export class FA3InvoiceBuilder {
     const current = this.data.annotations?.newTransportMeans ?? [];
     return this.annotation({
       newTransport: true,
-      newTransportIntraEu: intraEu,
+      newTransportIntraEu: intraEu || Boolean(this.data.annotations?.newTransportIntraEu),
       newTransportMeans: means ? [...current, means] : current,
     });
   }
 
-  newTransportMeans(means: FA3NewTransportMeansInput, intraEu = false): this {
+  newTransportMeans(means: FA3NewTransportMeansInput | FA3XsdObject, intraEu = false): this {
     const current = this.data.annotations?.newTransportMeans ?? [];
     return this.annotation({
       newTransport: true,
-      newTransportIntraEu: intraEu,
+      newTransportIntraEu: intraEu || Boolean(this.data.annotations?.newTransportIntraEu),
       newTransportMeans: [...current, means],
     });
   }
@@ -1205,6 +1205,7 @@ const FA_MERGE_ARRAY_KEYS = [
   "ZaliczkaCzesciowa",
   "FakturaZaliczkowa",
   "Podmiot2K",
+  "DaneFaKorygowanej",
 ] as const;
 
 const FA_MERGE_OBJECT_KEYS = [
@@ -1212,6 +1213,7 @@ const FA_MERGE_OBJECT_KEYS = [
   "Rozliczenie",
   "WarunkiTransakcji",
   "Zamowienie",
+  "Podmiot1K",
 ] as const;
 
 function asXmlObjectArray(value: XmlValue | XmlValue[] | undefined): XmlObject[] {
