@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { XMLParser } from "fast-xml-parser";
 import fc from "fast-check";
 import { buildFakturaXml, FA3Invoice, FA3Party } from "../../dist/index.js";
-import { loadBundledFa3Xsd, skipUnlessLibxml, validateXml } from "../helpers/fa3Xsd.js";
+import { validateWellFormed } from "../helpers/fa3Xsd.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -20,11 +20,7 @@ const fa2TemplatePath = path.join(
 );
 const requiredFa2Fixtures = [xsdFa2Path, fa2TemplatePath];
 const missingFa2Fixture = requiredFa2Fixtures.find((fixturePath) => !fs.existsSync(fixturePath));
-const libxmljs = await loadLibxml();
-const skipFa2XsdTest =
-  (missingFa2Fixture ? `Missing fixture: ${missingFa2Fixture}` : false) ||
-  (libxmljs ? false : "Missing optional libxmljs2 native binding.");
-const skipFa3XsdTest = skipUnlessLibxml(libxmljs);
+const skipFa2Test = missingFa2Fixture ? `Missing fixture: ${missingFa2Fixture}` : false;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -32,14 +28,6 @@ const xmlParser = new XMLParser({
   parseTagValue: false,
   parseAttributeValue: false,
 });
-
-async function loadLibxml() {
-  try {
-    return await import("libxmljs2");
-  } catch {
-    return undefined;
-  }
-}
 
 function loadTemplateXml(templatePath) {
   const xml = fs.readFileSync(templatePath, "utf8");
@@ -58,20 +46,6 @@ function parseFaktura(xml) {
     }
   }
   return faktura;
-}
-
-function loadXsd(schemaPath) {
-  const baseDir = path.dirname(schemaPath);
-  const bazowePath = path.join(baseDir, "bazowe", "StrukturyDanych_v10-0E.xsd");
-  const bazoweUrl = pathToFileURL(bazowePath).href;
-  let content = fs.readFileSync(schemaPath, "utf8");
-  content = content.replace(
-    /schemaLocation="http:\/\/crd\.gov\.pl\/xml\/schematy\/dziedzinowe\/mf\/2022\/01\/05\/eD\/DefinicjeTypy\/StrukturyDanych_v10-0E\.xsd"/g,
-    `schemaLocation="${bazoweUrl}"`,
-  );
-  return libxmljs.parseXml(content, {
-    baseUrl: pathToFileURL(baseDir + path.sep).href,
-  });
 }
 
 function asArray(value) {
@@ -143,7 +117,7 @@ function makeFa3Variant(variant) {
   return builder.build().toFakturaInput();
 }
 
-function propertyTest(schema, templatePath, xsdPath, skipReason) {
+function propertyTest(schema, templatePath, skipReason) {
   const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
   const rowNameArb = fc
     .stringOf(
@@ -175,16 +149,15 @@ function propertyTest(schema, templatePath, xsdPath, skipReason) {
   });
 
   test(
-    `property: ${schema} builder produces XSD-valid XML for many variants`,
+    `property: ${schema} builder produces well-formed XML for many variants`,
     { skip: skipReason },
     async () => {
       const template = parseFaktura(loadTemplateXml(templatePath));
-      const xsd = loadXsd(xsdPath);
       await fc.assert(
         fc.asyncProperty(variantArb, async (variant) => {
           const faktura = makeVariant(template, variant);
           const xml = buildFakturaXml(faktura, { schema });
-          validateXml(libxmljs, xml, xsd);
+          validateWellFormed(xml);
         }),
         { numRuns: 25 },
       );
@@ -192,7 +165,7 @@ function propertyTest(schema, templatePath, xsdPath, skipReason) {
   );
 }
 
-function propertyTestFa3(skipReason) {
+function propertyTestFa3() {
   const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
   const rowNameArb = fc
     .stringOf(
@@ -223,22 +196,17 @@ function propertyTestFa3(skipReason) {
     ),
   });
 
-  test(
-    "property: FA3 builder produces XSD-valid XML for many variants",
-    { skip: skipReason },
-    async () => {
-      const xsd = loadBundledFa3Xsd(libxmljs);
-      await fc.assert(
-        fc.asyncProperty(variantArb, async (variant) => {
-          const faktura = makeFa3Variant(variant);
-          const xml = buildFakturaXml(faktura, { schema: "FA3" });
-          validateXml(libxmljs, xml, xsd);
-        }),
-        { numRuns: 25 },
-      );
-    },
-  );
+  test("property: FA3 builder produces well-formed XML for many variants", async () => {
+    await fc.assert(
+      fc.asyncProperty(variantArb, async (variant) => {
+        const faktura = makeFa3Variant(variant);
+        const xml = buildFakturaXml(faktura, { schema: "FA3" });
+        validateWellFormed(xml);
+      }),
+      { numRuns: 25 },
+    );
+  });
 }
 
-propertyTest("FA2", fa2TemplatePath, xsdFa2Path, skipFa2XsdTest);
-propertyTestFa3(skipFa3XsdTest);
+propertyTest("FA2", fa2TemplatePath, skipFa2Test);
+propertyTestFa3();

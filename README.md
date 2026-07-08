@@ -23,12 +23,11 @@ npm install ksef-client
 Opcjonalne zależności:
 
 ```bash
-npm install qrcode node-forge libxmljs2
+npm install qrcode node-forge
 ```
 
 - `qrcode` jest wymagane dla `client.qr`
 - `node-forge` jest wymagane dla `XadesKeyPair.fromPkcs12*`
-- `libxmljs2` jest wymagane dla walidacji XSD FA(3) (`validateFa3XmlXsd`, `FA3Invoice.toXmlValidated`)
 
 ## Budowanie faktur FA(3)
 
@@ -45,9 +44,10 @@ const invoice = FA3Invoice.basic("FV/001/2026")
   .build();
 
 const xml = invoice.toXml();
+const validatedXml = await invoice.toXmlValidated(); // well-formedness check
 ```
 
-Szczegoly API, korekty, zaliczki i walidacja XSD: [`docs/xml/invoice.md`](docs/xml/invoice.md).
+Szczegoly API, korekty, zaliczki i walidacja XML: [`docs/xml/invoice.md`](docs/xml/invoice.md).
 
 ## Quick Start
 

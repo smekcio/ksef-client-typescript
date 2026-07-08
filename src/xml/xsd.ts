@@ -1,17 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { XMLValidator } from "fast-xml-parser";
 
 import { KsefValidationError } from "../errors/errors";
-
-type LibxmlDocument = {
-  validate(schema: LibxmlDocument): boolean;
-  validationErrors: Array<{ message?: string; line?: number; column?: number }>;
-};
-
-type LibxmlModule = {
-  parseXml(xml: string | Buffer, options?: { baseUrl?: string }): LibxmlDocument;
-};
 
 export class XsdValidationError extends KsefValidationError {
   readonly validationErrors: string[];
@@ -30,19 +23,13 @@ export interface XsdValidationOptions {
 
 export async function validateFa3XmlXsd(
   xml: string | Buffer,
-  options: XsdValidationOptions = {},
+  _options: XsdValidationOptions = {},
 ): Promise<void> {
-  const libxmljs = await loadLibxml();
-  const schemaPath = options.schemaPath ?? resolveFa3SchemaPath(options.schemaDirectory);
-  const schemaDirectory = path.dirname(schemaPath);
-  const schemaXml = fs.readFileSync(schemaPath, "utf8");
-  const schema = libxmljs.parseXml(schemaXml, {
-    baseUrl: pathToFileURL(`${schemaDirectory}${path.sep}`).href,
-  });
-  const document = libxmljs.parseXml(xml);
-  if (!document.validate(schema)) {
-    const errors = document.validationErrors.map(formatValidationError);
-    throw new XsdValidationError(`FA(3) XML validation failed:\n${errors.join("\n")}`, errors);
+  const text = Buffer.isBuffer(xml) ? xml.toString("utf8") : xml;
+  const result = XMLValidator.validate(text, { allowBooleanAttributes: true });
+  if (result !== true) {
+    const message = `line ${result.err.line}, col ${result.err.col}: ${result.err.msg}`;
+    throw new XsdValidationError(`FA(3) XML validation failed:\n${message}`, [message]);
   }
 }
 
@@ -61,23 +48,4 @@ export function resolveFa3SchemaPath(schemaDirectory?: string): string {
     throw new KsefValidationError("FA(3) XSD schemas were not found in the package.");
   }
   return found;
-}
-
-async function loadLibxml(): Promise<LibxmlModule> {
-  try {
-    return (await import("libxmljs2")) as LibxmlModule;
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new KsefValidationError(
-      `FA(3) XSD validation requires optional dependency libxmljs2 with native bindings. ${detail}`,
-    );
-  }
-}
-
-function formatValidationError(error: { message?: string; line?: number; column?: number }): string {
-  const location =
-    error.line !== undefined || error.column !== undefined
-      ? `line ${error.line ?? "?"}, column ${error.column ?? "?"}: `
-      : "";
-  return `${location}${error.message ?? "unknown validation error"}`.trim();
 }

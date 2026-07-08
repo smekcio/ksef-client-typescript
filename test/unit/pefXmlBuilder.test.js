@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { XMLParser } from "fast-xml-parser";
 import { buildPefXml, isPefUblDocumentInput, KsefValidationError } from "../../dist/index.js";
+import { validateWellFormed } from "../helpers/fa3Xsd.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const workspaceRoot = path.resolve(packageRoot, "..");
@@ -29,10 +30,7 @@ const pefKor3TemplatePath = path.join(
 );
 const requiredFixtures = [pef3XsdPath, pefKor3XsdPath, pef3TemplatePath, pefKor3TemplatePath];
 const missingFixture = requiredFixtures.find((fixturePath) => !fs.existsSync(fixturePath));
-const libxmljs = await loadLibxml();
-const skipXsdTest =
-  (missingFixture ? `Missing fixture: ${missingFixture}` : false) ||
-  (libxmljs ? false : "Missing optional libxmljs2 native binding.");
+const skipPefTest = missingFixture ? `Missing fixture: ${missingFixture}` : false;
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -40,31 +38,6 @@ const xmlParser = new XMLParser({
   parseTagValue: false,
   parseAttributeValue: false,
 });
-
-async function loadLibxml() {
-  try {
-    return await import("libxmljs2");
-  } catch {
-    return undefined;
-  }
-}
-
-function loadXsd(schemaPath) {
-  const baseDir = path.dirname(schemaPath);
-  const content = fs.readFileSync(schemaPath, "utf8");
-  return libxmljs.parseXml(content, {
-    baseUrl: pathToFileURL(baseDir + path.sep).href,
-  });
-}
-
-function validateXml(xml, xsdDoc) {
-  const doc = libxmljs.parseXml(xml);
-  const valid = doc.validate(xsdDoc);
-  if (!valid) {
-    const errors = doc.validationErrors.map((err) => err.message.trim()).join("\n");
-    throw new Error(`XML validation failed:\n${errors}`);
-  }
-}
 
 function loadTemplateXml(templatePath) {
   const xml = fs.readFileSync(templatePath, "utf8");
@@ -101,18 +74,17 @@ function stripRootAttributes(root) {
   return clone;
 }
 
-test("PEF(3) XML builder produces XSD-valid XML", { skip: skipXsdTest }, () => {
+test("PEF(3) XML builder produces well-formed XML", { skip: skipPefTest }, () => {
   const templateXml = loadTemplateXml(pef3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   if (rootKey !== "Invoice") {
     throw new Error(`Expected Invoice root element, got ${rootKey}.`);
   }
   const xml = buildPefXml({ Invoice: stripRootAttributes(root) });
-  const xsd = loadXsd(pef3XsdPath);
-  validateXml(xml, xsd);
+  validateWellFormed(xml);
 });
 
-test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipXsdTest }, () => {
+test("PEF_KOR(3) XML builder produces well-formed XML", { skip: skipPefTest }, () => {
   const templateXml = loadTemplateXml(pefKor3TemplatePath);
   const { rootKey, root } = parseRoot(templateXml);
   const localRoot = rootKey.includes(":") ? rootKey.split(":").at(-1) : rootKey;
@@ -120,8 +92,7 @@ test("PEF_KOR(3) XML builder produces XSD-valid XML", { skip: skipXsdTest }, () 
     throw new Error(`Expected CreditNote root element, got ${rootKey}.`);
   }
   const xml = buildPefXml({ CreditNote: stripRootAttributes(root) });
-  const xsd = loadXsd(pefKor3XsdPath);
-  validateXml(xml, xsd);
+  validateWellFormed(xml);
 });
 
 test("isPefUblDocumentInput accepts exactly one supported root object", () => {

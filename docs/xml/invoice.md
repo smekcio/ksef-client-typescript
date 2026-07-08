@@ -6,7 +6,7 @@ Narzędzia z tej sekcji służą do przygotowania dokumentów XML przekazywanych
 
 - `buildFakturaXml(faktura: FakturaInput, options?: FakturaXmlOptions): string`
 - `FA3Invoice.basic(number)` / `correction(number)` / `advance(number)` / `settlement(number)`
-- `validateFa3XmlXsd(xml, options?): Promise<void>`
+- `validateFa3XmlXsd(xml, options?): Promise<void>` — sprawdza poprawność składniową XML (well-formedness)
 - `serializeInvoiceXml(input: InvoiceXmlInput, options?: FakturaXmlOptions): Buffer`
 - `buildPefXml(input: PefUblDocumentInput, options?: { pretty?: boolean }): string`
 
@@ -84,9 +84,10 @@ wygodnymi można użyć typowanych nazwami XSD rozszerzeń `withRawFa(...)`, `wi
 `transactionTerms({ raw: ... })` albo `attachment({ raw: ... })`. `withRawRoot(...)` nie podmienia
 sekcji zarządzanych przez builder (`Naglowek`, `Podmiot1`, `Podmiot2`, `Fa`, `Stopka`, `Zalacznik`).
 
-Walidacja XSD FA(3) jest dostępna przez `invoice.toXmlValidated()`, `invoice.toBufferValidated()`
-albo `validateFa3XmlXsd(xml)`. Wymaga opcjonalnej zależności `libxmljs2`, ponieważ walidacja XSD
-korzysta z natywnych bindingów.
+Walidacja XML FA(3) jest dostępna przez `invoice.toXmlValidated()`, `invoice.toBufferValidated()`
+albo `validateFa3XmlXsd(xml)`. Sprawdza poprawność składniową XML (well-formedness) przy użyciu
+`fast-xml-parser` — bez zewnętrznych zależności natywnych. Pliki `.xsd` w paczce służą jako
+referencja schematu; `resolveFa3SchemaPath()` lokalizuje je w `src/xml/fa3-schemas/`.
 
 Najważniejsze różnice względem buildera Python:
 
