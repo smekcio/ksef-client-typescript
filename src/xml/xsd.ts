@@ -6,31 +6,51 @@ import { XMLValidator } from "fast-xml-parser";
 
 import { KsefValidationError } from "../errors/errors";
 
-export class XsdValidationError extends KsefValidationError {
+export class XmlWellFormedError extends KsefValidationError {
   readonly validationErrors: string[];
 
   constructor(message: string, validationErrors: string[] = []) {
     super(message);
-    this.name = "XsdValidationError";
+    this.name = "XmlWellFormedError";
     this.validationErrors = validationErrors;
   }
 }
 
-export interface XsdValidationOptions {
-  schemaPath?: string;
-  schemaDirectory?: string;
+/** @deprecated Use {@link XmlWellFormedError} instead. */
+export class XsdValidationError extends XmlWellFormedError {
+  constructor(message: string, validationErrors: string[] = []) {
+    super(message, validationErrors);
+    this.name = "XsdValidationError";
+  }
 }
 
-export async function validateFa3XmlXsd(
+export interface XmlWellFormedOptions {
+  allowBooleanAttributes?: boolean;
+}
+
+/** @deprecated Use {@link XmlWellFormedOptions} instead. */
+export type XsdValidationOptions = XmlWellFormedOptions;
+
+export async function validateFa3XmlWellFormed(
   xml: string | Buffer,
-  _options: XsdValidationOptions = {},
+  options: XmlWellFormedOptions = {},
 ): Promise<void> {
   const text = Buffer.isBuffer(xml) ? xml.toString("utf8") : xml;
-  const result = XMLValidator.validate(text, { allowBooleanAttributes: true });
+  const result = XMLValidator.validate(text, {
+    allowBooleanAttributes: options.allowBooleanAttributes ?? true,
+  });
   if (result !== true) {
     const message = `line ${result.err.line}, col ${result.err.col}: ${result.err.msg}`;
-    throw new XsdValidationError(`FA(3) XML validation failed:\n${message}`, [message]);
+    throw new XmlWellFormedError(`FA(3) XML is not well-formed:\n${message}`, [message]);
   }
+}
+
+/** @deprecated Use {@link validateFa3XmlWellFormed} instead. Checks XML well-formedness only, not XSD schema conformance. */
+export async function validateFa3XmlXsd(
+  xml: string | Buffer,
+  options: XmlWellFormedOptions = {},
+): Promise<void> {
+  return validateFa3XmlWellFormed(xml, options);
 }
 
 export function resolveFa3SchemaPath(schemaDirectory?: string): string {

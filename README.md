@@ -44,7 +44,7 @@ const invoice = FA3Invoice.basic("FV/001/2026")
   .build();
 
 const xml = invoice.toXml();
-const validatedXml = await invoice.toXmlValidated(); // well-formedness check
+const wellFormedXml = await invoice.toXmlWellFormed();
 ```
 
 Szczegoly API, korekty, zaliczki i walidacja XML: [`docs/xml/invoice.md`](docs/xml/invoice.md).

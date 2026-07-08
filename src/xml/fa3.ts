@@ -1,7 +1,7 @@
 import { KsefValidationError } from "../errors/errors";
 import { buildFakturaXml, FakturaInput, FakturaXmlOptions } from "./invoice";
 import { XmlObject, XmlValue } from "./xml";
-import { validateFa3XmlXsd } from "./xsd";
+import { validateFa3XmlWellFormed } from "./xsd";
 import { FA3XsdObject, FA3XsdRootExtension } from "./fa3-xsd-types";
 
 export type FA3InvoiceKind =
@@ -595,18 +595,28 @@ export class FA3Invoice {
     return buildFakturaXml(this.toFakturaInput(), { schema: "FA3", ...options });
   }
 
-  async toXmlValidated(options?: FakturaXmlOptions): Promise<string> {
+  async toXmlWellFormed(options?: FakturaXmlOptions): Promise<string> {
     const xml = this.toXml(options);
-    await validateFa3XmlXsd(xml);
+    await validateFa3XmlWellFormed(xml);
     return xml;
+  }
+
+  /** @deprecated Use {@link toXmlWellFormed} instead. */
+  async toXmlValidated(options?: FakturaXmlOptions): Promise<string> {
+    return this.toXmlWellFormed(options);
   }
 
   toBuffer(options?: FakturaXmlOptions): Buffer {
     return Buffer.from(this.toXml(options), "utf8");
   }
 
+  async toBufferWellFormed(options?: FakturaXmlOptions): Promise<Buffer> {
+    return Buffer.from(await this.toXmlWellFormed(options), "utf8");
+  }
+
+  /** @deprecated Use {@link toBufferWellFormed} instead. */
   async toBufferValidated(options?: FakturaXmlOptions): Promise<Buffer> {
-    return Buffer.from(await this.toXmlValidated(options), "utf8");
+    return this.toBufferWellFormed(options);
   }
 }
 
@@ -1188,7 +1198,9 @@ function buildFa(data: FA3InvoiceBuildData): XmlObject {
         }
       : {}),
     ...(data.exciseRefund ? { ZwrotAkcyzy: "1" } : {}),
-    FaWiersz: data.lines.map((line, index) => lineToXml(line, index + 1)),
+    ...(data.lines.length
+      ? { FaWiersz: data.lines.map((line, index) => lineToXml(line, index + 1)) }
+      : {}),
     ...(data.settlement ? { Rozliczenie: settlementToXml(data.settlement) } : {}),
     ...(data.paymentTerms ? { Platnosc: paymentToXml(data.paymentTerms, decimalFromSummaryTotal(summary)) } : {}),
     ...(data.transactionTerms ? { WarunkiTransakcji: transactionTermsToXml(data.transactionTerms) } : {}),

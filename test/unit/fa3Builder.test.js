@@ -9,8 +9,10 @@ import {
   FA3TaxCategory,
   FA3TransportKind,
   KsefValidationError,
+  XmlWellFormedError,
   resolveFa3SchemaPath,
   serializeInvoiceXml,
+  validateFa3XmlWellFormed,
 } from "../../dist/index.js";
 
 const seller = FA3Party.polishCompany({
@@ -164,6 +166,7 @@ test("FA3Invoice builder supports advance order rows and serializeInvoiceXml", (
   assert.match(text, /<ZaliczkaCzesciowa><P_6Z>2026-06-30<\/P_6Z><P_15Z>615.00<\/P_15Z><\/ZaliczkaCzesciowa>/);
   assert.match(text, /<ZamowienieWiersz><NrWierszaZam>1<\/NrWierszaZam>/);
   assert.match(text, /<P_11NettoZ>500.00<\/P_11NettoZ>/);
+  assert.doesNotMatch(text, /<FaWiersz>/);
 });
 
 test("FA3Invoice builder supports typed transport means and attachments", () => {
@@ -352,7 +355,7 @@ test("FA3Invoice builder supports settlement charges and corrected additional pa
   assert.match(correctionXml, /<IDWew>INT-1<\/IDWew>/);
 });
 
-test("FA3Invoice validated XML passes well-formedness check", async () => {
+test("FA3Invoice toXmlWellFormed returns well-formed XML", async () => {
   const invoice = FA3Invoice.basic("FV/XSD/2")
     .seller(seller)
     .buyer(buyer)
@@ -360,13 +363,27 @@ test("FA3Invoice validated XML passes well-formedness check", async () => {
     .addLine({ description: "XSD", quantity: "1", unitNetPrice: "10", tax: "23" })
     .build();
 
-  const xml = await invoice.toXmlValidated();
+  const xml = await invoice.toXmlWellFormed();
   assert.match(xml, /<Faktura/);
 });
 
-test("FA3Invoice validated XML rejects malformed XML", async () => {
-  assert.doesNotThrow(() => resolveFa3SchemaPath());
+test("validateFa3XmlWellFormed rejects malformed XML", async () => {
+  await assert.rejects(
+    () => validateFa3XmlWellFormed("<Faktura><unclosed>"),
+    (error) => {
+      assert.ok(error instanceof XmlWellFormedError);
+      assert.ok(error.validationErrors.length > 0);
+      return true;
+    },
+  );
+});
 
+test("resolveFa3SchemaPath locates bundled FA(3) reference schema", () => {
+  assert.doesNotThrow(() => resolveFa3SchemaPath());
+  assert.match(resolveFa3SchemaPath(), /schemat_FA\(3\)_v1-0E\.xsd$/);
+});
+
+test("deprecated toXmlValidated delegates to toXmlWellFormed", async () => {
   const invoice = FA3Invoice.basic("FV/XSD/1")
     .seller(seller)
     .buyer(buyer)

@@ -136,7 +136,6 @@ const ORDER_MAP: Record<string, string[]> = {
     "NrFaKorygowany",
     "Podmiot1K",
     "Podmiot2K",
-    "Podmiot3K",
     "ZaliczkaCzesciowa",
     "P_15ZK",
     "KursWalutyZK",

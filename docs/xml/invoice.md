@@ -6,7 +6,8 @@ Narzędzia z tej sekcji służą do przygotowania dokumentów XML przekazywanych
 
 - `buildFakturaXml(faktura: FakturaInput, options?: FakturaXmlOptions): string`
 - `FA3Invoice.basic(number)` / `correction(number)` / `advance(number)` / `settlement(number)`
-- `validateFa3XmlXsd(xml, options?): Promise<void>` — sprawdza poprawność składniową XML (well-formedness)
+- `validateFa3XmlWellFormed(xml, options?): Promise<void>` — sprawdza poprawność składniową XML (well-formedness)
+- `validateFa3XmlXsd(xml, options?): Promise<void>` — alias przestarzały; patrz `validateFa3XmlWellFormed`
 - `serializeInvoiceXml(input: InvoiceXmlInput, options?: FakturaXmlOptions): Buffer`
 - `buildPefXml(input: PefUblDocumentInput, options?: { pretty?: boolean }): string`
 
@@ -45,7 +46,7 @@ Zachowanie:
 ## Przykład 1: typed builder FA(3)
 
 ```ts
-import { FA3Invoice, FA3Party, FA3TaxCategory } from "ksef-client-typescript";
+import { FA3Invoice, FA3Party, FA3TaxCategory } from "ksef-client";
 
 const seller = FA3Party.polishCompany({
   nip: "1111111111",
@@ -84,10 +85,12 @@ wygodnymi można użyć typowanych nazwami XSD rozszerzeń `withRawFa(...)`, `wi
 `transactionTerms({ raw: ... })` albo `attachment({ raw: ... })`. `withRawRoot(...)` nie podmienia
 sekcji zarządzanych przez builder (`Naglowek`, `Podmiot1`, `Podmiot2`, `Fa`, `Stopka`, `Zalacznik`).
 
-Walidacja XML FA(3) jest dostępna przez `invoice.toXmlValidated()`, `invoice.toBufferValidated()`
-albo `validateFa3XmlXsd(xml)`. Sprawdza poprawność składniową XML (well-formedness) przy użyciu
-`fast-xml-parser` — bez zewnętrznych zależności natywnych. Pliki `.xsd` w paczce służą jako
-referencja schematu; `resolveFa3SchemaPath()` lokalizuje je w `src/xml/fa3-schemas/`.
+Walidacja poprawności składniowej XML FA(3) jest dostępna przez `invoice.toXmlWellFormed()`,
+`invoice.toBufferWellFormed()` albo `validateFa3XmlWellFormed(xml)`. Sprawdza wyłącznie
+well-formedness przy użyciu `fast-xml-parser` — **nie** weryfikuje zgodności ze schematem XSD.
+Pliki `.xsd` w paczce służą jako referencja; `resolveFa3SchemaPath()` lokalizuje je w `src/xml/fa3-schemas/`.
+
+Metody `toXmlValidated()`, `toBufferValidated()` i `validateFa3XmlXsd()` pozostają jako przestarzałe aliasy.
 
 Najważniejsze różnice względem buildera Python:
 
@@ -99,7 +102,7 @@ Najważniejsze różnice względem buildera Python:
 ## Przykład 2: obiekt FA -> XML
 
 ```ts
-import { buildFakturaXml } from "ksef-client-typescript";
+import { buildFakturaXml } from "ksef-client";
 
 const xml = buildFakturaXml(
   {
@@ -143,7 +146,7 @@ const xml = buildFakturaXml(
 ## Przykład 3: PEF UBL -> XML
 
 ```ts
-import { buildPefXml } from "ksef-client-typescript";
+import { buildPefXml } from "ksef-client";
 
 const pefXml = buildPefXml({
   Invoice: {
@@ -156,7 +159,7 @@ const pefXml = buildPefXml({
 ## Przykład 4: `serializeInvoiceXml(...)`
 
 ```ts
-import { FA3Invoice, serializeInvoiceXml } from "ksef-client-typescript";
+import { FA3Invoice, serializeInvoiceXml } from "ksef-client";
 
 const fromString = serializeInvoiceXml("<Faktura>...</Faktura>");
 const fromObject = serializeInvoiceXml({
