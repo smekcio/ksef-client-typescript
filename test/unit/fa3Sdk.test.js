@@ -46,6 +46,17 @@ test("FA3 SDK builds XML from typed builder", async () => {
   assert.match(xml, /<FaWiersz>/);
 });
 
+test("FA3 builder emits WariantFormularza=3", async () => {
+  const xml = await FA3Invoice.basic("FV/VAR/1")
+    .issueDate("2026-01-15")
+    .seller({ name: "S", taxId: "1111111111" })
+    .buyer({ name: "B", taxId: "2222222222" })
+    .addLine({ description: "x", quantity: 1, unit: "szt", unitNetPrice: 100, vatRate: 23 })
+    .build()
+    .toXml();
+  assert.match(xml, /<WariantFormularza>3<\/WariantFormularza>/);
+});
+
 test("FA3 SDK validates required data before XML generation", async () => {
   const draft = new FA3Draft({
     invoiceNumber: "",

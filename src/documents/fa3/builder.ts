@@ -4,6 +4,7 @@ import { createZip } from "../../utils/zip";
 import { buildFakturaXml, FakturaInput } from "../../xml/invoice";
 import { XmlObject } from "../../xml/xml";
 import { KsefValidationError } from "../../errors/errors";
+import { FA3_FORM_VARIANT } from "./enums";
 import { validateFa3Xml } from "./xml";
 import {
   FA3AdvancePayment,
@@ -912,7 +913,7 @@ export class FA3Draft {
           schemaVersion: "1-0E",
           value: "FA",
         },
-        WariantFormularza: "1",
+        WariantFormularza: FA3_FORM_VARIANT,
         DataWytworzeniaFa: this.value.issueDate,
         SystemInfo: "ksef-client-typescript-fa3",
       },

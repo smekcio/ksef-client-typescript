@@ -1,3 +1,5 @@
+export const FA3_FORM_VARIANT = "3" as const;
+
 export const CorrectionType = {
   TAX_BASE_OR_TAX: "1",
   OTHER: "2",
