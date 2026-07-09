@@ -775,6 +775,10 @@ test("builder: correction with full metadata", async () => {
     .toXml();
   assert.match(xml, /<RodzajFaktury>KOR<\/RodzajFaktury>/);
   assert.match(xml, /<TypKorekty>1<\/TypKorekty>/);
+  assert.match(xml, /<DataWystFaKorygowanej>2025-12-01<\/DataWystFaKorygowanej>/);
+  assert.match(xml, /<NrFaKorygowanej>FV\/OLD\/1<\/NrFaKorygowanej>/);
+  assert.match(xml, /<NrKSeF>1<\/NrKSeF>/);
+  assert.match(xml, /<NrKSeFFaKorygowanej>KSEF-OLD<\/NrKSeFFaKorygowanej>/);
   assert.match(xml, /<OkresFaKorygowanej>2025-12<\/OkresFaKorygowanej>/);
   assert.match(xml, /<NrFaKorygowany>FV\/OLD\/1-OVR<\/NrFaKorygowany>/);
   assert.match(xml, /<StanPrzed>1<\/StanPrzed>/);

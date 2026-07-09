@@ -154,6 +154,13 @@ const ORDER_MAP: Record<string, string[]> = {
     "P_23",
     "PMarzy",
   ],
+  DaneFaKorygowanej: [
+    "DataWystFaKorygowanej",
+    "NrFaKorygowanej",
+    "NrKSeF",
+    "NrKSeFFaKorygowanej",
+    "NrKSeFN",
+  ],
   OkresFa: ["P_6_Od", "P_6_Do"],
   FaWiersz: [
     "NrWierszaFa",

@@ -418,7 +418,10 @@ test("builder.ts: branch matrix for optional mappings and validation paths", asy
       correctedKsefNumber: "KSEF-1",
     })
     .toXml();
-  assert.match(correctionOnlyKsef, /<NumerKSeF>KSEF-1<\/NumerKSeF>/);
+  assert.match(correctionOnlyKsef, /<NrKSeF>1<\/NrKSeF>/);
+  assert.match(correctionOnlyKsef, /<NrKSeFFaKorygowanej>KSEF-1<\/NrKSeFFaKorygowanej>/);
+  assert.match(correctionOnlyKsef, /<DataWystFaKorygowanej>2025-12-01<\/DataWystFaKorygowanej>/);
+  assert.match(correctionOnlyKsef, /<NrFaKorygowanej>FV\/1<\/NrFaKorygowanej>/);
 
   const correctionUnknownType = await FA3Invoice.correction("KOR/T/1")
     .issueDate("2026-01-15")

@@ -326,6 +326,29 @@ function mapAdnotacje(input: NormalizedFA3Draft): XmlObject {
   };
 }
 
+function mapDaneFaKorygowanej(input: NormalizedFA3Draft): XmlObject | undefined {
+  const correctedDate = input.correctedInvoiceDate?.trim();
+  const correctedNumber = input.correctedInvoiceNumber?.trim();
+  if (!correctedDate || !correctedNumber) {
+    return undefined;
+  }
+
+  const dane: XmlObject = {
+    DataWystFaKorygowanej: correctedDate,
+    NrFaKorygowanej: correctedNumber,
+  };
+
+  const correctedKsefNumber = input.correctedKsefNumber?.trim();
+  if (correctedKsefNumber) {
+    dane.NrKSeF = "1";
+    dane.NrKSeFFaKorygowanej = correctedKsefNumber;
+  } else {
+    dane.NrKSeFN = "1";
+  }
+
+  return dane;
+}
+
 function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
   const kind = input.kind;
   const payload: XmlObject = { RodzajFaktury: KIND_CODE[kind] };
@@ -337,20 +360,15 @@ function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
     if (input.correctionReason) {
       payload.PrzyczynaKorekty = input.correctionReason;
     }
-    if (input.correctedInvoiceNumber) {
-      payload.NrFaKorygowanej = input.correctedInvoiceNumber;
-    }
     if (input.correctedPeriod) {
       payload.OkresFaKorygowanej = input.correctedPeriod;
     }
     if (input.correctedInvoiceNumberOverride) {
       payload.NrFaKorygowany = input.correctedInvoiceNumberOverride;
     }
-    if (input.correctedKsefNumber || input.correctedInvoiceDate) {
-      payload.DaneFaKorygowanej = {
-        ...(input.correctedKsefNumber ? { NumerKSeF: input.correctedKsefNumber } : {}),
-        ...(input.correctedInvoiceDate ? { DataWystawieniaFa: input.correctedInvoiceDate } : {}),
-      };
+    const dane = mapDaneFaKorygowanej(input);
+    if (dane) {
+      payload.DaneFaKorygowanej = dane;
     }
   }
 

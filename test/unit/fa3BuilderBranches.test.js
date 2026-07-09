@@ -190,7 +190,7 @@ test("builder.ts: remaining optional false branches and advance reference cleari
     .addLine(LINE)
     .correction({ reason: "r", correctedInvoiceNumber: "FV/1", correctedInvoiceDate: "2025-12-01" })
     .toXml();
-  assert.match(correctedDateOnly, /<DataWystawieniaFa>/);
+  assert.match(correctedDateOnly, /<DataWystFaKorygowanej>/);
 
   const advanceRateOnly = await FA3Invoice.advance("ZAL/R/1")
     .issueDate("2026-01-15")
@@ -303,7 +303,7 @@ test("builder.ts: attachment block without header keeps tables and paragraphs op
   assert.ok(blok[0].Tabela);
 });
 
-test("builder.ts: correction toFakturaInput with ksef only skips corrected date", () => {
+test("builder.ts: correction toFakturaInput with ksef only skips DaneFaKorygowanej without date/number", () => {
   const draft = new FA3Draft({
     invoiceNumber: "KOR/KSEF/1",
     issueDate: "2026-01-15",
@@ -314,8 +314,7 @@ test("builder.ts: correction toFakturaInput with ksef only skips corrected date"
     correctedKsefNumber: "KSEF-123",
   });
   const dane = draft.toFakturaInput().Fa.DaneFaKorygowanej;
-  assert.equal(dane.NumerKSeF, "KSEF-123");
-  assert.equal(dane.DataWystawieniaFa, undefined);
+  assert.equal(dane, undefined);
 });
 
 test("builder.ts: additional party role other without description via toFakturaInput", () => {
