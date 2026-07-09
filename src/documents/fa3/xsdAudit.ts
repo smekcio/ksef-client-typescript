@@ -99,7 +99,6 @@ const SUPPORTED_PATHS = new Set([
   "/Faktura/Fa/DodatkowyOpis",
   "/Faktura/Fa/FakturaZaliczkowa",
   "/Faktura/Fa/FaWiersz",
-  "/Faktura/Fa/FaWiersze",
   "/Faktura/Fa/Rozliczenie",
   "/Faktura/Fa/Platnosc",
 ]);
@@ -114,7 +113,6 @@ const PARTIALLY_SUPPORTED_PREFIXES = [
 
 const SUPPORTED_PREFIXES = [
   "/Faktura/Fa/FaWiersz/",
-  "/Faktura/Fa/FaWiersze/",
   "/Faktura/Fa/Rozliczenie/",
   "/Faktura/Fa/Platnosc/",
   "/Faktura/Fa/DodatkowyOpis/",

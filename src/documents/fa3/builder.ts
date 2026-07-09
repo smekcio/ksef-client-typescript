@@ -839,10 +839,6 @@ export class FA3Draft {
       P_15: money(totals.gross),
       ...mapAdnotacje(this.value),
       FaWiersz: lines,
-      FaWiersze: {
-        LiczbaWierszyFa: String(lines.length),
-        WartoscWierszyFa: money(totals.gross),
-      },
       ...mapKindSpecificFields(this.value),
     };
 

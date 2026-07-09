@@ -137,7 +137,6 @@ const ORDER_MAP: Record<string, string[]> = {
     "FakturaZaliczkowa",
     "ZwrotAkcyzy",
     "FaWiersz",
-    "FaWiersze",
     "Rozliczenie",
     "Platnosc",
     "WarunkiTransakcji",
