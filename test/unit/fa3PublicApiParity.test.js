@@ -75,6 +75,7 @@ const ACCEPTED_TS_FA3_SYMBOLS = new Set([
   "CorrectionReference",
   "Discount",
   "ExciseRefund",
+  "FA3_FORM_VARIANT",
   "FA3ImportError",
   "FA3ImportResult",
   "FA3InvalidRow",

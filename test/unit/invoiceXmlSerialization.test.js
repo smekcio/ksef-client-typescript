@@ -20,7 +20,7 @@ function minimalFaktura() {
         schemaVersion: "1-0E",
         value: "FA",
       },
-      WariantFormularza: "1",
+      WariantFormularza: "3",
       DataWytworzeniaFa: "2026-03-03T12:00:00Z",
       SystemInfo: "ksef-client-typescript-test",
     },

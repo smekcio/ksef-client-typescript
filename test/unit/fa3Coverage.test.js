@@ -1067,7 +1067,7 @@ test("xsd.ts: validateFa3XmlXsd throws when libxmljs2 missing", { skip: hasLibxm
 
 test("xsd.ts: validateFa3XmlXsd with libxmljs2 (valid + invalid)", { skip: !hasLibxml }, async () => {
   const validXml = await basicBuilder("FV/VALID/1").toXml();
-  await validateFa3XmlXsd(validXml).catch((error) => assert.ok(error instanceof Error));
+  await validateFa3XmlXsd(validXml);
   await assert.rejects(() => validateFa3XmlXsd("<Faktura></Faktura>"), /XSD validation failed/);
 });
 
