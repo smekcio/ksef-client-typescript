@@ -6,6 +6,13 @@
 
 * **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.6.2](https://github.com/smekcio/ksef-client-typescript/compare/v0.6.1...v0.6.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **fa3:** emit WariantFormularza=3 in invoice builder ([#39](https://github.com/smekcio/ksef-client-typescript/issues/39)) ([ed43d3a](https://github.com/smekcio/ksef-client-typescript/commit/ed43d3a1d7c4c09fefb6326c0044398b3826ad39))
+
 ## [0.6.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.6.0...v0.6.1) (2026-07-08)
 
 
