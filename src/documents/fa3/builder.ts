@@ -288,6 +288,28 @@ function extractTotals(input: NormalizedFA3Draft): { net: number; vat: number; g
   };
 }
 
+function mapAdnotacje(input: NormalizedFA3Draft): XmlObject {
+  const hasAnnex15Line = input.lines.some((line) => line.annex15);
+  const gross = extractTotals(input).gross;
+  const splitPaymentRequested = input.splitPaymentAnnotation === true;
+
+  const p18a =
+    splitPaymentRequested || (hasAnnex15Line && gross > 15000) ? "1" : "2";
+
+  return {
+    Adnotacje: {
+      P_16: "2",
+      P_17: "2",
+      P_18: "2",
+      P_18A: p18a,
+      Zwolnienie: { P_19N: "1" },
+      NoweSrodkiTransportu: { P_22N: "1" },
+      P_23: "2",
+      PMarzy: { P_PMarzyN: "1" },
+    },
+  };
+}
+
 function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
   const kind = input.kind;
   const payload: XmlObject = { RodzajFaktury: KIND_CODE[kind] };
@@ -792,12 +814,12 @@ export class FA3Draft {
     const faPayload: XmlObject = {
       KodWaluty: normalizeCurrency(this.value.currency),
       P_1: toDateOnly(this.value.issueDate),
-      P_1M: this.value.issuePlace,
+      ...(this.value.issuePlace?.trim() ? { P_1M: this.value.issuePlace.trim() } : {}),
       P_2: this.value.invoiceNumber,
       P_13_1: money(totals.net),
       P_14_1: money(totals.vat),
       P_15: money(totals.gross),
-      ...(this.value.lines.some((line) => line.annex15) ? { P_18A: "1" } : {}),
+      ...mapAdnotacje(this.value),
       FaWiersz: lines,
       FaWiersze: {
         LiczbaWierszyFa: String(lines.length),
@@ -1325,6 +1347,7 @@ export class FA3InvoiceBuilder {
       ...current,
       method: "6",
     };
+    this.value.splitPaymentAnnotation = true;
     return this;
   }
 

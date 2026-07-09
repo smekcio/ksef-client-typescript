@@ -67,6 +67,16 @@ const xml = buildFakturaXml(
       P_13_1: "100.00",
       P_14_1: "23.00",
       P_15: "123.00",
+      Adnotacje: {
+        P_16: "2",
+        P_17: "2",
+        P_18: "2",
+        P_18A: "2",
+        Zwolnienie: { P_19N: "1" },
+        NoweSrodkiTransportu: { P_22N: "1" },
+        P_23: "2",
+        PMarzy: { P_PMarzyN: "1" },
+      },
       RodzajFaktury: "VAT",
       FaWiersz: {
         NrWierszaFa: "1",

@@ -46,6 +46,35 @@ test("FA3 SDK builds XML from typed builder", async () => {
   assert.match(xml, /<FaWiersz>/);
 });
 
+test("FA3 basic invoice omits empty P_1M and emits Adnotacje before RodzajFaktury", async () => {
+  const xml = await FA3Invoice.basic("FV/1/2026")
+    .issuedOn(new Date("2026-07-09"))
+    .seller({ name: "Sprzedawca", taxId: "1234567890" })
+    .buyer({ name: "Nabywca", taxId: "5252525252" })
+    .addServiceLine("Usługa", { quantity: 1, unitNetPrice: 100, vatRate: 23 })
+    .toXml();
+
+  assert.doesNotMatch(xml, /<P_1M/);
+  assert.match(xml, /<Adnotacje>/);
+  assert.match(xml, /<P_18A>2<\/P_18A>/);
+  assert.match(xml, /<RodzajFaktury>VAT<\/RodzajFaktury>/);
+  const adnotacjeIndex = xml.indexOf("<Adnotacje>");
+  const rodzajIndex = xml.indexOf("<RodzajFaktury>");
+  assert.ok(adnotacjeIndex >= 0 && rodzajIndex > adnotacjeIndex);
+});
+
+test("FA3 basic invoice emits P_1M when issuePlace is set", async () => {
+  const xml = await FA3Invoice.basic("FV/PLACE/1")
+    .issueDate("2026-01-15")
+    .issuePlace("Warszawa")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addLine({ description: "x", quantity: 1, unit: "szt", unitNetPrice: 100, vatRate: 23 })
+    .toXml();
+
+  assert.match(xml, /<P_1M>Warszawa<\/P_1M>/);
+});
+
 test("FA3 builder emits WariantFormularza=3", async () => {
   const xml = await FA3Invoice.basic("FV/VAR/1")
     .issueDate("2026-01-15")

@@ -302,6 +302,7 @@ export interface FA3DraftInput {
   advancePayments?: FA3AdvancePayment[];
   additionalParties?: FA3Party[];
   marginProcedure?: FA3MarginProcedure;
+  splitPaymentAnnotation?: boolean;
   transportKind?: FA3TransportKind;
   foreignCurrencyRate?: number | string;
   simplifiedReceiptLike?: boolean;
