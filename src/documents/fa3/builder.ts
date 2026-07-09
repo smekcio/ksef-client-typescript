@@ -133,6 +133,21 @@ function money(value: number | string): string {
   return toNumber(value).toFixed(2);
 }
 
+function percentage(value: number | string): string {
+  const numeric = toNumber(value);
+  if (Number.isInteger(numeric)) {
+    return String(numeric);
+  }
+  return String(numeric);
+}
+
+function mapXiiVatRate(value: number | string | null | undefined): string | undefined {
+  if (value === null || value === undefined || isZeroVat(value)) {
+    return undefined;
+  }
+  return percentage(value);
+}
+
 function toDateOnly(value: string): string {
   return value.includes("T") ? value.slice(0, 10) : value;
 }
@@ -227,6 +242,7 @@ function computeLineAmounts(line: FA3Line): {
 function mapLine(line: FA3Line, index: number): XmlObject {
   const amounts = computeLineAmounts(line);
   const vatRateText = amounts.vatRate === 0 ? "0" : String(amounts.vatRate);
+  const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
   return {
     NrWierszaFa: String(index + 1),
     P_7: line.description,
@@ -236,7 +252,7 @@ function mapLine(line: FA3Line, index: number): XmlObject {
     P_11: money(amounts.net),
     P_11Vat: money(amounts.vat),
     P_12: vatRateText,
-    P_12_XII: amounts.vatRate === 0 ? "true" : "false",
+    ...(xiiVatRate ? { P_12_XII: xiiVatRate } : {}),
     P_14_5: money(amounts.gross),
     ...(line.serviceDate ? { P_6A: toDateOnly(line.serviceDate) } : {}),
     ...(line.beforeCorrection ? { StanPrzed: "1" } : {}),
@@ -708,6 +724,7 @@ function mapOrder(input: NormalizedFA3Draft): XmlObject | undefined {
       const net = toNumber(line.quantity) * toNumber(line.unitNetPrice);
       const vatRate = isZeroVat(line.vatRate) ? 0 : toNumber(line.vatRate as number | string);
       const vat = vatRate === 0 ? 0 : (net * vatRate) / 100;
+      const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
       return {
         NrWierszaZam: String(index + 1),
         P_7Z: line.description,
@@ -717,6 +734,7 @@ function mapOrder(input: NormalizedFA3Draft): XmlObject | undefined {
         P_11NettoZ: money(net),
         P_11VatZ: money(vat),
         ...(line.vatRate !== undefined ? { P_12Z: String(line.vatRate) } : {}),
+        ...(xiiVatRate ? { P_12Z_XII: xiiVatRate } : {}),
       };
     }),
   };
@@ -1317,6 +1335,7 @@ export class FA3InvoiceBuilder {
       unitNetPrice: number | string;
       unit?: string;
       vatRate?: number | string | null;
+      xiiVatRate?: number | string | null;
       gtu?: string;
       procedure?: string;
       annex15?: boolean;
@@ -1328,6 +1347,7 @@ export class FA3InvoiceBuilder {
       unit: options.unit ?? "szt",
       unitNetPrice: options.unitNetPrice,
       ...(options.vatRate !== undefined ? { vatRate: options.vatRate } : {}),
+      ...(options.xiiVatRate !== undefined ? { xiiVatRate: options.xiiVatRate } : {}),
       ...(options.gtu !== undefined ? { gtu: options.gtu } : {}),
       ...(options.procedure !== undefined ? { procedure: options.procedure } : {}),
       ...(options.annex15 !== undefined ? { annex15: options.annex15 } : {}),
