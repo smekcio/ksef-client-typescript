@@ -253,7 +253,7 @@ function mapLine(line: FA3Line, index: number): XmlObject {
     P_11Vat: money(amounts.vat),
     P_12: vatRateText,
     ...(xiiVatRate ? { P_12_XII: xiiVatRate } : {}),
-    P_14_5: money(amounts.gross),
+    ...(line.annex15 ? { P_12_Zal_15: "1" } : {}),
     ...(line.serviceDate ? { P_6A: toDateOnly(line.serviceDate) } : {}),
     ...(line.beforeCorrection ? { StanPrzed: "1" } : {}),
     ...(line.uniqueId ? { UU_ID: line.uniqueId } : {}),

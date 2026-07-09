@@ -56,6 +56,7 @@ test("FA3 basic invoice omits empty P_1M and emits Adnotacje before RodzajFaktur
 
   assert.doesNotMatch(xml, /<P_1M/);
   assert.doesNotMatch(xml, /<P_12_XII>/);
+  assert.doesNotMatch(xml, /<P_14_5>/);
   assert.match(xml, /<P_12>23<\/P_12>/);
   assert.match(xml, /<Adnotacje>/);
   assert.match(xml, /<P_18A>2<\/P_18A>/);
