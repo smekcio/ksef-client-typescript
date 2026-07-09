@@ -622,7 +622,35 @@ test("builder: full-featured basic invoice serializes many branches", async () =
   assert.match(xml, /<RodzajTransportu>3<\/RodzajTransportu>/);
   assert.match(xml, /<GTU>GTU_01<\/GTU>/);
   assert.match(xml, /<UU_ID>UU-1<\/UU_ID>/);
-  assert.match(xml, /<P_18A>1<\/P_18A>/);
+  assert.match(xml, /<Adnotacje>[\s\S]*<P_18A>2<\/P_18A>[\s\S]*<\/Adnotacje>/);
+});
+
+test("builder: annex15 with gross above 15000 sets P_18A inside Adnotacje", async () => {
+  const xml = await FA3Invoice.basic("FV/MPP/1")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addGoodsLine("Towar zał. 15", {
+      quantity: 1,
+      unitNetPrice: 13000,
+      vatRate: 23,
+      annex15: true,
+    })
+    .toXml();
+
+  assert.match(xml, /<Adnotacje>[\s\S]*<P_18A>1<\/P_18A>[\s\S]*<\/Adnotacje>/);
+});
+
+test("builder: splitPayment sets P_18A inside Adnotacje", async () => {
+  const xml = await FA3Invoice.basic("FV/SPLIT/1")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addLine({ description: "x", quantity: 1, unit: "szt", unitNetPrice: 100, vatRate: 23 })
+    .splitPayment()
+    .toXml();
+
+  assert.match(xml, /<Adnotacje>[\s\S]*<P_18A>1<\/P_18A>[\s\S]*<\/Adnotacje>/);
 });
 
 test("builder: order mapping + attachment blocks + transport other", async () => {
