@@ -133,6 +133,21 @@ function money(value: number | string): string {
   return toNumber(value).toFixed(2);
 }
 
+function percentage(value: number | string): string {
+  const numeric = toNumber(value);
+  if (Number.isInteger(numeric)) {
+    return String(numeric);
+  }
+  return String(numeric);
+}
+
+function mapXiiVatRate(value: number | string | null | undefined): string | undefined {
+  if (value === null || value === undefined || isZeroVat(value)) {
+    return undefined;
+  }
+  return percentage(value);
+}
+
 function toDateOnly(value: string): string {
   return value.includes("T") ? value.slice(0, 10) : value;
 }
@@ -227,6 +242,7 @@ function computeLineAmounts(line: FA3Line): {
 function mapLine(line: FA3Line, index: number): XmlObject {
   const amounts = computeLineAmounts(line);
   const vatRateText = amounts.vatRate === 0 ? "0" : String(amounts.vatRate);
+  const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
   return {
     NrWierszaFa: String(index + 1),
     P_7: line.description,
@@ -236,8 +252,8 @@ function mapLine(line: FA3Line, index: number): XmlObject {
     P_11: money(amounts.net),
     P_11Vat: money(amounts.vat),
     P_12: vatRateText,
-    P_12_XII: amounts.vatRate === 0 ? "true" : "false",
-    P_14_5: money(amounts.gross),
+    ...(xiiVatRate ? { P_12_XII: xiiVatRate } : {}),
+    ...(line.annex15 ? { P_12_Zal_15: "1" } : {}),
     ...(line.serviceDate ? { P_6A: toDateOnly(line.serviceDate) } : {}),
     ...(line.beforeCorrection ? { StanPrzed: "1" } : {}),
     ...(line.uniqueId ? { UU_ID: line.uniqueId } : {}),
@@ -310,6 +326,29 @@ function mapAdnotacje(input: NormalizedFA3Draft): XmlObject {
   };
 }
 
+function mapDaneFaKorygowanej(input: NormalizedFA3Draft): XmlObject | undefined {
+  const correctedDate = input.correctedInvoiceDate?.trim();
+  const correctedNumber = input.correctedInvoiceNumber?.trim();
+  if (!correctedDate || !correctedNumber) {
+    return undefined;
+  }
+
+  const dane: XmlObject = {
+    DataWystFaKorygowanej: correctedDate,
+    NrFaKorygowanej: correctedNumber,
+  };
+
+  const correctedKsefNumber = input.correctedKsefNumber?.trim();
+  if (correctedKsefNumber) {
+    dane.NrKSeF = "1";
+    dane.NrKSeFFaKorygowanej = correctedKsefNumber;
+  } else {
+    dane.NrKSeFN = "1";
+  }
+
+  return dane;
+}
+
 function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
   const kind = input.kind;
   const payload: XmlObject = { RodzajFaktury: KIND_CODE[kind] };
@@ -321,20 +360,15 @@ function mapKindSpecificFields(input: NormalizedFA3Draft): XmlObject {
     if (input.correctionReason) {
       payload.PrzyczynaKorekty = input.correctionReason;
     }
-    if (input.correctedInvoiceNumber) {
-      payload.NrFaKorygowanej = input.correctedInvoiceNumber;
-    }
     if (input.correctedPeriod) {
       payload.OkresFaKorygowanej = input.correctedPeriod;
     }
     if (input.correctedInvoiceNumberOverride) {
       payload.NrFaKorygowany = input.correctedInvoiceNumberOverride;
     }
-    if (input.correctedKsefNumber || input.correctedInvoiceDate) {
-      payload.DaneFaKorygowanej = {
-        ...(input.correctedKsefNumber ? { NumerKSeF: input.correctedKsefNumber } : {}),
-        ...(input.correctedInvoiceDate ? { DataWystawieniaFa: input.correctedInvoiceDate } : {}),
-      };
+    const dane = mapDaneFaKorygowanej(input);
+    if (dane) {
+      payload.DaneFaKorygowanej = dane;
     }
   }
 
@@ -708,6 +742,7 @@ function mapOrder(input: NormalizedFA3Draft): XmlObject | undefined {
       const net = toNumber(line.quantity) * toNumber(line.unitNetPrice);
       const vatRate = isZeroVat(line.vatRate) ? 0 : toNumber(line.vatRate as number | string);
       const vat = vatRate === 0 ? 0 : (net * vatRate) / 100;
+      const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
       return {
         NrWierszaZam: String(index + 1),
         P_7Z: line.description,
@@ -717,6 +752,7 @@ function mapOrder(input: NormalizedFA3Draft): XmlObject | undefined {
         P_11NettoZ: money(net),
         P_11VatZ: money(vat),
         ...(line.vatRate !== undefined ? { P_12Z: String(line.vatRate) } : {}),
+        ...(xiiVatRate ? { P_12Z_XII: xiiVatRate } : {}),
       };
     }),
   };
@@ -821,10 +857,6 @@ export class FA3Draft {
       P_15: money(totals.gross),
       ...mapAdnotacje(this.value),
       FaWiersz: lines,
-      FaWiersze: {
-        LiczbaWierszyFa: String(lines.length),
-        WartoscWierszyFa: money(totals.gross),
-      },
       ...mapKindSpecificFields(this.value),
     };
 
@@ -1317,6 +1349,7 @@ export class FA3InvoiceBuilder {
       unitNetPrice: number | string;
       unit?: string;
       vatRate?: number | string | null;
+      xiiVatRate?: number | string | null;
       gtu?: string;
       procedure?: string;
       annex15?: boolean;
@@ -1328,6 +1361,7 @@ export class FA3InvoiceBuilder {
       unit: options.unit ?? "szt",
       unitNetPrice: options.unitNetPrice,
       ...(options.vatRate !== undefined ? { vatRate: options.vatRate } : {}),
+      ...(options.xiiVatRate !== undefined ? { xiiVatRate: options.xiiVatRate } : {}),
       ...(options.gtu !== undefined ? { gtu: options.gtu } : {}),
       ...(options.procedure !== undefined ? { procedure: options.procedure } : {}),
       ...(options.annex15 !== undefined ? { annex15: options.annex15 } : {}),

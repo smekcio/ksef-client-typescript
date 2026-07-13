@@ -356,6 +356,7 @@ test("domain.ts helpers cover all branches", () => {
   assert.equal(TaxCategory.outsideCountry().code, "np I");
   assert.equal(TaxCategory.serviceArticle100().code, "np II");
   assert.equal(TaxCategory.reverseCharge().code, "oo");
+  assert.deepEqual(TaxCategory.xii(12.5), { xiiVatRate: 12.5, vatRate: null });
 
   assert.deepEqual(Discount.amount(10, "promo"), { kind: "amount", value: 10, reason: "promo" });
   assert.deepEqual(Discount.amount(10), { kind: "amount", value: 10 });
@@ -775,6 +776,10 @@ test("builder: correction with full metadata", async () => {
     .toXml();
   assert.match(xml, /<RodzajFaktury>KOR<\/RodzajFaktury>/);
   assert.match(xml, /<TypKorekty>1<\/TypKorekty>/);
+  assert.match(xml, /<DataWystFaKorygowanej>2025-12-01<\/DataWystFaKorygowanej>/);
+  assert.match(xml, /<NrFaKorygowanej>FV\/OLD\/1<\/NrFaKorygowanej>/);
+  assert.match(xml, /<NrKSeF>1<\/NrKSeF>/);
+  assert.match(xml, /<NrKSeFFaKorygowanej>KSEF-OLD<\/NrKSeFFaKorygowanej>/);
   assert.match(xml, /<OkresFaKorygowanej>2025-12<\/OkresFaKorygowanej>/);
   assert.match(xml, /<NrFaKorygowany>FV\/OLD\/1-OVR<\/NrFaKorygowany>/);
   assert.match(xml, /<StanPrzed>1<\/StanPrzed>/);

@@ -212,6 +212,9 @@ export class TaxCategory {
   static reverseCharge(): FA3TaxCategory {
     return { code: "oo", vatRate: null };
   }
+  static xii(rate: number | string): FA3TaxCategory {
+    return { xiiVatRate: rate, vatRate: null };
+  }
 }
 
 export const VatClass = TaxCategory;

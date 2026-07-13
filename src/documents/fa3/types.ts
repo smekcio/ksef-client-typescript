@@ -127,6 +127,8 @@ export interface FA3TaxCategory {
     | "np II"
     | "oo";
   vatRate?: number | string | null;
+  /** Stawka VAT w procedurze działu XII rozdz. 6a ustawy → pole XML P_12_XII (TProcentowy). */
+  xiiVatRate?: number | string | null;
   exemptionBasis?: string;
   exemptionBasisType?: "law" | "directive" | "other";
 }
@@ -143,6 +145,8 @@ export interface FA3Line {
   unit: string;
   unitNetPrice: number | string;
   vatRate?: number | string | null;
+  /** Stawka VAT w procedurze działu XII rozdz. 6a ustawy → pole XML P_12_XII (TProcentowy). */
+  xiiVatRate?: number | string | null;
   netAmount?: number | string;
   vatAmount?: number | string;
   grossAmount?: number | string;
@@ -232,6 +236,7 @@ export interface FA3OrderLineSection {
   quantity: number | string;
   unitNetPrice: number | string;
   vatRate?: number | string | null;
+  xiiVatRate?: number | string | null;
 }
 
 export interface FA3OrderSection {

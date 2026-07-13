@@ -137,7 +137,6 @@ const ORDER_MAP: Record<string, string[]> = {
     "FakturaZaliczkowa",
     "ZwrotAkcyzy",
     "FaWiersz",
-    "FaWiersze",
     "Rozliczenie",
     "Platnosc",
     "WarunkiTransakcji",
@@ -154,6 +153,13 @@ const ORDER_MAP: Record<string, string[]> = {
     "NoweSrodkiTransportu",
     "P_23",
     "PMarzy",
+  ],
+  DaneFaKorygowanej: [
+    "DataWystFaKorygowanej",
+    "NrFaKorygowanej",
+    "NrKSeF",
+    "NrKSeFFaKorygowanej",
+    "NrKSeFN",
   ],
   OkresFa: ["P_6_Od", "P_6_Do"],
   FaWiersz: [

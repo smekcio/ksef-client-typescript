@@ -55,12 +55,46 @@ test("FA3 basic invoice omits empty P_1M and emits Adnotacje before RodzajFaktur
     .toXml();
 
   assert.doesNotMatch(xml, /<P_1M/);
+  assert.doesNotMatch(xml, /<P_12_XII>/);
+  assert.doesNotMatch(xml, /<P_14_5>/);
+  assert.doesNotMatch(xml, /<FaWiersze>/);
+  assert.match(xml, /<FaWiersz>/);
+  assert.match(xml, /<P_12>23<\/P_12>/);
   assert.match(xml, /<Adnotacje>/);
   assert.match(xml, /<P_18A>2<\/P_18A>/);
   assert.match(xml, /<RodzajFaktury>VAT<\/RodzajFaktury>/);
   const adnotacjeIndex = xml.indexOf("<Adnotacje>");
   const rodzajIndex = xml.indexOf("<RodzajFaktury>");
   assert.ok(adnotacjeIndex >= 0 && rodzajIndex > adnotacjeIndex);
+});
+
+test("FA3 line emits P_12_XII only for division XII VAT rate", async () => {
+  const standard = await FA3Invoice.basic("FV/STD/1")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addServiceLine("Usługa", { quantity: 1, unitNetPrice: 100, vatRate: 23 })
+    .toXml();
+
+  assert.doesNotMatch(standard, /<P_12_XII>/);
+
+  const xii = await FA3Invoice.basic("FV/XII/1")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addServiceLine("Usługa XII", { quantity: 1, unitNetPrice: 100, xiiVatRate: 12 })
+    .toXml();
+
+  assert.match(xii, /<P_12_XII>12<\/P_12_XII>/);
+
+  const xiiFractional = await FA3Invoice.basic("FV/XII/2")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addServiceLine("Usługa XII ułamkowa", { quantity: 1, unitNetPrice: 100, xiiVatRate: 12.5 })
+    .toXml();
+
+  assert.match(xiiFractional, /<P_12_XII>12.5<\/P_12_XII>/);
 });
 
 test("FA3 basic invoice emits P_1M when issuePlace is set", async () => {
