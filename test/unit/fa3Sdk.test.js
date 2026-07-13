@@ -86,6 +86,15 @@ test("FA3 line emits P_12_XII only for division XII VAT rate", async () => {
     .toXml();
 
   assert.match(xii, /<P_12_XII>12<\/P_12_XII>/);
+
+  const xiiFractional = await FA3Invoice.basic("FV/XII/2")
+    .issueDate("2026-01-15")
+    .seller({ name: "Sprzedawca", taxId: "1111111111" })
+    .buyer({ name: "Nabywca", taxId: "2222222222" })
+    .addServiceLine("Usługa XII ułamkowa", { quantity: 1, unitNetPrice: 100, xiiVatRate: 12.5 })
+    .toXml();
+
+  assert.match(xiiFractional, /<P_12_XII>12.5<\/P_12_XII>/);
 });
 
 test("FA3 basic invoice emits P_1M when issuePlace is set", async () => {

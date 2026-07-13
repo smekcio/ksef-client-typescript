@@ -356,6 +356,7 @@ test("domain.ts helpers cover all branches", () => {
   assert.equal(TaxCategory.outsideCountry().code, "np I");
   assert.equal(TaxCategory.serviceArticle100().code, "np II");
   assert.equal(TaxCategory.reverseCharge().code, "oo");
+  assert.deepEqual(TaxCategory.xii(12.5), { xiiVatRate: 12.5, vatRate: null });
 
   assert.deepEqual(Discount.amount(10, "promo"), { kind: "amount", value: 10, reason: "promo" });
   assert.deepEqual(Discount.amount(10), { kind: "amount", value: 10 });

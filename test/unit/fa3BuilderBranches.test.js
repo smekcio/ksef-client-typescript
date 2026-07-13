@@ -272,6 +272,20 @@ test("builder.ts: orderLine before order() and splitPayment before payment()", a
   assert.equal(fa.Platnosc.FormaPlatnosci, "6");
 });
 
+test("builder.ts: orderLine emits P_12Z_XII for division XII VAT rate", async () => {
+  const xml = await FA3Invoice.basic("FV/OL/XII/1")
+    .issueDate("2026-01-15")
+    .seller(SELLER)
+    .buyer(BUYER)
+    .addLine(LINE)
+    .order(123)
+    .orderLine({ description: "Zam XII", quantity: 1, unitNetPrice: 100, xiiVatRate: 12.5 })
+    .toXml();
+
+  assert.match(xml, /<Zamowienie>/);
+  assert.match(xml, /<P_12Z_XII>12.5<\/P_12Z_XII>/);
+});
+
 test("builder.ts: order date without number covers optional order branches", () => {
   const draft = new FA3Draft({
     invoiceNumber: "FV/ODT/1",
