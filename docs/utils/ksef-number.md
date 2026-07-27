@@ -5,6 +5,8 @@ Walidacja numeru KSeF obejmuje format wejścia i zgodność sumy kontrolnej CRC-
 ## API
 
 - `validateKsefNumber(ksefNumber: string): KsefNumberValidationResult`
+- `isValidKsefNumber(ksefNumber: string): boolean`
+- `requireKsefNumber(ksefNumber: string): string`
 
 ```ts
 interface KsefNumberValidationResult {
@@ -12,6 +14,9 @@ interface KsefNumberValidationResult {
   message?: string;
 }
 ```
+
+`requireKsefNumber` zwraca kanoniczną (35-znakową) wartość albo rzuca `Error`.
+Wariant 36-znakowy jest normalizowany przed zwróceniem.
 
 ## Co jest sprawdzane
 

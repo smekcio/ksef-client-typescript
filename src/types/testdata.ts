@@ -25,3 +25,7 @@ export interface TestDataContextUnblockRequest {
 }
 
 export type TestDataContextUnblockResponse = JsonObject;
+
+export interface TestDataUpdateCertificateRequest {
+  validTo: string;
+}

@@ -17,6 +17,8 @@ export * from "./crypto/cryptographyService";
 export * from "./errors/errors";
 export * from "./utils/base64url";
 export * from "./utils/buffer";
+export * from "./utils/certificateSerial";
+export * from "./utils/collectiveIdentifier";
 export * from "./utils/crc8";
 export * from "./utils/ksefNumber";
 export * from "./utils/zip";

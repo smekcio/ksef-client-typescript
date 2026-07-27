@@ -1,6 +1,7 @@
 export { ActiveSessionsClient } from "./activeSessionsClient";
 export { AuthClient } from "./authClient";
 export { CertificatesClient } from "./certificatesClient";
+export { CollectiveIdentifiersClient } from "./collectiveIdentifiersClient";
 export { InvoicesClient } from "./invoicesClient";
 export { LighthouseClient } from "./lighthouseClient";
 export { LimitsClient } from "./limitsClient";

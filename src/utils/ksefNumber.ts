@@ -5,9 +5,13 @@ export interface KsefNumberValidationResult {
   message?: string;
 }
 
-export function validateKsefNumber(ksefNumber: string): KsefNumberValidationResult {
+type NormalizeResult =
+  | { ok: true; value: string }
+  | { ok: false; message: string };
+
+function normalizeAndValidateKsefNumber(ksefNumber: string): NormalizeResult {
   if (!ksefNumber) {
-    return { isValid: false, message: "KSeF number is empty." };
+    return { ok: false, message: "KSeF number is empty." };
   }
 
   let normalized = ksefNumber;
@@ -16,25 +20,45 @@ export function validateKsefNumber(ksefNumber: string): KsefNumberValidationResu
     if (parts.length === 5) {
       const [part0, part1, part2, part3, part4] = parts;
       if (!part0 || !part1 || !part2 || !part3 || !part4) {
-        return { isValid: false, message: "Invalid KSeF number format." };
+        return { ok: false, message: "Invalid KSeF number format." };
       }
       normalized = [part0, part1, part2 + part3, part4].join("-");
     } else {
-      return { isValid: false, message: "Invalid KSeF number format." };
+      return { ok: false, message: "Invalid KSeF number format." };
     }
   }
 
   if (normalized.length !== 35) {
-    return { isValid: false, message: "KSeF number must be 35 characters long." };
+    return { ok: false, message: "KSeF number must be 35 characters long." };
   }
   const main = normalized.slice(0, 32);
   const checksum = normalized.slice(-2);
   const computed = crc8Hex(main);
   if (computed !== checksum) {
     return {
-      isValid: false,
+      ok: false,
       message: `Invalid checksum. Expected ${computed}, got ${checksum}.`,
     };
   }
+  return { ok: true, value: normalized };
+}
+
+export function validateKsefNumber(ksefNumber: string): KsefNumberValidationResult {
+  const result = normalizeAndValidateKsefNumber(ksefNumber);
+  if (!result.ok) {
+    return { isValid: false, message: result.message };
+  }
   return { isValid: true };
+}
+
+export function isValidKsefNumber(ksefNumber: string): boolean {
+  return validateKsefNumber(ksefNumber).isValid;
+}
+
+export function requireKsefNumber(ksefNumber: string): string {
+  const result = normalizeAndValidateKsefNumber(ksefNumber);
+  if (!result.ok) {
+    throw new Error(`Invalid KSeF number: ${result.message}`);
+  }
+  return result.value;
 }

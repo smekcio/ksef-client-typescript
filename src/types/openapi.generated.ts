@@ -2,7 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
-export const OPENAPI_SCHEMA_COUNT = 289 as const;
+export const OPENAPI_SCHEMA_COUNT = 302 as const;
 
 export type AllowedIps = {
   ip4Addresses?: Array<string> | null;
@@ -20,6 +20,7 @@ export type ApiError = {
 
 export type ApiRateLimitsOverride = {
   batchSession: ApiRateLimitValuesOverride;
+  collectiveIdentifier: ApiRateLimitValuesOverride;
   invoiceDownload: ApiRateLimitValuesOverride;
   invoiceExport: ApiRateLimitValuesOverride;
   invoiceExportStatus: ApiRateLimitValuesOverride;
@@ -227,6 +228,66 @@ export type CheckAttachmentPermissionStatusResponse = {
   revokedDate?: string | null;
 };
 
+export type CollectiveIdentifierInvoice = {
+  description?: string | null;
+  ksefNumber: KsefNumber;
+  payment?: CollectiveIdentifierInvoicePayment | null;
+};
+
+export type CollectiveIdentifierInvoicePayment = {
+  amount: number;
+  currency: CurrencyCode;
+};
+
+export type CollectiveIdentifierInvoicesQueryResponse = {
+  continuationToken?: string | null;
+  invoices: Array<CollectiveIdentifierInvoicesQueryResponseItem>;
+};
+
+export type CollectiveIdentifierInvoicesQueryResponseItem = {
+  description?: string | null;
+  detailsHidden: boolean;
+  ksefNumber: KsefNumber;
+  payment?: CollectiveIdentifierInvoicesQueryResponseItemPayment | null;
+};
+
+export type CollectiveIdentifierInvoicesQueryResponseItemPayment = {
+  amount: number;
+  currency: string;
+};
+
+export type CollectiveIdentifiersByKsefNumberQueryResponse = {
+  collectiveIdentifiers: Array<CollectiveIdentifiersByKsefNumberQueryResponseItem>;
+  continuationToken?: string | null;
+};
+
+export type CollectiveIdentifiersByKsefNumberQueryResponseItem = {
+  collectiveIdentifierNumber: string;
+  createdInCurrentContext: boolean;
+  dateCreated: string;
+};
+
+export type CollectiveIdentifiersQueryRequest = {
+  collectiveIdentifierNumber?: string | null;
+  createdInCurrentContext?: boolean | null;
+  dateCreatedFrom: string;
+  dateCreatedTo: string;
+  invoiceCountFrom?: number | null;
+  invoiceCountTo?: number | null;
+};
+
+export type CollectiveIdentifiersQueryResponse = {
+  collectiveIdentifiers: Array<CollectiveIdentifiersQueryResponseItem>;
+  continuationToken?: string | null;
+};
+
+export type CollectiveIdentifiersQueryResponseItem = {
+  collectiveIdentifierNumber: string;
+  createdInCurrentContext: boolean;
+  dateCreated: string;
+  invoiceCount: number;
+};
+
 export type CommonSessionStatus = "Cancelled" | "Failed" | "InProgress" | "Succeeded";
 
 export type CompressionType = "TarGz" | "Zip";
@@ -235,6 +296,7 @@ export type CurrencyCode = "AED" | "AFN" | "ALL" | "AMD" | "ANG" | "AOA" | "ARS"
 
 export type EffectiveApiRateLimits = {
   batchSession: EffectiveApiRateLimitValues;
+  collectiveIdentifier: EffectiveApiRateLimitValues;
   invoiceDownload: EffectiveApiRateLimitValues;
   invoiceExport: EffectiveApiRateLimitValues;
   invoiceExportStatus: EffectiveApiRateLimitValues;
@@ -546,6 +608,14 @@ export type FormCode = {
   schemaVersion: string;
   systemCode: string;
   value: string;
+};
+
+export type GenerateCollectiveIdentifierRequest = {
+  invoices: Array<CollectiveIdentifierInvoice>;
+};
+
+export type GenerateCollectiveIdentifierResponse = {
+  collectiveIdentifierNumber: string;
 };
 
 export type GenerateTokenRequest = {
@@ -890,7 +960,7 @@ export type PersonalPermissionsContextIdentifier = {
 
 export type PersonalPermissionsContextIdentifierType = "InternalId" | "Nip";
 
-export type PersonalPermissionScope = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage" | "VatUeManage";
+export type PersonalPermissionScope = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage" | "VatUeManage";
 
 export type PersonalPermissionsQueryRequest = {
   contextIdentifier?: PersonalPermissionsContextIdentifier | null;
@@ -906,7 +976,7 @@ export type PersonalPermissionsTargetIdentifier = {
 
 export type PersonalPermissionsTargetIdentifierType = "AllPartners" | "InternalId" | "Nip";
 
-export type PersonalPermissionType = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage" | "VatUeManage";
+export type PersonalPermissionType = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage" | "VatUeManage";
 
 export type PersonByFingerprintWithIdentifierDetails = {
   firstName: string;
@@ -978,7 +1048,7 @@ export type PersonPermissionsContextIdentifier = {
 
 export type PersonPermissionsContextIdentifierType = "InternalId" | "Nip";
 
-export type PersonPermissionScope = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
+export type PersonPermissionScope = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
 
 export type PersonPermissionsGrantRequest = {
   description: string;
@@ -1022,7 +1092,7 @@ export type PersonPermissionSubjectDetails = {
 
 export type PersonPermissionSubjectDetailsType = "PersonByFingerprintWithIdentifier" | "PersonByFingerprintWithoutIdentifier" | "PersonByIdentifier";
 
-export type PersonPermissionType = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
+export type PersonPermissionType = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
 
 export type PersonRemoveRequest = {
   nip: Nip;
@@ -1380,7 +1450,11 @@ export type TestDataPermissionsRevokeRequest = {
   contextIdentifier: TestDataContextIdentifier;
 };
 
-export type TestDataPermissionType = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
+export type TestDataPermissionType = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
+
+export type TestDataUpdateCertificateRequest = {
+  validTo: string;
+};
 
 export type ThirdSubjectIdentifierType = "InternalId" | "Nip" | "None" | "Other" | "VatUe";
 
@@ -1403,7 +1477,7 @@ export type TokenInfo = {
   validUntil: string;
 };
 
-export type TokenPermissionType = "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
+export type TokenPermissionType = "CollectiveIdentifierManage" | "CredentialsManage" | "CredentialsRead" | "EnforcementOperations" | "Introspection" | "InvoiceRead" | "InvoiceWrite" | "SubunitManage";
 
 export type TokenStatusResponse = {
   authorIdentifier: TokenAuthorIdentifierTypeIdentifier;
@@ -1499,6 +1573,16 @@ export interface OpenApiGeneratedSchemaMap {
   CertificateSubjectLimitsOverride: CertificateSubjectLimitsOverride;
   Challenge: Challenge;
   CheckAttachmentPermissionStatusResponse: CheckAttachmentPermissionStatusResponse;
+  CollectiveIdentifierInvoice: CollectiveIdentifierInvoice;
+  CollectiveIdentifierInvoicePayment: CollectiveIdentifierInvoicePayment;
+  CollectiveIdentifierInvoicesQueryResponse: CollectiveIdentifierInvoicesQueryResponse;
+  CollectiveIdentifierInvoicesQueryResponseItem: CollectiveIdentifierInvoicesQueryResponseItem;
+  CollectiveIdentifierInvoicesQueryResponseItemPayment: CollectiveIdentifierInvoicesQueryResponseItemPayment;
+  CollectiveIdentifiersByKsefNumberQueryResponse: CollectiveIdentifiersByKsefNumberQueryResponse;
+  CollectiveIdentifiersByKsefNumberQueryResponseItem: CollectiveIdentifiersByKsefNumberQueryResponseItem;
+  CollectiveIdentifiersQueryRequest: CollectiveIdentifiersQueryRequest;
+  CollectiveIdentifiersQueryResponse: CollectiveIdentifiersQueryResponse;
+  CollectiveIdentifiersQueryResponseItem: CollectiveIdentifiersQueryResponseItem;
   CommonSessionStatus: CommonSessionStatus;
   CompressionType: CompressionType;
   CurrencyCode: CurrencyCode;
@@ -1567,6 +1651,8 @@ export interface OpenApiGeneratedSchemaMap {
   ExportInvoicesResponse: ExportInvoicesResponse;
   ForbiddenProblemDetails: ForbiddenProblemDetails;
   FormCode: FormCode;
+  GenerateCollectiveIdentifierRequest: GenerateCollectiveIdentifierRequest;
+  GenerateCollectiveIdentifierResponse: GenerateCollectiveIdentifierResponse;
   GenerateTokenRequest: GenerateTokenRequest;
   GenerateTokenResponse: GenerateTokenResponse;
   GoneProblemDetails: GoneProblemDetails;
@@ -1733,6 +1819,7 @@ export interface OpenApiGeneratedSchemaMap {
   TestDataPermissionsGrantRequest: TestDataPermissionsGrantRequest;
   TestDataPermissionsRevokeRequest: TestDataPermissionsRevokeRequest;
   TestDataPermissionType: TestDataPermissionType;
+  TestDataUpdateCertificateRequest: TestDataUpdateCertificateRequest;
   ThirdSubjectIdentifierType: ThirdSubjectIdentifierType;
   TokenAuthorIdentifierType: TokenAuthorIdentifierType;
   TokenAuthorIdentifierTypeIdentifier: TokenAuthorIdentifierTypeIdentifier;

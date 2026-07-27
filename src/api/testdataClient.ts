@@ -6,7 +6,9 @@ import {
   TestDataContextUnblockResponse,
   TestdataRequest,
   TestdataResponse,
+  TestDataUpdateCertificateRequest,
 } from "../types/testdata";
+import { requireCertificateSerialNumber } from "../utils/certificateSerial";
 
 export class TestdataClient extends BaseClient {
   async enableAttachments(request: TestdataRequest): Promise<TestdataResponse> {
@@ -49,6 +51,20 @@ export class TestdataClient extends BaseClient {
 
   async removeSubject(request: TestdataRequest): Promise<TestdataResponse> {
     return this.post("/testdata/subject/remove", request);
+  }
+
+  async updateCertificate(
+    serialNumber: string,
+    request: TestDataUpdateCertificateRequest,
+  ): Promise<void> {
+    const validated = requireCertificateSerialNumber(serialNumber);
+    const token = await this.getAccessToken();
+    await this.http.request<void>({
+      method: "PUT",
+      path: `/testdata/certificates/${encodeURIComponent(validated)}`,
+      body: request,
+      authToken: token,
+    });
   }
 
   private async post<TResponse = TestdataResponse>(path: string, body: object): Promise<TResponse> {

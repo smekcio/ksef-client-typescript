@@ -5,13 +5,12 @@ Biblioteka udostępnia typowane klienty endpointów, gotowe workflowy (auth/sesj
 
 ## Kompatybilność
 
-- KSeF API: `v2.6.0`
+- KSeF API: `v2.7.0` ([changelog API](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md#wersja-270))
 - Node.js: `>= 20`
 - Środowiska: `TEST`, `DEMO`, `PRD`
 
-KSeF `2.6.0` obejmuje obsługę `application/problem+json`, doprecyzowane operacje
-na tokenie użytym do bieżącego uwierzytelnienia. SDK zachowuje dotychczasowe metody klientów,
-a bogatszy format błędów możesz wymusić przez nagłówek
+KSeF `2.7.0` dodaje identyfikatory zbiorcze (IZ) oraz `PUT /testdata/certificates/{serialNumber}`.
+SDK zachowuje dotychczasowe metody klientów; bogatszy format błędów możesz wymusić przez nagłówek
 `X-Error-Format: problem-details` ustawiony w `KsefClientOptions.headers`.
 
 ## Instalacja

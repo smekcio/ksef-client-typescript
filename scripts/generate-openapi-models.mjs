@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(scriptDir, "..");
-const defaultOpenApiPath = path.resolve(packageRoot, "..", "ksef-docs", "open-api.json");
+const defaultOpenApiPath = path.resolve(packageRoot, "..", "ksef-api", "open-api.json");
 const defaultOutputPath = path.resolve(packageRoot, "src", "types", "openapi.generated.ts");
 
 function printUsage() {
