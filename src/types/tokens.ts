@@ -1,4 +1,5 @@
 export type TokenPermissionType =
+  | "CollectiveIdentifierManage"
   | "InvoiceRead"
   | "InvoiceWrite"
   | "CredentialsRead"

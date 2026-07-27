@@ -2,13 +2,13 @@
 
 Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz gotowe workflowy dla najczęstszych procesów: uwierzytelniania, sesji wysyłkowych i eksportu faktur.
 
-Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w `ksef-docs/`.
+Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api).
 
-Kompatybilność SDK: **KSeF API `v2.6.0`**.
+Kompatybilność SDK: **KSeF API `v2.7.0`**.
 
 ## Status parity
 
-Aktualny status zgodności SDK względem `ksef-docs` znajdziesz w raporcie:
+Aktualny status zgodności SDK względem `ksef-api` znajdziesz w raporcie:
 [parity-ksef-docs.md](parity-ksef-docs.md).
 
 ## Wymagania
@@ -55,6 +55,7 @@ Biblioteka udostępnia dwa poziomy użycia:
 - [`client.permissions`](api/permissions.md)
 - [`client.certificates`](api/certificates.md)
 - [`client.tokens`](api/tokens.md)
+- [`client.collectiveIdentifiers`](api/collective-identifiers.md)
 - [`client.limits` (limits + rate limits)](api/limits.md)
 - [`client.security`](api/security.md)
 - [`client.testdata`](api/testdata.md)

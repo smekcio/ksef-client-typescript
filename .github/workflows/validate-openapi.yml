@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      OPENAPI_URL: https://raw.githubusercontent.com/CIRFMF/ksef-docs/main/open-api.json
+      OPENAPI_URL: https://raw.githubusercontent.com/CIRFMF/ksef-api/main/open-api.json
 
     steps:
       - name: Checkout repository

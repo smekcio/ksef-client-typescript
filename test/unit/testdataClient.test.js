@@ -73,3 +73,31 @@ test("testdata endpoints use expected paths and body forwarding", async () => {
     assert.deepEqual(options.body, request);
   }
 });
+
+test("updateCertificate puts to /testdata/certificates/{serialNumber}", async () => {
+  let capturedOptions;
+  const http = {
+    request: async (options) => {
+      capturedOptions = options;
+      return undefined;
+    },
+  };
+  const client = new TestdataClient(http, async () => "access-token");
+  const request = { validTo: "2026-12-31T23:59:59Z" };
+
+  await client.updateCertificate("0123456789ABCDEF", request);
+
+  assert.equal(capturedOptions.method, "PUT");
+  assert.equal(capturedOptions.path, "/testdata/certificates/0123456789ABCDEF");
+  assert.deepEqual(capturedOptions.body, request);
+  assert.equal(capturedOptions.authToken, "access-token");
+});
+
+test("updateCertificate rejects invalid serial number", async () => {
+  const client = new TestdataClient({ request: async () => undefined }, async () => "access-token");
+
+  await assert.rejects(
+    () => client.updateCertificate("bad", { validTo: "2026-12-31T23:59:59Z" }),
+    /Invalid certificate serial number/,
+  );
+});

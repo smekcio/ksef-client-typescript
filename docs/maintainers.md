@@ -7,7 +7,7 @@ README pozostaje zwięzły i skupiony na użytkowniku SDK.
 
 - Node.js `>= 20`
 - `npm`
-- lokalne repo `ksef-docs` (do kontroli zgodności OpenAPI)
+- lokalne repo `ksef-api` (do kontroli zgodności OpenAPI) albo pobrany `open-api.json`
 
 ## Szybki flow lokalny
 
@@ -29,18 +29,21 @@ Uwaga: CI wymaga 100% coverage (statement/branch/function/line).
 
 ## Kontrola zgodności z OpenAPI
 
-Aktualny target kompatybilności repo: **KSeF API `2.6.0`**.
+Aktualny target kompatybilności repo: **KSeF API `2.7.0`**.
+
+Źródło kontraktu: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) (`open-api.json`)
+lub live TEST: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`.
 
 Regeneracja modeli:
 
 ```bash
-npm run generate:openapi-models -- --openapi ../ksef-docs/open-api.json --output src/types/openapi.generated.ts
+npm run generate:openapi-models -- --openapi ../ksef-api/open-api.json --output src/types/openapi.generated.ts
 ```
 
 Kontrola pokrycia endpointów:
 
 ```bash
-npm run check:openapi-coverage -- --openapi ../ksef-docs/open-api.json --src src/api
+npm run check:openapi-coverage -- --openapi ../ksef-api/open-api.json --src src/api
 ```
 
 ## Workflowy GitHub Actions

@@ -17,6 +17,7 @@ Dla scenariuszy wieloetapowych (uwierzytelnianie, sesje, eksport) używaj warstw
 - [`client.permissions`](permissions.md)
 - [`client.certificates`](certificates.md)
 - [`client.tokens`](tokens.md)
+- [`client.collectiveIdentifiers`](collective-identifiers.md)
 - [`client.limits`](limits.md)
 - [`client.security`](security.md)
 - [`client.testdata`](testdata.md)

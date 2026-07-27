@@ -2,6 +2,7 @@ import {
   ActiveSessionsClient,
   AuthClient,
   CertificatesClient,
+  CollectiveIdentifiersClient,
   InvoicesClient,
   LighthouseClient,
   LimitsClient,
@@ -75,6 +76,7 @@ export class KsefClient {
   readonly tokens: TokensClient;
   readonly limits: LimitsClient;
   readonly testdata: TestdataClient;
+  readonly collectiveIdentifiers: CollectiveIdentifiersClient;
   readonly peppol: PeppolClient;
   readonly lighthouse: LighthouseClient;
   readonly activeSessions: ActiveSessionsClient;
@@ -146,6 +148,7 @@ export class KsefClient {
     this.tokens = new TokensClient(this.http, tokenProvider);
     this.limits = new LimitsClient(this.http, tokenProvider);
     this.testdata = new TestdataClient(this.http, tokenProvider);
+    this.collectiveIdentifiers = new CollectiveIdentifiersClient(this.http, tokenProvider);
     this.peppol = new PeppolClient(this.http, tokenProvider);
     this.lighthouse = new LighthouseClient(this.http, baseLighthouseUrl);
     this.activeSessions = new ActiveSessionsClient(this.http, tokenProvider);

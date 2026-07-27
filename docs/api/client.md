@@ -13,6 +13,7 @@ Podklienci domenowi:
 - `client.permissions`
 - `client.certificates`
 - `client.tokens`
+- `client.collectiveIdentifiers`
 - `client.limits`
 - `client.security`
 - `client.testdata`

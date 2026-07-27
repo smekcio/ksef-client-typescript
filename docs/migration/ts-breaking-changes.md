@@ -28,8 +28,8 @@ Ten dokument opisuje zmiany procesowe po rozszerzeniu SDK i automatyzacji modeli
 
 ```bash
 npm ci
-npm run generate:openapi-models -- --openapi ../ksef-docs/open-api.json --output src/types/openapi.generated.ts
-node scripts/check-openapi-coverage.mjs --openapi ../ksef-docs/open-api.json --src src/api
+npm run generate:openapi-models -- --openapi ../ksef-api/open-api.json --output src/types/openapi.generated.ts
+node scripts/check-openapi-coverage.mjs --openapi ../ksef-api/open-api.json --src src/api
 npm run lint
 npm run typecheck
 ```

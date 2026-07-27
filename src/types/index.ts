@@ -1,5 +1,6 @@
 export * from "./auth";
 export * from "./certificates";
+export * from "./collectiveIdentifiers";
 export * from "./common";
 export * from "./invoices";
 export * from "./lighthouse";

@@ -13,13 +13,13 @@ npm ci
 Generowanie modeli OpenAPI:
 
 ```bash
-npm run generate:openapi-models -- --openapi ../ksef-docs/open-api.json --output src/types/openapi.generated.ts
+npm run generate:openapi-models -- --openapi ../ksef-api/open-api.json --output src/types/openapi.generated.ts
 ```
 
 Kontrola pokrycia endpointow TypeScript vs OpenAPI:
 
 ```bash
-node scripts/check-openapi-coverage.mjs --openapi ../ksef-docs/open-api.json --src src/api
+node scripts/check-openapi-coverage.mjs --openapi ../ksef-api/open-api.json --src src/api
 ```
 
 Pelna lokalna kontrola jak w CI:

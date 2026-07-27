@@ -10,6 +10,8 @@ Wszystkie poniższe funkcje są eksportowane z głównego wejścia pakietu (`kse
 - [CRC-8](crc8.md) - obliczanie sumy kontrolnej (`crc8`, `crc8Hex`)
 - [JWT](jwt.md) - dekodowanie payloadu tokena i odczyt daty wygaśnięcia
 - [Numer KSeF](ksef-number.md) - lokalna walidacja numeru wraz z checksumą
+- [Identyfikator zbiorczy](collective-identifier.md) - walidacja numeru IZ
+- [Numer seryjny certyfikatu](certificate-serial.md) - walidacja `^[0-9A-F]{16}$`
 - [ZIP](zip.md) - tworzenie i rozpakowanie archiwów z limitami bezpieczeństwa
 
 ## Przykład importu

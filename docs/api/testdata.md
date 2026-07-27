@@ -16,12 +16,14 @@ Endpointy testdata są przeznaczone dla środowisk testowych (`TEST` i `DEMO`) d
 - `removePerson(request)`
 - `createSubject(request)`
 - `removeSubject(request)`
+- `updateCertificate(serialNumber, request)`
 
 ## Najważniejsze informacje
 
 - Wszystkie metody tego klienta używają `accessToken`.
 - `blockContext(...)` i `unblockContext(...)` przyjmują `contextIdentifier`.
 - Dozwolone typy `contextIdentifier.type` to: `Nip`, `InternalId`, `NipVatUe`, `PeppolId`.
+- `updateCertificate(serialNumber, { validTo })` skróca okres ważności certyfikatu KSeF na środowiskach testowych (`PUT /testdata/certificates/{serialNumber}`); `serialNumber` musi mieć format `^[0-9A-F]{16}$`.
 - Operacje na endpointach `/testdata/limits/*` oraz `/testdata/rate-limits*` nie są realizowane przez `client.testdata`; obsługuje je `client.limits`.
 
 ## Operacje limit/rate-limit (klient `limits`)
@@ -127,4 +129,12 @@ const revokeRequest: TestdataRequest = {
 
 await client.testdata.enableAttachments(enableRequest);
 await client.testdata.revokeAttachments(revokeRequest);
+```
+
+### Skrócenie ważności certyfikatu testowego
+
+```ts
+await client.testdata.updateCertificate("0123456789ABCDEF", {
+  validTo: "2026-12-31T23:59:59Z",
+});
 ```

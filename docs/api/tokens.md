@@ -18,8 +18,8 @@ Token KSeF możesz wykorzystać np. w autoryzacji przez `authenticateWithKsefTok
 - Dostępne wartości `status`: `"Pending"`, `"Active"`, `"Revoking"`, `"Revoked"`, `"Failed"`.
 - Dostępne wartości `authorIdentifierType`: `"Nip"`, `"Pesel"`, `"Fingerprint"`.
 - Typ `TokenPermissionType` (używany m.in. w `GenerateTokenRequest.permissions`) obejmuje:
-  `"InvoiceRead"`, `"InvoiceWrite"`, `"CredentialsRead"`, `"CredentialsManage"`, `"SubunitManage"`,
-  `"EnforcementOperations"`, `"Introspection"`.
+  `"CollectiveIdentifierManage"`, `"InvoiceRead"`, `"InvoiceWrite"`, `"CredentialsRead"`,
+  `"CredentialsManage"`, `"SubunitManage"`, `"EnforcementOperations"`, `"Introspection"`.
 - Stronicowanie listy tokenów działa przez nagłówek `x-continuation-token` (potwierdzone testami jednostkowymi).
 - Od KSeF API `2.6.0` `GET /tokens` może zwrócić także informacje o tokenie użytym do bieżącego
   uwierzytelnienia, nawet bez `CredentialsManage` / `CredentialsRead`.

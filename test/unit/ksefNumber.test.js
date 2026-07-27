@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateKsefNumber } from "../../dist/index.js";
+import { isValidKsefNumber, requireKsefNumber, validateKsefNumber } from "../../dist/index.js";
 
 test("validates KSeF number checksum", () => {
   const valid = "5265877635-20250826-0100001AF629-AF";
@@ -46,4 +46,17 @@ test("accepts 36-char variant and normalizes middle segments before checksum val
   assert.equal(withExtraSeparator.length, 36);
   const result = validateKsefNumber(withExtraSeparator);
   assert.equal(result.isValid, true);
+});
+
+test("requireKsefNumber returns value or throws", () => {
+  const valid = "5265877635-20250826-0100001AF629-AF";
+  assert.equal(requireKsefNumber(valid), valid);
+  assert.equal(isValidKsefNumber(valid), true);
+  assert.throws(() => requireKsefNumber("bad"), /Invalid KSeF number/);
+});
+
+test("requireKsefNumber returns normalized 35-char form for 36-char input", () => {
+  const withExtraSeparator = "5265877635-20250826-0100001A-F629-AF";
+  assert.equal(withExtraSeparator.length, 36);
+  assert.equal(requireKsefNumber(withExtraSeparator), "5265877635-20250826-0100001AF629-AF");
 });
