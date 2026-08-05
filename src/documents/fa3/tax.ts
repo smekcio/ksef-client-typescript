@@ -1,8 +1,8 @@
 import { FA3Line } from "./types";
 
 function toNumber(value: number | string | null | undefined): number {
-  if (value === null || value === undefined) return 0;
-  const parsed = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+  if (value == null || value === "") return 0;
+  const parsed = Number(String(value).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -61,7 +61,7 @@ export interface TaxSummaryRow {
   net: number;
   vat: number;
   gross: number;
-  vatPln?: number;
+  vatPln: number;
 }
 
 /** Mapuje kod FA(3) / numeryczny rate na kubełek P_13_x. Pusty/nieznany → 23or22. */
@@ -103,7 +103,7 @@ export function resolveVatRateCode(line: FA3Line): string {
   const fromCode = line.vatCode?.trim();
   if (fromCode) return fromCode;
 
-  if (line.vatRate === null || line.vatRate === undefined || line.vatRate === "") {
+  if (line.vatRate == null || line.vatRate === "") {
     return "0 KR";
   }
 
@@ -129,20 +129,18 @@ export class TaxSummary {
     for (const line of lines) {
       const qty = toNumber(line.quantity);
       const unitNet = toNumber(line.unitNetPrice);
-      const rate = line.vatRate === null || line.vatRate === undefined ? 0 : toNumber(line.vatRate);
+      const rate = toNumber(line.vatRate);
       const rateCode = resolveVatRateCode(line);
       const sign = invertBefore && line.beforeCorrection ? -1 : 1;
       const unsignedNet = toNumber(line.netAmount ?? qty * unitNet);
-      const unsignedVat = toNumber(
-        line.vatAmount ?? (rate === 0 || !Number.isFinite(rate) ? 0 : (unsignedNet * rate) / 100),
-      );
+      const unsignedVat = toNumber(line.vatAmount ?? (rate === 0 ? 0 : (unsignedNet * rate) / 100));
       const unsignedGross = toNumber(line.grossAmount ?? unsignedNet + unsignedVat);
       const prev = map.get(rateCode) ?? { rateCode, net: 0, vat: 0, gross: 0, vatPln: 0 };
       prev.net = money(prev.net + sign * unsignedNet);
       prev.vat = money(prev.vat + sign * unsignedVat);
       prev.gross = money(prev.gross + sign * unsignedGross);
       if (line.vatAmountPln != null && line.vatAmountPln !== "") {
-        prev.vatPln = money((prev.vatPln ?? 0) + sign * toNumber(line.vatAmountPln));
+        prev.vatPln = money(prev.vatPln + sign * toNumber(line.vatAmountPln));
       }
       map.set(rateCode, prev);
     }
@@ -168,7 +166,7 @@ export function taxSummaryToFaFields(
     const prev = buckets.get(key) ?? {
       net: 0,
       vat: 0,
-      vatPln: includeVatPln ? 0 : null,
+      vatPln: null,
     };
     prev.net = money(prev.net + row.net);
     prev.vat = money(prev.vat + row.vat);
