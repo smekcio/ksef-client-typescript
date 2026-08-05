@@ -267,59 +267,53 @@ function mapLine(line: FA3Line, index: number): XmlObject {
   };
 }
 
-function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat: number; gross: number } {
-  let net = 0;
-  let vat = 0;
-  let gross = 0;
-  for (const payment of payments) {
-    const amount = toNumber(payment.amount);
-    const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
-    if (vatRate === null) {
-      net += amount;
-      gross += amount;
-      continue;
-    }
-    const divisor = 1 + vatRate / 100;
-    const paymentNet = amount / divisor;
-    const paymentVat = amount - paymentNet;
-    net += paymentNet;
-    vat += paymentVat;
-    gross += amount;
+type AdvanceSplit = {
+  net: number;
+  vat: number;
+  gross: number;
+  vatRate: number;
+  vatCode: string;
+};
+
+function splitAdvancePayment(payment: FA3AdvancePayment): AdvanceSplit {
+  const gross = toNumber(payment.amount);
+  const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
+  if (vatRate === null) {
+    return { net: gross, vat: 0, gross, vatRate: 0, vatCode: "0 KR" };
   }
-  return { net, vat, gross };
+  const divisor = 1 + vatRate / 100;
+  const net = gross / divisor;
+  const vat = gross - net;
+  return { net, vat, gross, vatRate, vatCode: String(vatRate) };
+}
+
+function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat: number; gross: number } {
+  return payments.reduce(
+    (acc, payment) => {
+      const split = splitAdvancePayment(payment);
+      acc.net += split.net;
+      acc.vat += split.vat;
+      acc.gross += split.gross;
+      return acc;
+    },
+    { net: 0, vat: 0, gross: 0 },
+  );
 }
 
 /** Synthetic FA lines so advancePayments contribute to P_13_x/P_14_x buckets (not FaWiersz). */
 function advancePaymentsAsLines(payments: FA3AdvancePayment[]): FA3Line[] {
   return payments.map((payment) => {
-    const amount = toNumber(payment.amount);
-    const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
-    if (vatRate === null) {
-      return {
-        description: "Zaliczka",
-        quantity: 1,
-        unit: "szt",
-        unitNetPrice: amount,
-        vatRate: 0,
-        vatCode: "0 KR",
-        netAmount: amount,
-        vatAmount: 0,
-        grossAmount: amount,
-      };
-    }
-    const divisor = 1 + vatRate / 100;
-    const net = amount / divisor;
-    const vat = amount - net;
+    const split = splitAdvancePayment(payment);
     return {
       description: "Zaliczka",
       quantity: 1,
       unit: "szt",
-      unitNetPrice: net,
-      vatRate,
-      vatCode: String(vatRate),
-      netAmount: net,
-      vatAmount: vat,
-      grossAmount: amount,
+      unitNetPrice: split.net,
+      vatRate: split.vatRate,
+      vatCode: split.vatCode,
+      netAmount: split.net,
+      vatAmount: split.vat,
+      grossAmount: split.gross,
     };
   });
 }
