@@ -6,6 +6,13 @@
 
 * **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.7.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.7.0...v0.7.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **fa3:** split VAT summary into P_13/P_14 rate buckets ([#47](https://github.com/smekcio/ksef-client-typescript/issues/47)) ([dc58cc4](https://github.com/smekcio/ksef-client-typescript/commit/dc58cc4539edd39bfdb5b0a8da445e14eab3aaf6))
+
 ## [0.7.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.6.4...v0.7.0) (2026-07-27)
 
 
