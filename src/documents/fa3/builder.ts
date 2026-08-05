@@ -289,6 +289,41 @@ function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat
   return { net, vat, gross };
 }
 
+/** Synthetic FA lines so advancePayments contribute to P_13_x/P_14_x buckets (not FaWiersz). */
+function advancePaymentsAsLines(payments: FA3AdvancePayment[]): FA3Line[] {
+  return payments.map((payment) => {
+    const amount = toNumber(payment.amount);
+    const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
+    if (vatRate === null) {
+      return {
+        description: "Zaliczka",
+        quantity: 1,
+        unit: "szt",
+        unitNetPrice: amount,
+        vatRate: 0,
+        vatCode: "0 KR",
+        netAmount: amount,
+        vatAmount: 0,
+        grossAmount: amount,
+      };
+    }
+    const divisor = 1 + vatRate / 100;
+    const net = amount / divisor;
+    const vat = amount - net;
+    return {
+      description: "Zaliczka",
+      quantity: 1,
+      unit: "szt",
+      unitNetPrice: net,
+      vatRate,
+      vatCode: String(vatRate),
+      netAmount: net,
+      vatAmount: vat,
+      grossAmount: amount,
+    };
+  });
+}
+
 function extractTotals(input: NormalizedFA3Draft): { net: number; vat: number; gross: number } {
   const linesTotals = input.lines.reduce(
     (acc, line) => {
@@ -856,9 +891,12 @@ export class FA3Draft {
     const includeVatPln =
       currency !== "PLN" && this.value.lines.some((line) => line.vatAmountPln != null && line.vatAmountPln !== "");
     const taxFields = taxSummaryToFaFields(
-      TaxSummary.fromLines(this.value.lines, {
-        treatBeforeCorrectionAsNegative: CORRECTION_KINDS.has(kind),
-      }),
+      TaxSummary.fromLines(
+        [...this.value.lines, ...advancePaymentsAsLines(this.value.advancePayments)],
+        {
+          treatBeforeCorrectionAsNegative: CORRECTION_KINDS.has(kind),
+        },
+      ),
       { includeVatPln },
     );
     const faPayload: XmlObject = {

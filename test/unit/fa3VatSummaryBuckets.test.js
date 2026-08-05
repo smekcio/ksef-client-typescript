@@ -356,3 +356,49 @@ test("addGoodsLine accepts vatCode, vatAmountPln and explicit amounts", async ()
   assert.match(xml, /<P_14_1>23\.00<\/P_14_1>/);
   assert.match(xml, /<P_14_1W>50\.25<\/P_14_1W>/);
 });
+
+test("advance invoice puts advancePayment VAT into P_13_1/P_14_1", async () => {
+  const xml = await FA3Invoice.advance("ZAL/1")
+    .issueDate("2026-08-01")
+    .seller({ name: "Sprzedawca", taxId: "1111111111", addressLine1: "A 1" })
+    .buyer({ name: "Nabywca", taxId: "2222222222", addressLine1: "B 2" })
+    .advancePayment({ amount: 123, vatRate: 23 })
+    .toXml();
+
+  assert.match(xml, /<RodzajFaktury>ZAL<\/RodzajFaktury>/);
+  assert.match(xml, /<ZaliczkaCzesciowa>/);
+  assert.match(xml, /<P_13_1>100\.00<\/P_13_1>/);
+  assert.match(xml, /<P_14_1>23\.00<\/P_14_1>/);
+  assert.match(xml, /<P_15>123\.00<\/P_15>/);
+  assert.doesNotMatch(xml, /<FaWiersz>/);
+});
+
+test("advance invoice splits mixed advancePayment VAT rates", async () => {
+  const xml = await FA3Invoice.advance("ZAL/MIX/1")
+    .issueDate("2026-08-01")
+    .seller({ name: "Sprzedawca", taxId: "1111111111", addressLine1: "A 1" })
+    .buyer({ name: "Nabywca", taxId: "2222222222", addressLine1: "B 2" })
+    .advancePayment({ amount: 123, vatRate: 23 })
+    .advancePayment({ amount: 54, vatRate: 8 })
+    .toXml();
+
+  assert.match(xml, /<P_13_1>100\.00<\/P_13_1>/);
+  assert.match(xml, /<P_14_1>23\.00<\/P_14_1>/);
+  assert.match(xml, /<P_13_2>50\.00<\/P_13_2>/);
+  assert.match(xml, /<P_14_2>4\.00<\/P_14_2>/);
+  assert.match(xml, /<P_15>177\.00<\/P_15>/);
+});
+
+test("advance payment without vatRate uses P_13_6_1", async () => {
+  const xml = await FA3Invoice.advance("ZAL/0/1")
+    .issueDate("2026-08-01")
+    .seller({ name: "Sprzedawca", taxId: "1111111111", addressLine1: "A 1" })
+    .buyer({ name: "Nabywca", taxId: "2222222222", addressLine1: "B 2" })
+    .advancePayment({ amount: 80 })
+    .toXml();
+
+  assert.match(xml, /<P_13_6_1>80\.00<\/P_13_6_1>/);
+  assert.doesNotMatch(xml, /<P_13_1>/);
+  assert.doesNotMatch(xml, /<P_14_1>/);
+  assert.match(xml, /<P_15>80\.00<\/P_15>/);
+});
