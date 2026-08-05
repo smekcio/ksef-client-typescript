@@ -25,7 +25,7 @@ import {
   validatePartyIdentifier,
   validateSellerPartyIdentifier,
 } from "./identifier";
-import { TaxSummary, taxSummaryToFaFields } from "./tax";
+import { TaxSummary, resolveVatRateCode, taxSummaryToFaFields } from "./tax";
 
 interface FA3XmlOptions {
   pretty?: boolean;
@@ -242,11 +242,6 @@ function computeLineAmounts(line: FA3Line): {
 
 function mapLine(line: FA3Line, index: number): XmlObject {
   const amounts = computeLineAmounts(line);
-  const vatRateText = line.vatCode?.trim()
-    ? line.vatCode.trim()
-    : amounts.vatRate === 0
-      ? "0"
-      : String(amounts.vatRate);
   const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
   return {
     NrWierszaFa: String(index + 1),
@@ -256,7 +251,7 @@ function mapLine(line: FA3Line, index: number): XmlObject {
     P_9A: money(line.unitNetPrice),
     P_11: money(amounts.net),
     P_11Vat: money(amounts.vat),
-    P_12: vatRateText,
+    P_12: resolveVatRateCode(line),
     ...(xiiVatRate ? { P_12_XII: xiiVatRate } : {}),
     ...(line.annex15 ? { P_12_Zal_15: "1" } : {}),
     ...(line.serviceDate ? { P_6A: toDateOnly(line.serviceDate) } : {}),

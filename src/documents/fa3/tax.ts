@@ -1,3 +1,4 @@
+import { KsefValidationError } from "../../errors/errors";
 import { FA3Line } from "./types";
 
 function toNumber(value: number | string | null | undefined): number {
@@ -64,9 +65,12 @@ export interface TaxSummaryRow {
   vatPln: number;
 }
 
-/** Mapuje kod FA(3) / numeryczny rate na kubełek P_13_x. Pusty/nieznany → 23or22. */
+/** Mapuje kod FA(3) / numeryczny rate na kubełek P_13_x. Pusty/nieznany → KsefValidationError. */
 export function faVatBucketForCode(code: string | null | undefined): FaVatBucketKey {
-  const trimmed = code?.trim() || "23";
+  const trimmed = code?.trim();
+  if (!trimmed) {
+    throw new KsefValidationError("Unknown FA(3) VAT rate code: (empty)");
+  }
   switch (trimmed) {
     case "23":
     case "22":
@@ -94,7 +98,7 @@ export function faVatBucketForCode(code: string | null | undefined): FaVatBucket
     case "oo":
       return "oo";
     default:
-      return "23or22";
+      throw new KsefValidationError(`Unknown FA(3) VAT rate code: ${trimmed}`);
   }
 }
 

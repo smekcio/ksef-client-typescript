@@ -46,13 +46,19 @@ test("faVatBucketForCode covers all FA rate codes", () => {
     ["np I", "npI"],
     ["np II", "npII"],
     ["oo", "oo"],
-    ["", "23or22"],
-    [null, "23or22"],
-    [undefined, "23or22"],
-    ["unknown", "23or22"],
   ];
   for (const [code, expected] of cases) {
     assert.equal(faVatBucketForCode(code), expected, `code=${String(code)}`);
+  }
+});
+
+test("faVatBucketForCode throws on empty or unknown codes", () => {
+  for (const code of ["", null, undefined, "unknown", "23%"]) {
+    assert.throws(
+      () => faVatBucketForCode(code),
+      /Unknown FA\(3\) VAT rate code/,
+      `code=${String(code)}`,
+    );
   }
 });
 
@@ -174,6 +180,28 @@ test("FA3 XML uses P_13_6_1 for 0 KR", async () => {
   assert.match(xml, /<P_13_6_1>80\.00<\/P_13_6_1>/);
   assert.match(xml, /<P_12>0 KR<\/P_12>/);
   assert.doesNotMatch(xml, /<P_13_1>/);
+});
+
+test("FA3 XML emits P_12 0 KR when vatRate is 0 without vatCode", async () => {
+  const xml = await FA3Invoice.basic("FV/0KR/2")
+    .issueDate("2026-08-01")
+    .seller({ name: "Sprzedawca", taxId: "1111111111", addressLine1: "A 1" })
+    .buyer({ name: "Nabywca", taxId: "2222222222", addressLine1: "B 2" })
+    .addLine({
+      description: "Zero legacy",
+      quantity: 1,
+      unit: "szt",
+      unitNetPrice: 40,
+      vatRate: 0,
+      netAmount: 40,
+      vatAmount: 0,
+      grossAmount: 40,
+    })
+    .toXml();
+
+  assert.match(xml, /<P_12>0 KR<\/P_12>/);
+  assert.doesNotMatch(xml, /<P_12>0<\/P_12>/);
+  assert.match(xml, /<P_13_6_1>40\.00<\/P_13_6_1>/);
 });
 
 test("FA3 XML emits P_14_1W for foreign currency vatAmountPln", async () => {
