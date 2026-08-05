@@ -25,6 +25,7 @@ import {
   validatePartyIdentifier,
   validateSellerPartyIdentifier,
 } from "./identifier";
+import { TaxSummary, resolveVatRateCode, taxSummaryToFaFields } from "./tax";
 
 interface FA3XmlOptions {
   pretty?: boolean;
@@ -241,7 +242,6 @@ function computeLineAmounts(line: FA3Line): {
 
 function mapLine(line: FA3Line, index: number): XmlObject {
   const amounts = computeLineAmounts(line);
-  const vatRateText = amounts.vatRate === 0 ? "0" : String(amounts.vatRate);
   const xiiVatRate = mapXiiVatRate(line.xiiVatRate);
   return {
     NrWierszaFa: String(index + 1),
@@ -251,7 +251,7 @@ function mapLine(line: FA3Line, index: number): XmlObject {
     P_9A: money(line.unitNetPrice),
     P_11: money(amounts.net),
     P_11Vat: money(amounts.vat),
-    P_12: vatRateText,
+    P_12: resolveVatRateCode(line),
     ...(xiiVatRate ? { P_12_XII: xiiVatRate } : {}),
     ...(line.annex15 ? { P_12_Zal_15: "1" } : {}),
     ...(line.serviceDate ? { P_6A: toDateOnly(line.serviceDate) } : {}),
@@ -262,26 +262,55 @@ function mapLine(line: FA3Line, index: number): XmlObject {
   };
 }
 
-function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat: number; gross: number } {
-  let net = 0;
-  let vat = 0;
-  let gross = 0;
-  for (const payment of payments) {
-    const amount = toNumber(payment.amount);
-    const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
-    if (vatRate === null) {
-      net += amount;
-      gross += amount;
-      continue;
-    }
-    const divisor = 1 + vatRate / 100;
-    const paymentNet = amount / divisor;
-    const paymentVat = amount - paymentNet;
-    net += paymentNet;
-    vat += paymentVat;
-    gross += amount;
+type AdvanceSplit = {
+  net: number;
+  vat: number;
+  gross: number;
+  vatRate: number;
+  vatCode: string;
+};
+
+function splitAdvancePayment(payment: FA3AdvancePayment): AdvanceSplit {
+  const gross = toNumber(payment.amount);
+  const vatRate = isZeroVat(payment.vatRate) ? null : toNumber(payment.vatRate as number | string);
+  if (vatRate === null) {
+    return { net: gross, vat: 0, gross, vatRate: 0, vatCode: "0 KR" };
   }
-  return { net, vat, gross };
+  const divisor = 1 + vatRate / 100;
+  const net = gross / divisor;
+  const vat = gross - net;
+  return { net, vat, gross, vatRate, vatCode: String(vatRate) };
+}
+
+function computeAdvanceNetVat(payments: FA3AdvancePayment[]): { net: number; vat: number; gross: number } {
+  return payments.reduce(
+    (acc, payment) => {
+      const split = splitAdvancePayment(payment);
+      acc.net += split.net;
+      acc.vat += split.vat;
+      acc.gross += split.gross;
+      return acc;
+    },
+    { net: 0, vat: 0, gross: 0 },
+  );
+}
+
+/** Synthetic FA lines so advancePayments contribute to P_13_x/P_14_x buckets (not FaWiersz). */
+function advancePaymentsAsLines(payments: FA3AdvancePayment[]): FA3Line[] {
+  return payments.map((payment) => {
+    const split = splitAdvancePayment(payment);
+    return {
+      description: "Zaliczka",
+      quantity: 1,
+      unit: "szt",
+      unitNetPrice: split.net,
+      vatRate: split.vatRate,
+      vatCode: split.vatCode,
+      netAmount: split.net,
+      vatAmount: split.vat,
+      grossAmount: split.gross,
+    };
+  });
 }
 
 function extractTotals(input: NormalizedFA3Draft): { net: number; vat: number; gross: number } {
@@ -847,13 +876,24 @@ export class FA3Draft {
     const kind = this.value.kind;
     const lines = this.value.lines.map((line, index) => mapLine(line, index));
     const totals = extractTotals(this.value);
+    const currency = normalizeCurrency(this.value.currency);
+    const includeVatPln =
+      currency !== "PLN" && this.value.lines.some((line) => line.vatAmountPln != null && line.vatAmountPln !== "");
+    const taxFields = taxSummaryToFaFields(
+      TaxSummary.fromLines(
+        [...this.value.lines, ...advancePaymentsAsLines(this.value.advancePayments)],
+        {
+          treatBeforeCorrectionAsNegative: CORRECTION_KINDS.has(kind),
+        },
+      ),
+      { includeVatPln },
+    );
     const faPayload: XmlObject = {
-      KodWaluty: normalizeCurrency(this.value.currency),
+      KodWaluty: currency,
       P_1: toDateOnly(this.value.issueDate),
       ...(this.value.issuePlace?.trim() ? { P_1M: this.value.issuePlace.trim() } : {}),
       P_2: this.value.invoiceNumber,
-      P_13_1: money(totals.net),
-      P_14_1: money(totals.vat),
+      ...taxFields,
       P_15: money(totals.gross),
       ...mapAdnotacje(this.value),
       FaWiersz: lines,
@@ -1349,10 +1389,15 @@ export class FA3InvoiceBuilder {
       unitNetPrice: number | string;
       unit?: string;
       vatRate?: number | string | null;
+      vatCode?: string;
+      vatAmountPln?: number | string | null;
       xiiVatRate?: number | string | null;
       gtu?: string;
       procedure?: string;
       annex15?: boolean;
+      netAmount?: number | string;
+      vatAmount?: number | string;
+      grossAmount?: number | string;
     },
   ): FA3InvoiceBuilder {
     return this.addLine({
@@ -1361,10 +1406,15 @@ export class FA3InvoiceBuilder {
       unit: options.unit ?? "szt",
       unitNetPrice: options.unitNetPrice,
       ...(options.vatRate !== undefined ? { vatRate: options.vatRate } : {}),
+      ...(options.vatCode !== undefined ? { vatCode: options.vatCode } : {}),
+      ...(options.vatAmountPln !== undefined ? { vatAmountPln: options.vatAmountPln } : {}),
       ...(options.xiiVatRate !== undefined ? { xiiVatRate: options.xiiVatRate } : {}),
       ...(options.gtu !== undefined ? { gtu: options.gtu } : {}),
       ...(options.procedure !== undefined ? { procedure: options.procedure } : {}),
       ...(options.annex15 !== undefined ? { annex15: options.annex15 } : {}),
+      ...(options.netAmount !== undefined ? { netAmount: options.netAmount } : {}),
+      ...(options.vatAmount !== undefined ? { vatAmount: options.vatAmount } : {}),
+      ...(options.grossAmount !== undefined ? { grossAmount: options.grossAmount } : {}),
     });
   }
 

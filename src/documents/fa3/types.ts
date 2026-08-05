@@ -145,6 +145,13 @@ export interface FA3Line {
   unit: string;
   unitNetPrice: number | string;
   vatRate?: number | string | null;
+  /**
+   * Kod stawki FA(3) P_12 (np. "23", "zw", "0 KR").
+   * Gdy podany — używany w P_12 i kubełkach P_13_x / P_14_x; vatRate nadal do wyliczenia kwot.
+   */
+  vatCode?: string;
+  /** Kwota VAT w PLN (faktura walutowa) — sumowana do P_14_xW. */
+  vatAmountPln?: number | string | null;
   /** Stawka VAT w procedurze działu XII rozdz. 6a ustawy → pole XML P_12_XII (TProcentowy). */
   xiiVatRate?: number | string | null;
   netAmount?: number | string;
