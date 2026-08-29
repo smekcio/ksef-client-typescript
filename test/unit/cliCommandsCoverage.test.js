@@ -271,7 +271,10 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/v2/sessions/ONLINE-REF-1/invoices/INV-REF-1/upo") {
+    if (
+      req.method === "GET" &&
+      url.pathname === "/v2/sessions/ONLINE-REF-1/invoices/INV-REF-1/upo"
+    ) {
       res.writeHead(200, { "Content-Type": "application/xml" });
       res.end(upoXml);
       return;
@@ -314,7 +317,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
         },
         {
           fileName: "invoice-1.xml",
-          content: Buffer.from("<Invoice id=\"1\" />", "utf8"),
+          content: Buffer.from('<Invoice id="1" />', "utf8"),
         },
       ]);
       exportPart = CryptographyService.encryptAes256Cbc(archive, cipherKey, cipherIv);
@@ -334,6 +337,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
             invoiceCount: 1,
             size: exportPart.length,
             isTruncated: false,
+            compressionType: "Zip",
             parts: [
               {
                 ordinalNumber: 1,
@@ -397,11 +401,14 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
 
     capture = createCaptureIo();
-    exitCode = await runCli(["--json", "profile", "set", "ops", "--env", "DEMO", "--lighthouse-env", "PROD"], {
-      io: capture.io,
-      env,
-      cwd: tempDir,
-    });
+    exitCode = await runCli(
+      ["--json", "profile", "set", "ops", "--env", "DEMO", "--lighthouse-env", "PROD"],
+      {
+        io: capture.io,
+        env,
+        cwd: tempDir,
+      },
+    );
     assert.equal(exitCode, 0, `${capture.stderr.join("\n")}\n${capture.stdout.join("\n")}`);
 
     capture = createCaptureIo();
@@ -411,24 +418,34 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
     assert.match(capture.stdout[0], /ops/);
 
     capture = createCaptureIo();
-    exitCode = await runCli(["--json", "profile", "use", "default"], { io: capture.io, env, cwd: tempDir });
-    assert.equal(exitCode, 0);
-
-    capture = createCaptureIo();
-    exitCode = await runCli(["--json", "auth", "login", "--token", "KSEF-TOKEN-1", "--profile", "default"], {
+    exitCode = await runCli(["--json", "profile", "use", "default"], {
       io: capture.io,
       env,
       cwd: tempDir,
     });
+    assert.equal(exitCode, 0);
+
+    capture = createCaptureIo();
+    exitCode = await runCli(
+      ["--json", "auth", "login", "--token", "KSEF-TOKEN-1", "--profile", "default"],
+      {
+        io: capture.io,
+        env,
+        cwd: tempDir,
+      },
+    );
     assert.equal(exitCode, 0);
     assert.match(capture.stdout[0], /"stored": true/);
 
     capture = createCaptureIo();
-    exitCode = await runCli(["--json", "auth", "status", "--profile", "default", "--page-size", "5"], {
-      io: capture.io,
-      env,
-      cwd: tempDir,
-    });
+    exitCode = await runCli(
+      ["--json", "auth", "status", "--profile", "default", "--page-size", "5"],
+      {
+        io: capture.io,
+        env,
+        cwd: tempDir,
+      },
+    );
     assert.equal(exitCode, 0);
     assert.match(capture.stdout[0], /activeSessions/);
 
@@ -657,16 +674,7 @@ test("CLI flow covers profile/auth/health/invoice/send/upo/export commands", asy
 
     capture = createCaptureIo();
     exitCode = await runCli(
-      [
-        "--json",
-        "upo",
-        "get",
-        "ONLINE-REF-1",
-        "--profile",
-        "default",
-        "--upo-ref",
-        "UPO-REF-1",
-      ],
+      ["--json", "upo", "get", "ONLINE-REF-1", "--profile", "default", "--upo-ref", "UPO-REF-1"],
       {
         io: capture.io,
         env,

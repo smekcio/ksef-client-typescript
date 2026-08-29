@@ -37,6 +37,7 @@ export interface HttpClientOptions {
   strictPresignedUrlValidation?: boolean;
   allowedPresignedHosts?: string[];
   allowPrivateNetworkPresignedUrls?: boolean;
+  systemWarningHandler?: (warning: string) => void;
 }
 
 export interface RetryOptions {
@@ -166,9 +167,10 @@ function isApiErrorArray(value: unknown): value is ApiError[] {
   return Array.isArray(value) && value.every(isApiErrorPayload);
 }
 
-function hasRequiredProblemDetailsFields(
-  payload: Record<string, unknown>,
-): payload is Record<string, unknown> & {
+function hasRequiredProblemDetailsFields(payload: Record<string, unknown>): payload is Record<
+  string,
+  unknown
+> & {
   detail: string;
   status: number;
   timestamp: string;
@@ -303,6 +305,7 @@ export class HttpClient {
   private readonly strictPresignedUrlValidation: boolean;
   private readonly allowedPresignedHosts: string[] | undefined;
   private readonly allowPrivateNetworkPresignedUrls: boolean;
+  private readonly systemWarningHandler: ((warning: string) => void) | undefined;
 
   constructor(options: HttpClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl, options.appendV2 ?? true);
@@ -318,6 +321,7 @@ export class HttpClient {
     this.strictPresignedUrlValidation = options.strictPresignedUrlValidation ?? true;
     this.allowedPresignedHosts = options.allowedPresignedHosts;
     this.allowPrivateNetworkPresignedUrls = options.allowPrivateNetworkPresignedUrls ?? false;
+    this.systemWarningHandler = options.systemWarningHandler;
   }
 
   async request<T>(options: HttpRequestOptions): Promise<T> {
@@ -371,7 +375,11 @@ export class HttpClient {
           init.body = body;
         }
         const response = await fetch(url, init);
-        if (shouldRetryResponse(response.status, retryPolicy) && canRetryMethod && attempt < maxAttempts) {
+        if (
+          shouldRetryResponse(response.status, retryPolicy) &&
+          canRetryMethod &&
+          attempt < maxAttempts
+        ) {
           await response.arrayBuffer().catch(() => undefined);
           const retryAfter = response.headers.get("retry-after") ?? undefined;
           const delayMs = computeRetryDelayMs(retryAfter, attempt, this.maxRetryDelayMs);
@@ -383,11 +391,7 @@ export class HttpClient {
         return await this.handleResponse<T>(response, options.responseType);
       } catch (error) {
         lastError = error;
-        if (
-          shouldRetryTimeout(error, retryPolicy) &&
-          canRetryMethod &&
-          attempt < maxAttempts
-        ) {
+        if (shouldRetryTimeout(error, retryPolicy) && canRetryMethod && attempt < maxAttempts) {
           const delayMs = computeRetryDelayMs(undefined, attempt, this.maxRetryDelayMs);
           clearTimeout(timeout);
           await sleep(delayMs);
@@ -426,7 +430,9 @@ export class HttpClient {
       {
         strictPresignedUrlValidation: this.strictPresignedUrlValidation,
         allowPrivateNetworkPresignedUrls: this.allowPrivateNetworkPresignedUrls,
-        ...(this.allowedPresignedHosts ? { allowedPresignedHosts: this.allowedPresignedHosts } : {}),
+        ...(this.allowedPresignedHosts
+          ? { allowedPresignedHosts: this.allowedPresignedHosts }
+          : {}),
       },
       url,
     );
@@ -468,6 +474,7 @@ export class HttpClient {
     response: Response,
     responseType?: "json" | "text" | "buffer",
   ): Promise<T> {
+    this.notifySystemWarning(response);
     const contentType = response.headers.get("content-type") ?? "";
 
     if (!response.ok) {
@@ -540,6 +547,14 @@ export class HttpClient {
       );
     }
     throw new KsefHttpError(status, `HTTP request failed with ${status}`, text);
+  }
+
+  private notifySystemWarning(response: Response): void {
+    const warning = response.headers.get("x-system-warning");
+    if (!warning || !this.systemWarningHandler) {
+      return;
+    }
+    this.systemWarningHandler(warning);
   }
 }
 

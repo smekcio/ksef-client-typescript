@@ -6,6 +6,7 @@ Funkcje tworzą archiwum ZIP z pamięci oraz bezpiecznie je rozpakowują z limit
 
 - `createZip(entries: ZipEntryInput[]): Promise<Buffer>`
 - `unzip(buffer: Buffer, options?: UnzipOptions): Promise<Map<string, Buffer>>`
+- `untarGz(buffer: Buffer, options?: UnzipOptions): Promise<Map<string, Buffer>>`
 
 ```ts
 interface ZipEntryInput {
@@ -21,7 +22,7 @@ interface UnzipOptions {
 }
 ```
 
-## Domyślne limity `unzip`
+## Domyślne limity `unzip` / `untarGz`
 
 - `maxFiles`: `10_000`
 - `maxTotalUncompressedSize`: `2_000_000_000` bajtów
@@ -51,5 +52,6 @@ console.log(files.get("a.txt")?.toString("utf8")); // "test"
 ## Uwagi operacyjne
 
 - `unzip(...)` pomija wpisy katalogowe (`name/`).
-- Po przekroczeniu limitów funkcja odrzuca `Promise` z błędem (np. `zip contains too many files`, `zip exceeds max_total_uncompressed_size`).
+- `untarGz(...)` pomija katalogi, odrzuca linki i niebezpieczne ścieżki (`..`, ścieżki bezwzględne).
+- Po przekroczeniu limitów funkcja odrzuca `Promise` z błędem (np. `zip contains too many files`, `tar.gz exceeds max_total_uncompressed_size`).
 - Wynikiem jest `Map<string, Buffer>`, gdzie kluczem jest pełna nazwa wpisu ZIP.

@@ -33,6 +33,7 @@ Konfiguracja dotyczy zarówno `new KsefClient(...)`, jak i `KsefClient.connect(.
 | `allowedPresignedHosts`            | `string[]`                           | Allowlista hostów dla URL pre-signed (z `skipAuth`).                            | Brak                            |
 | `allowPrivateNetworkPresignedUrls` | `boolean`                            | Czy dopuszczać prywatne/link-local/rezerwowe adresy IP dla URL pre-signed.      | `false`                         |
 | `requireExportPartHash`            | `boolean`                            | Domyślna polityka integralności eksportu (`encryptedPartHash`) w workflow eksportu. | `true`                       |
+| `systemWarningHandler`             | `(warning: string) => void`          | Callback wywoływany, gdy KSeF zwróci nagłówek `X-System-Warning`.                  | brak                         |
 
 ## Uwaga bezpieczeństwa: globalne `headers`
 
@@ -104,6 +105,23 @@ Walidacja hosta/IP i allowlista dzialaja niezaleznie od `strictPresignedUrlValid
 - `requireExportPartHash: true` (domyslnie): brak hashu lub mismatch przerywa workflow,
 - `requireExportPartHash: false`: brak wymuszonej walidacji hashy.
 
+### `systemWarningHandler`
+
+Opcjonalny callback wywoływany, gdy KSeF zwróci nagłówek `X-System-Warning`.
+Nagłówek przenosi ostrzeżenia techniczne i nie oznacza błędu operacji.
+Na środowisku TEST możesz wymusić treść ostrzeżenia nagłówkiem żądania `X-Test-System-Warning`
+w `KsefClientOptions.headers`.
+
+```ts
+const client = new KsefClient({
+  environment: "TEST",
+  headers: { "X-Test-System-Warning": "[test]: synthetic warning" },
+  systemWarningHandler: (warning) => {
+    console.warn(warning);
+  },
+});
+```
+
 ### `noProxy`
 
 `noProxy` jest interpretowane jako lista rozdzielona przecinkami:
@@ -119,6 +137,7 @@ Walidacja hosta/IP i allowlista dzialaja niezaleznie od `strictPresignedUrlValid
 - stałe nagłówki diagnostyczne i śledzące, np. `X-Request-Id`, `X-Correlation-Id`,
 - nagłówki identyfikujące aplikację lub wersję integracji, np. `X-App-Name`, `X-App-Version`,
 - `X-Error-Format: problem-details`, jeśli chcesz wymusić format `application/problem+json` dla `400` i `429`,
+- na środowisku TEST `X-Test-System-Warning`, aby wymusić treść ostrzeżenia zwracaną jako `X-System-Warning`,
 - wymagane przez infrastrukturę pośrednią (proxy/gateway), jeśli mają wartość niesekretną i mogą być wysyłane do wszystkich hostów.
 
 ### Czego unikać

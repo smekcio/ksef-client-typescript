@@ -5,7 +5,7 @@ Eksport obejmuje:
 1. start eksportu (`POST /invoices/exports`),
 2. polling statusu eksportu,
 3. pobranie partów z pre-signed URL,
-4. odszyfrowanie, scalenie i rozpakowanie paczki,
+4. odszyfrowanie, scalenie i rozpakowanie paczki według `package.compressionType` (`Zip` albo `TarGz`),
 5. odczyt `_metadata.json` i faktur XML.
 
 W SDK odpowiadają za to:
@@ -15,9 +15,9 @@ W SDK odpowiadają za to:
 
 ## Metody `InvoiceExportWorkflow`
 
-- `startExport(options)`
+- `startExport(options)` — opcjonalne `compressionType: "Zip" | "TarGz"`
 - `waitForExport(referenceNumber, options?)`
-- `downloadAndProcessPackage(status, encryptionData, options?)`
+- `downloadAndProcessPackage(status, encryptionData, options?)` — wymaga `package.compressionType`
 
 ## Metoda `IncrementalExportWorkflow`
 
@@ -64,7 +64,7 @@ Walidacja uruchamia się lokalnie przed requestem.
 - jeśli `dateRange.from`/`dateRange.to` jest ISO date-time bez offsetu, SDK normalizuje go
   do strefy `Europe/Warsaw` i wysyła z offsetem (`+01:00`/`+02:00`).
 - `to` nie może być mniejsze od `from`.
-- maksymalny zakres to 3 miesiące (liczone kalendarzowo, z clampem dni miesiąca).
+- maksymalny zakres to 100 dni kalendarzowych UTC.
 
 Szczegół praktyczny: dla `YYYY-MM-DD` SDK parsuje datę jako UTC `00:00:00`, więc porównania zakresu są deterministyczne między strefami czasowymi.
 

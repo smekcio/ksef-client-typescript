@@ -223,7 +223,7 @@ test("CLI uncovered branch pack: profile/auth/upo/send/export/error-normalizatio
         },
         {
           fileName: "invoice-1.xml",
-          content: Buffer.from("<Invoice id=\"1\" />", "utf8"),
+          content: Buffer.from('<Invoice id="1" />', "utf8"),
         },
       ]);
       exportPart = CryptographyService.encryptAes256Cbc(archive, cipherKey, cipherIv);
@@ -240,6 +240,10 @@ test("CLI uncovered branch pack: profile/auth/upo/send/export/error-normalizatio
         JSON.stringify({
           status: { code: 200, description: "Completed" },
           package: {
+            invoiceCount: 1,
+            size: 1,
+            isTruncated: false,
+            compressionType: "Zip",
             parts: [
               {
                 ordinalNumber: 1,
@@ -476,7 +480,16 @@ test("CLI uncovered branch pack: profile/auth/upo/send/export/error-normalizatio
 
     capture = createCaptureIo();
     exitCode = await runCli(
-      ["--json", "send", "--profile", "default", "--invoice-file", invoiceFile, "--form-code", "FA2"],
+      [
+        "--json",
+        "send",
+        "--profile",
+        "default",
+        "--invoice-file",
+        invoiceFile,
+        "--form-code",
+        "FA2",
+      ],
       { io: capture.io, env, cwd: tempDir },
     );
     assert.equal(exitCode, 0);

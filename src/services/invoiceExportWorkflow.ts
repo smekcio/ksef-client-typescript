@@ -11,13 +11,14 @@ import {
   validateInvoiceQueryFilters,
 } from "../types/invoices";
 import { StatusInfo } from "../types/common";
-import { unzip } from "../utils/zip";
+import { unzip, untarGz } from "../utils/zip";
 
 export interface ExportStartOptions {
   filters: InvoiceQueryFilters;
   encryptionData?: EncryptionData;
   publicCertificateBase64Der?: string;
   onlyMetadata?: boolean;
+  compressionType?: "Zip" | "TarGz";
   /**
    * @deprecated Use `onlyMetadata` instead.
    */
@@ -80,6 +81,7 @@ export class InvoiceExportWorkflow {
       ...((options.onlyMetadata ?? options.includeMetadata) !== undefined
         ? { onlyMetadata: options.onlyMetadata ?? options.includeMetadata }
         : {}),
+      ...(options.compressionType ? { compressionType: options.compressionType } : {}),
     };
     const response = await this.invoicesClient.exportInvoices(request);
     return {
@@ -126,13 +128,15 @@ export class InvoiceExportWorkflow {
     if (parts.length === 0) {
       return { metadataSummaries: [], invoiceXmlFiles: {} };
     }
+    const compressionType = resolveExportCompressionType(packageInfo.compressionType);
     const verifyHashes = resolveRequireExportPartHash(options, this.requireExportPartHash);
     const encryptedParts = await this.downloadParts(parts, verifyHashes);
     const decryptedParts = encryptedParts.map((part) =>
       CryptographyService.decryptAes256Cbc(part, encryptionData.cipherKey, encryptionData.cipherIv),
     );
     const archiveBytes = Buffer.concat(decryptedParts);
-    const entries = await unzip(archiveBytes);
+    const entries =
+      compressionType === "TarGz" ? await untarGz(archiveBytes) : await unzip(archiveBytes);
 
     const metadataSummaries: Array<Record<string, unknown>> = [];
     const invoiceXmlFiles: Record<string, string> = {};
@@ -165,7 +169,8 @@ export class InvoiceExportWorkflow {
         skipAuth: true,
       });
       if (verifyHashes) {
-        const expectedHash = typeof part.encryptedPartHash === "string" ? part.encryptedPartHash : "";
+        const expectedHash =
+          typeof part.encryptedPartHash === "string" ? part.encryptedPartHash : "";
         if (!expectedHash.trim()) {
           throw new KsefError(`Missing encrypted part hash for ${part.partName}.`);
         }
@@ -212,4 +217,22 @@ function resolveRequireExportPartHash(
     return options.requireExportPartHash;
   }
   return defaultValue;
+}
+
+function resolveExportCompressionType(value: string | null | undefined): "Zip" | "TarGz" {
+  if (value === undefined || value === null || value.trim() === "") {
+    throw new KsefError("Export package is missing compressionType.");
+  }
+  const normalized = value.trim();
+  if (normalized === "Zip" || normalized.toLowerCase() === "zip") {
+    return "Zip";
+  }
+  if (
+    normalized === "TarGz" ||
+    normalized.toLowerCase() === "targz" ||
+    normalized.toLowerCase() === "tar.gz"
+  ) {
+    return "TarGz";
+  }
+  throw new KsefError("Unsupported compression type. Use Zip or TarGz.");
 }

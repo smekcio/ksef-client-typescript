@@ -4,6 +4,8 @@
 
 ### Features
 
+- **api:** add KSeF API 2.7.1 support (IZ invoices POST, generate min 2, query/export 100 days UTC, export compressionType from package)
+- **api:** unpack invoice export packages by `compressionType` (Zip/TarGz) and expose `systemWarningHandler`
 - **api:** add collective identifier helpers, pagination iterators and CLI `ksef-ts iz`
 
 ### Bug Fixes
