@@ -36,6 +36,19 @@ Podstawowe uzycie CLI:
 node dist/cli/index.js --help
 ```
 
+## Identyfikatory zbiorcze (`iz`)
+
+```text
+ksef-ts iz generate --ksef-number TEXT [--ksef-number TEXT] [--from-file PATH]
+ksef-ts iz query --from YYYY-MM-DD --to YYYY-MM-DD [--iz TEXT] [--page-size 10] [--all]
+ksef-ts iz invoices --iz TEXT [--iz TEXT] [--page-size 10] [--all]
+ksef-ts iz by-ksef --ksef-number TEXT [--page-size 10] [--all]
+```
+
+`generate` wymaga co najmniej dwóch numerów KSeF. `query` i `invoices` bez `--all`
+zwracają `continuationToken` do kolejnej strony. Zakres `--from/--to` nie może
+przekraczać 100 dni. Jedno żądanie `iz invoices` przyjmuje maksymalnie 10 numerów IZ.
+
 ## Session checkpoints (resume)
 
 CLI wspiera zapisywalne checkpointy sesji online/batch:

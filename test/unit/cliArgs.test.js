@@ -81,8 +81,32 @@ test("parseArgv handles sparse argv, -- separator and --key=value syntax", async
   assert.deepEqual(parsed.positionals, ["invoice", "query"]);
 });
 
+test("parseArgv collects repeatable --ksef-number and --iz values", async () => {
+  const { parseArgv, getStringListOption, getStringOption } = await loadArgsModule();
+  const parsed = parseArgv([
+    "iz",
+    "generate",
+    "--ksef-number",
+    "n1",
+    "--ksef-number=n2",
+    "--iz",
+    "iz-1",
+    "--iz",
+    "iz-2",
+    "--from",
+    "2026-01-01",
+  ]);
+
+  assert.deepEqual(getStringListOption(parsed.options, "ksef-number"), ["n1", "n2"]);
+  assert.deepEqual(getStringListOption(parsed.options, "iz"), ["iz-1", "iz-2"]);
+  assert.equal(getStringOption(parsed.options, "ksef-number"), "n2");
+  assert.equal(getStringOption(parsed.options, "from"), "2026-01-01");
+  assert.deepEqual(getStringListOption(parsed.options, "missing"), []);
+});
+
 test("option accessors cover boolean and number conversion branches", async () => {
-  const { getBooleanOption, getNumberOption, getStringOption } = await loadArgsModule();
+  const { getBooleanOption, getNumberOption, getStringOption, getStringListOption } =
+    await loadArgsModule();
   const options = {
     flagTrue: true,
     flagFalseString: "false",
@@ -91,6 +115,7 @@ test("option accessors cover boolean and number conversion branches", async () =
     numeric: "123",
     notNumeric: "abc",
     plain: "text",
+    listed: ["a"],
   };
 
   assert.equal(getBooleanOption(options, "flagTrue"), true);
@@ -101,6 +126,8 @@ test("option accessors cover boolean and number conversion branches", async () =
 
   assert.equal(getStringOption(options, "plain"), "text");
   assert.equal(getStringOption(options, "flagTrue"), undefined);
+  assert.equal(getStringOption(options, "listed"), "a");
+  assert.deepEqual(getStringListOption(options, "plain"), ["text"]);
 
   assert.equal(getNumberOption(options, "numeric"), 123);
   assert.equal(getNumberOption(options, "notNumeric"), undefined);
