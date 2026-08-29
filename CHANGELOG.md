@@ -12,6 +12,13 @@
 
 - **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.8.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.7.1...v0.8.0) (2026-08-29)
+
+
+### Features
+
+* add KSeF API 2.7.1 support ([#49](https://github.com/smekcio/ksef-client-typescript/issues/49)) ([d2f6102](https://github.com/smekcio/ksef-client-typescript/commit/d2f6102e701a4312a0178531b739c40cb174ad83))
+
 ## [0.7.1](https://github.com/smekcio/ksef-client-typescript/compare/v0.7.0...v0.7.1) (2026-08-05)
 
 
