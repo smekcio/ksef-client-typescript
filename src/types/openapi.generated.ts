@@ -2,7 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
-export const OPENAPI_SCHEMA_COUNT = 302 as const;
+export const OPENAPI_SCHEMA_COUNT = 305 as const;
 
 export type AllowedIps = {
   ip4Addresses?: Array<string> | null;
@@ -228,6 +228,14 @@ export type CheckAttachmentPermissionStatusResponse = {
   revokedDate?: string | null;
 };
 
+export type CollectiveIdentifierContextLimitsOverride = {
+  maxInvoices: number;
+};
+
+export type CollectiveIdentifierEffectiveContextLimits = {
+  maxInvoices: number;
+};
+
 export type CollectiveIdentifierInvoice = {
   description?: string | null;
   ksefNumber: KsefNumber;
@@ -239,12 +247,17 @@ export type CollectiveIdentifierInvoicePayment = {
   currency: CurrencyCode;
 };
 
+export type CollectiveIdentifierInvoicesQueryRequest = {
+  collectiveIdentifierNumbers: Array<string>;
+};
+
 export type CollectiveIdentifierInvoicesQueryResponse = {
   continuationToken?: string | null;
   invoices: Array<CollectiveIdentifierInvoicesQueryResponseItem>;
 };
 
 export type CollectiveIdentifierInvoicesQueryResponseItem = {
+  collectiveIdentifierNumber: string;
   description?: string | null;
   detailsHidden: boolean;
   ksefNumber: KsefNumber;
@@ -318,6 +331,7 @@ export type EffectiveApiRateLimitValues = {
 
 export type EffectiveContextLimits = {
   batchSession: BatchSessionEffectiveContextLimits;
+  collectiveIdentifier: CollectiveIdentifierEffectiveContextLimits;
   onlineSession: OnlineSessionEffectiveContextLimits;
 };
 
@@ -748,6 +762,7 @@ export type InvoiceMetadataThirdSubjectIdentifier = {
 };
 
 export type InvoicePackage = {
+  compressionType: CompressionType;
   invoiceCount: number;
   isTruncated: boolean;
   lastInvoicingDate?: string | null;
@@ -1292,6 +1307,7 @@ export type SetRateLimitsRequest = {
 
 export type SetSessionLimitsRequest = {
   batchSession: BatchSessionContextLimitsOverride;
+  collectiveIdentifier: CollectiveIdentifierContextLimitsOverride;
   onlineSession: OnlineSessionContextLimitsOverride;
 };
 
@@ -1573,8 +1589,11 @@ export interface OpenApiGeneratedSchemaMap {
   CertificateSubjectLimitsOverride: CertificateSubjectLimitsOverride;
   Challenge: Challenge;
   CheckAttachmentPermissionStatusResponse: CheckAttachmentPermissionStatusResponse;
+  CollectiveIdentifierContextLimitsOverride: CollectiveIdentifierContextLimitsOverride;
+  CollectiveIdentifierEffectiveContextLimits: CollectiveIdentifierEffectiveContextLimits;
   CollectiveIdentifierInvoice: CollectiveIdentifierInvoice;
   CollectiveIdentifierInvoicePayment: CollectiveIdentifierInvoicePayment;
+  CollectiveIdentifierInvoicesQueryRequest: CollectiveIdentifierInvoicesQueryRequest;
   CollectiveIdentifierInvoicesQueryResponse: CollectiveIdentifierInvoicesQueryResponse;
   CollectiveIdentifierInvoicesQueryResponseItem: CollectiveIdentifierInvoicesQueryResponseItem;
   CollectiveIdentifierInvoicesQueryResponseItemPayment: CollectiveIdentifierInvoicesQueryResponseItemPayment;

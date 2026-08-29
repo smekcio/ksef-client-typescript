@@ -21,6 +21,7 @@ export interface InvoiceExportRequest {
   encryption: EncryptionInfo;
   filters: InvoiceQueryFilters;
   onlyMetadata?: boolean;
+  compressionType?: "Zip" | "TarGz" | null;
   /**
    * @deprecated Use `onlyMetadata` instead.
    */
@@ -43,6 +44,7 @@ export interface InvoicePackage {
   size: number;
   parts: InvoicePackagePart[];
   isTruncated: boolean;
+  compressionType?: "Zip" | "TarGz" | null;
   lastIssueDate?: string | null;
   lastInvoicingDate?: string | null;
   lastPermanentStorageDate?: string | null;
@@ -70,7 +72,7 @@ const ISO_DATE_TIME_WITHOUT_OFFSET_PATTERN =
   /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?$/;
 const ISO_DATE_TIME_CAPTURE_PATTERN =
   /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hour>[01]\d|2[0-3]):(?<minute>[0-5]\d)(?::(?<second>[0-5]\d)(?:\.(?<fraction>\d{1,9}))?)?$/;
-const MAX_DATE_RANGE_MONTHS = 3;
+export const INVOICE_QUERY_MAX_RANGE_DAYS = 100;
 const WARSAW_TIME_ZONE = "Europe/Warsaw";
 
 export function normalizeInvoiceQueryFilters(filters: InvoiceQueryFilters): InvoiceQueryFilters {
@@ -170,10 +172,16 @@ export function validateInvoiceQueryFilters(filters: InvoiceQueryFilters): void 
     );
   }
 
-  const maxAllowedToDate = addMonthsClamped(fromDate, MAX_DATE_RANGE_MONTHS);
-  if (toDate.getTime() > maxAllowedToDate.getTime()) {
+  const fromUtcDay = Date.UTC(
+    fromDate.getUTCFullYear(),
+    fromDate.getUTCMonth(),
+    fromDate.getUTCDate(),
+  );
+  const toUtcDay = Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate());
+  const spanDays = (toUtcDay - fromUtcDay) / 86_400_000;
+  if (spanDays > INVOICE_QUERY_MAX_RANGE_DAYS) {
     throw new KsefValidationError(
-      `Invoice query filters.dateRange cannot exceed ${MAX_DATE_RANGE_MONTHS} months.`,
+      `Invoice query filters.dateRange cannot exceed ${INVOICE_QUERY_MAX_RANGE_DAYS} days (UTC).`,
       [`dateRange.from: ${normalizedFromText}`, `dateRange.to: ${normalizedToText}`],
     );
   }
@@ -243,26 +251,6 @@ function parseIsoDateInput(value: string, fieldPath: string): Date {
   return parsed;
 }
 
-function addMonthsClamped(value: Date, months: number): Date {
-  const targetMonthIndex = value.getUTCMonth() + months;
-  const targetYear = value.getUTCFullYear() + Math.floor(targetMonthIndex / 12);
-  const normalizedMonth = ((targetMonthIndex % 12) + 12) % 12;
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
-  const targetDay = Math.min(value.getUTCDate(), daysInTargetMonth);
-
-  return new Date(
-    Date.UTC(
-      targetYear,
-      normalizedMonth,
-      targetDay,
-      value.getUTCHours(),
-      value.getUTCMinutes(),
-      value.getUTCSeconds(),
-      value.getUTCMilliseconds(),
-    ),
-  );
-}
-
 function isValidCalendarDate(year: number, month: number, day: number): boolean {
   if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
     return false;
@@ -295,7 +283,9 @@ function getOffsetMinutesForTimezone(date: Date, timeZone: string): number {
   const zonePart = parts.find((part) => part.type === "timeZoneName")?.value ?? "";
   const match = /^GMT(?<sign>[+-])(?<hours>\d{1,2})(?::?(?<minutes>\d{2}))?$/.exec(zonePart);
   if (!match?.groups) {
-    throw new KsefValidationError(`Unsupported timezone offset format for ${timeZone}: ${zonePart}`);
+    throw new KsefValidationError(
+      `Unsupported timezone offset format for ${timeZone}: ${zonePart}`,
+    );
   }
   const sign = match.groups.sign === "-" ? -1 : 1;
   const hours = Number(match.groups.hours);

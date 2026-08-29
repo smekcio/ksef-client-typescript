@@ -111,7 +111,7 @@ const metadata = await client.invoices.queryInvoiceMetadata(
 console.log(metadata);
 ```
 
-`queryInvoiceMetadata(...)` waliduje `dateRange` lokalnie. SDK zgłosi `KsefValidationError`, m.in. gdy zakres dat jest niepoprawny lub przekracza 3 miesiące.
+`queryInvoiceMetadata(...)` waliduje `dateRange` lokalnie. SDK zgłosi `KsefValidationError`, m.in. gdy zakres dat jest niepoprawny lub przekracza 100 dni UTC.
 
 ## 7) Pierwszy workflow biznesowy: sesja online
 

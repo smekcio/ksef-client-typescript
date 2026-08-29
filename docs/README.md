@@ -4,7 +4,7 @@ Dokumentacja opisuje publiczne API biblioteki `ksef-client-typescript` oraz goto
 
 Kontrakt API (OpenAPI), dokumenty procesowe i ograniczenia systemu znajdują się w [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api).
 
-Kompatybilność SDK: **KSeF API `v2.7.0`**.
+Kompatybilność SDK: **KSeF API `v2.7.1`**.
 
 ## Status parity
 

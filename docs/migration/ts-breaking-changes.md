@@ -15,6 +15,11 @@ Ten dokument opisuje zmiany procesowe po rozszerzeniu SDK i automatyzacji modeli
    - `requireExportPartHash` domyslnie jest `true`,
    - opcja `verifyHashes` pozostaje wspierana jako alias legacy.
 5. Dodano dedykowanego klienta `client.lighthouse` i wsparcie CLI dla `--lighthouse-env`.
+6. KSeF API 2.7.1:
+   - `listInvoices` używa `POST /collective-identifiers/invoices` i przyjmuje `string | string[]` (1–10 IZ),
+   - zakres query/export to 100 dni UTC (wcześniej 3 miesiące),
+   - `generate` odrzuca mniej niż 2 faktury przed HTTP,
+   - workflow eksportu wymaga `package.compressionType` i obsługuje TarGz.
 
 ## Wplyw na developerow
 

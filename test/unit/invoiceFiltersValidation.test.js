@@ -6,20 +6,20 @@ import {
   validateInvoiceQueryFilters,
 } from "../../dist/index.js";
 
-test("validateInvoiceQueryFilters accepts date range up to 3 months", () => {
+test("validateInvoiceQueryFilters accepts date range up to 100 days UTC", () => {
   assert.doesNotThrow(() => {
     validateInvoiceQueryFilters({
       subjectType: "Subject1",
       dateRange: {
         dateType: "Issue",
         from: "2025-01-01",
-        to: "2025-04-01",
+        to: "2025-04-11",
       },
     });
   });
 });
 
-test("validateInvoiceQueryFilters throws KsefValidationError for date range over 3 months", () => {
+test("validateInvoiceQueryFilters throws KsefValidationError for date range over 100 days UTC", () => {
   assert.throws(
     () =>
       validateInvoiceQueryFilters({
@@ -27,7 +27,7 @@ test("validateInvoiceQueryFilters throws KsefValidationError for date range over
         dateRange: {
           dateType: "Issue",
           from: "2025-01-01",
-          to: "2025-04-02",
+          to: "2025-04-12",
         },
       }),
     KsefValidationError,
@@ -295,10 +295,7 @@ test("normalizeInvoiceQueryFilters throws for unsupported timezone offset format
 test("normalizeInvoiceQueryFilters returns original text when regex exec has no named groups", () => {
   const originalExec = RegExp.prototype.exec;
   RegExp.prototype.exec = function patchedExec(text) {
-    if (
-      this.source.includes("(?<year>\\d{4})") &&
-      text === "2025-01-02T10:15:00"
-    ) {
+    if (this.source.includes("(?<year>\\d{4})") && text === "2025-01-02T10:15:00") {
       const result = ["2025-01-02T10:15:00"];
       result.index = 0;
       result.input = text;

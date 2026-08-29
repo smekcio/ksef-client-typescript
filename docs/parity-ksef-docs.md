@@ -1,42 +1,44 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-api`
 
-Data analizy: **2026-07-27**
+Data analizy: **2026-08-29**
 
 ## Zakres i źródła
 
-- Kontrakt API: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) `open-api.json` (`2.7.0`)
-- Changelog: [api-changelog.md](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md) (wersje do `2.7.0`)
+- Kontrakt API: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) `open-api.json` (`2.7.1`)
+- Changelog: [api-changelog.md](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md) (wersje do `2.7.1`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/client/*`, `docs/*`
 - Weryfikacja dodatkowa: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`
 
 ## Wynik ogólny
 
-- Pokrycie endpointów OpenAPI: **83/83** (78 ścieżek; nowe operacje IZ + testdata certificate)
+- Pokrycie endpointów OpenAPI: **83/83** (78 ścieżek; IZ invoices jako POST)
 - Braki endpointowe: **0**
 - Nadmiarowe endpointy po stronie TS: **0**
 - Zgodność kontraktu `ksef-api` vs `api-test`: **zgodna**
 
-## Zmiany uwzględnione po stronie SDK (2.7.0)
+## Zmiany uwzględnione po stronie SDK (2.7.1)
 
 1. Modele OpenAPI
-   - odświeżono `src/types/openapi.generated.ts` do kontraktu `ksef-api 2.7.0`;
-   - liczba schematów: `302`;
-   - nowe typy IZ (`GenerateCollectiveIdentifier*`, `CollectiveIdentifiers*`) oraz
-     `TestDataUpdateCertificateRequest`;
-   - `CollectiveIdentifierManage` w enumach uprawnień / tokenów.
+   - odświeżono `src/types/openapi.generated.ts` do kontraktu `ksef-api 2.7.1`;
+   - `CollectiveIdentifierInvoicesQueryRequest`, `package.compressionType`,
+     `SetSessionLimitsRequest.collectiveIdentifier.maxInvoices`.
 
 2. Identyfikatory zbiorcze
-   - `client.collectiveIdentifiers` (`generate`, `query`, `listInvoices`, `listByKsefNumber`);
-   - walidacja path params IZ i numeru KSeF przed wysłaniem żądania.
+   - `listInvoices` → `POST /collective-identifiers/invoices` (1–10 numerów, `pageSize` 10–500);
+   - helpery `generateForKsefNumbers`, `queryByCreatedRange`, `iterQuery` / `iterInvoices` / `iterByKsefNumber`;
+   - fail-fast: min. 2 faktury, unikalne numery KSeF, zakres dat 100 dni, limity `pageSize`.
 
-3. Testdata
-   - `client.testdata.updateCertificate(serialNumber, { validTo })` →
-     `PUT /testdata/certificates/{serialNumber}`;
-   - walidacja numeru seryjnego certyfikatu (`^[0-9A-F]{16}$`).
+3. Faktury i eksport
+   - lokalna walidacja `dateRange` 100 dni UTC;
+   - workflow eksportu rozpakowuje ZIP albo TarGz według `package.compressionType`.
 
-4. Dokumentacja SDK
-   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.7.0`;
-   - źródło kontraktu CI: `CIRFMF/ksef-api` (zamiast historycznego `ksef-docs`).
+4. Ostrzeżenia systemowe
+   - `KsefClientOptions.systemWarningHandler` dla nagłówka `X-System-Warning`;
+   - na TEST treść można wymusić przez `X-Test-System-Warning`.
+
+5. Dokumentacja SDK
+   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.7.1`;
+   - CLI `ksef-ts iz`.
 
 ## Weryfikacja parity endpointów
 
@@ -57,9 +59,9 @@ Data analizy: **2026-07-27**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została uaktualniona do spójności z KSeF `2.7.0`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.7.1`:
 
-- deklaracje kompatybilności API (`v2.7.0`) w README i docs,
-- dokumentacja `collectiveIdentifiers` oraz `testdata.updateCertificate`,
-- utils dla IZ i numeru seryjnego certyfikatu,
+- deklaracje kompatybilności API (`v2.7.1`) w README i docs,
+- dokumentacja `collectiveIdentifiers`, helperów IZ oraz CLI `ksef-ts iz`,
+- zakres query/export 100 dni UTC i `package.compressionType`,
 - zaktualizowany raport parity.

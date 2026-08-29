@@ -18,6 +18,9 @@ Niskopoziomowy klient dla `/limits/*`, `/rate-limits` oraz testowych endpointów
 ## Najważniejsze informacje
 
 - `getContextLimits`, `getSubjectLimits` i `getRateLimits` służą do odczytu aktualnych limitów.
+- `getContextLimits()` zwraca m.in. `collectiveIdentifier.maxInvoices`.
+- Grupa `collectiveIdentifier` w kontrakcie OpenAPI 2.7.1 ma wartości domyślne `20` / `120` / `240`
+  (na minutę / godzinę / dobę). Bieżące limity i tak odczytuj z `GET /rate-limits`.
 - Metody `change*` / `restore*` operują na endpointach testdata i są przeznaczone głównie do scenariuszy testowych.
 - Po zakończeniu testów warto przywrócić limity metodami `restore*`.
 - `getRateLimits()` odczytuje bieżące limity z `/rate-limits`.
@@ -53,7 +56,17 @@ console.log({ contextLimits, subjectLimits, rateLimits });
 import { LimitsChangeRequest } from "ksef-client-typescript";
 
 const request: LimitsChangeRequest = {
-  // Uzupełnij zgodnie z kontraktem OpenAPI dla /testdata/limits/context/session.
+  onlineSession: {
+    maxInvoiceSizeInMB: 10,
+    maxInvoiceWithAttachmentSizeInMB: 30,
+    maxInvoices: 100,
+  },
+  batchSession: {
+    maxInvoiceSizeInMB: 10,
+    maxInvoiceWithAttachmentSizeInMB: 30,
+    maxInvoices: 100,
+  },
+  collectiveIdentifier: { maxInvoices: 50 },
 };
 
 await client.limits.changeContextSessionLimits(request);
