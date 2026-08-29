@@ -55,6 +55,7 @@ export interface KsefClientOptions {
   allowedPresignedHosts?: string[];
   allowPrivateNetworkPresignedUrls?: boolean;
   requireExportPartHash?: boolean;
+  systemWarningHandler?: (warning: string) => void;
 }
 
 export interface KsefConnectOptions extends KsefClientOptions {
@@ -132,6 +133,9 @@ export class KsefClient {
       }),
       ...(options.allowPrivateNetworkPresignedUrls !== undefined && {
         allowPrivateNetworkPresignedUrls: options.allowPrivateNetworkPresignedUrls,
+      }),
+      ...(options.systemWarningHandler && {
+        systemWarningHandler: options.systemWarningHandler,
       }),
     };
     this.http = new HttpClient(httpOptions);

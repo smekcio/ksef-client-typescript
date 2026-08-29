@@ -18,7 +18,19 @@ import {
   type SessionStatusResponse,
   createZip,
 } from "../index";
-import { getBooleanOption, getNumberOption, getStringOption, parseArgv } from "./args";
+import {
+  getBooleanOption,
+  getNumberOption,
+  getStringListOption,
+  getStringOption,
+  parseArgv,
+  type CliOptions,
+} from "./args";
+import {
+  PAGE_SIZE_INVOICES_MAX,
+  PAGE_SIZE_MAX,
+  PAGE_SIZE_MIN,
+} from "../utils/collectiveIdentifier";
 import {
   createDefaultConfig,
   getConfigPath,
@@ -100,16 +112,14 @@ export async function runCli(argv: string[], options: RunCliOptions = {}): Promi
   const parsed = parseArgv(argv);
   const env = options.env ?? process.env;
   const cwd = options.cwd ?? process.cwd();
-  const io: CliIo =
-    options.io ??
-    {
-      stdout: (message: string) => {
-        process.stdout.write(`${message}\n`);
-      },
-      stderr: (message: string) => {
-        process.stderr.write(`${message}\n`);
-      },
-    };
+  const io: CliIo = options.io ?? {
+    stdout: (message: string) => {
+      process.stdout.write(`${message}\n`);
+    },
+    stderr: (message: string) => {
+      process.stderr.write(`${message}\n`);
+    },
+  };
 
   const context: CommandContext = {
     env,
@@ -153,6 +163,11 @@ export async function runCli(argv: string[], options: RunCliOptions = {}): Promi
         emit(context, result);
         return EXIT_SUCCESS;
       }
+      case "iz": {
+        const result = await runIz(rest, parsed.options, context);
+        emit(context, result);
+        return EXIT_SUCCESS;
+      }
       case "invoice": {
         const result = await runInvoice(rest, parsed.options, context);
         emit(context, result);
@@ -179,7 +194,10 @@ export async function runCli(argv: string[], options: RunCliOptions = {}): Promi
         return EXIT_SUCCESS;
       }
       default:
-        throw new CliError(`Unknown command "${command}". Use --help to list commands.`, EXIT_USAGE);
+        throw new CliError(
+          `Unknown command "${command}". Use --help to list commands.`,
+          EXIT_USAGE,
+        );
     }
   } catch (error) {
     const normalized = normalizeError(error);
@@ -190,7 +208,7 @@ export async function runCli(argv: string[], options: RunCliOptions = {}): Promi
 
 async function runInit(
   _positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<CliJson> {
   const config = await readConfig(context.cliHome);
@@ -219,7 +237,7 @@ async function runInit(
 
 async function runProfile(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<CliJson> {
   const [subcommand, ...rest] = positionals;
@@ -270,7 +288,10 @@ async function runProfile(
     config.profiles[profileName] = updated;
     await writeConfig(context.cliHome, config);
 
-    const warning = formatTokenStoreWarning(profileName, resolveTokenStore(updated, context.cliHome));
+    const warning = formatTokenStoreWarning(
+      profileName,
+      resolveTokenStore(updated, context.cliHome),
+    );
     if (warning) {
       context.io.stderr(warning);
     }
@@ -287,7 +308,7 @@ async function runProfile(
 
 async function runAuth(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<CliJson> {
   const [subcommand] = positionals;
@@ -396,10 +417,7 @@ async function runAuth(
   throw new CliError(`Unknown auth subcommand "${subcommand}".`);
 }
 
-async function runHealth(
-  options: Record<string, string | boolean>,
-  context: CommandContext,
-): Promise<CliJson> {
+async function runHealth(options: CliOptions, context: CommandContext): Promise<CliJson> {
   const loaded = await loadProfileContext(options, context);
   const client = createClient(loaded.profile);
 
@@ -431,10 +449,7 @@ async function runHealth(
   };
 }
 
-async function runLighthouse(
-  options: Record<string, string | boolean>,
-  context: CommandContext,
-): Promise<CliJson> {
+async function runLighthouse(options: CliOptions, context: CommandContext): Promise<CliJson> {
   const loaded = await loadProfileContext(options, context);
   const environment = resolveLighthouseEnvironment(loaded.profile, options);
   const baseUrl = KSEF_LIGHTHOUSE_URLS[environment];
@@ -473,9 +488,195 @@ async function runLighthouse(
   throw new CliError(`Failed to query lighthouse endpoint. ${errors.join("; ")}`, EXIT_REMOTE);
 }
 
+function rethrowIzValidation(error: unknown): never {
+  if (
+    error instanceof Error &&
+    !(error instanceof CliError) &&
+    !(error instanceof KsefError) &&
+    !(error instanceof KsefApiError)
+  ) {
+    throw new CliError(error.message, EXIT_USAGE);
+  }
+  throw error;
+}
+
+function resolveIzPageSize(options: CliOptions, maximum: number): number {
+  const pageSize = getNumberOption(options, "page-size") ?? PAGE_SIZE_MIN;
+  if (pageSize < PAGE_SIZE_MIN || pageSize > maximum) {
+    throw new CliError(`--page-size must be between ${PAGE_SIZE_MIN} and ${maximum}.`, EXIT_USAGE);
+  }
+  return pageSize;
+}
+
+async function createIzClient(
+  options: CliOptions,
+  context: CommandContext,
+): Promise<{ profileName: string; client: KsefClient }> {
+  const loaded = await loadProfileContext(options, context);
+  const baseUrl = getStringOption(options, "base-url");
+  const client = baseUrl
+    ? await createAuthenticatedClientForBaseUrl(
+        loaded.profileName,
+        loaded.profile,
+        baseUrl,
+        context,
+      )
+    : await createAuthenticatedClient(loaded.profileName, loaded.profile, context);
+  return { profileName: loaded.profileName, client };
+}
+
+async function readKsefNumbersFile(filePath: string, cwd: string): Promise<string[]> {
+  const absolute = path.resolve(cwd, filePath);
+  const raw = await readFile(absolute, "utf8");
+  return raw
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+}
+
+async function runIz(
+  positionals: string[],
+  options: CliOptions,
+  context: CommandContext,
+): Promise<CliJson> {
+  const [subcommand] = positionals;
+  if (!subcommand) {
+    throw new CliError("iz requires subcommand: generate | query | invoices | by-ksef.");
+  }
+
+  if (subcommand === "generate") {
+    const fromFile = getStringOption(options, "from-file");
+    const numbers = [...getStringListOption(options, "ksef-number")];
+    if (fromFile) {
+      numbers.push(...(await readKsefNumbersFile(fromFile, context.cwd)));
+    }
+    if (numbers.length === 0) {
+      throw new CliError("iz generate requires --ksef-number and/or --from-file.");
+    }
+    try {
+      const { client } = await createIzClient(options, context);
+      const response = await client.collectiveIdentifiers.generateForKsefNumbers(numbers);
+      return toJsonValue(response);
+    } catch (error) {
+      rethrowIzValidation(error);
+    }
+  }
+
+  if (subcommand === "query") {
+    const dateFrom = getStringOption(options, "from");
+    const dateTo = getStringOption(options, "to");
+    if (!dateFrom || !dateTo) {
+      throw new CliError("iz query requires --from and --to.");
+    }
+    const pageSize = resolveIzPageSize(options, PAGE_SIZE_MAX);
+    const fetchAll = getBooleanOption(options, "all");
+    const izNumber = getStringOption(options, "iz");
+    try {
+      const { client } = await createIzClient(options, context);
+      const request = {
+        dateCreatedFrom: dateFrom,
+        dateCreatedTo: dateTo,
+        ...(izNumber ? { collectiveIdentifierNumber: izNumber } : {}),
+      };
+      if (fetchAll) {
+        const items = [];
+        for await (const item of client.collectiveIdentifiers.iterQuery(request, { pageSize })) {
+          items.push(item);
+        }
+        return {
+          count: items.length,
+          items: toJsonValue(items),
+          continuationToken: "",
+        };
+      }
+      const response = await client.collectiveIdentifiers.queryByCreatedRange(dateFrom, dateTo, {
+        pageSize,
+        ...(izNumber ? { collectiveIdentifierNumber: izNumber } : {}),
+      });
+      return {
+        count: response.collectiveIdentifiers.length,
+        items: toJsonValue(response.collectiveIdentifiers),
+        continuationToken: response.continuationToken ?? "",
+      };
+    } catch (error) {
+      rethrowIzValidation(error);
+    }
+  }
+
+  if (subcommand === "invoices") {
+    const izNumbers = getStringListOption(options, "iz");
+    if (izNumbers.length === 0) {
+      throw new CliError("iz invoices requires --iz at least once.");
+    }
+    const pageSize = resolveIzPageSize(options, PAGE_SIZE_INVOICES_MAX);
+    const fetchAll = getBooleanOption(options, "all");
+    try {
+      const { client } = await createIzClient(options, context);
+      if (fetchAll) {
+        const items = [];
+        for await (const item of client.collectiveIdentifiers.iterInvoices(izNumbers, {
+          pageSize,
+        })) {
+          items.push(item);
+        }
+        return {
+          count: items.length,
+          items: toJsonValue(items),
+          continuationToken: "",
+        };
+      }
+      const response = await client.collectiveIdentifiers.listInvoices(izNumbers, { pageSize });
+      return {
+        count: response.invoices.length,
+        items: toJsonValue(response.invoices),
+        continuationToken: response.continuationToken ?? "",
+      };
+    } catch (error) {
+      rethrowIzValidation(error);
+    }
+  }
+
+  if (subcommand === "by-ksef") {
+    const ksefNumber = getStringOption(options, "ksef-number");
+    if (!ksefNumber) {
+      throw new CliError("iz by-ksef requires --ksef-number.");
+    }
+    const pageSize = resolveIzPageSize(options, PAGE_SIZE_MAX);
+    const fetchAll = getBooleanOption(options, "all");
+    try {
+      const { client } = await createIzClient(options, context);
+      if (fetchAll) {
+        const items = [];
+        for await (const item of client.collectiveIdentifiers.iterByKsefNumber(ksefNumber, {
+          pageSize,
+        })) {
+          items.push(item);
+        }
+        return {
+          count: items.length,
+          items: toJsonValue(items),
+          continuationToken: "",
+        };
+      }
+      const response = await client.collectiveIdentifiers.listByKsefNumber(ksefNumber, {
+        pageSize,
+      });
+      return {
+        count: response.collectiveIdentifiers.length,
+        items: toJsonValue(response.collectiveIdentifiers),
+        continuationToken: response.continuationToken ?? "",
+      };
+    } catch (error) {
+      rethrowIzValidation(error);
+    }
+  }
+
+  throw new CliError(`Unknown iz subcommand "${subcommand}".`);
+}
+
 async function runInvoice(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<CliJson | string> {
   const [subcommand, ...rest] = positionals;
@@ -532,10 +733,7 @@ async function runInvoice(
   throw new CliError(`Unknown invoice subcommand "${subcommand}".`);
 }
 
-async function runSend(
-  options: Record<string, string | boolean>,
-  context: CommandContext,
-): Promise<CliJson> {
+async function runSend(options: CliOptions, context: CommandContext): Promise<CliJson> {
   const loaded = await loadProfileContext(options, context);
   const client = await createAuthenticatedClient(loaded.profileName, loaded.profile, context);
   const invoiceFile = getStringOption(options, "invoice-file");
@@ -549,7 +747,8 @@ async function runSend(
   const pollIntervalMs = waitForUpo ? resolvePollIntervalMs(options, 2000) : 2000;
   const maxAttempts = waitForUpo ? resolveMaxAttempts(options, 60) : 60;
   const hashOfCorrectedInvoice = getStringOption(options, "hash-of-corrected-invoice");
-  const sessionId = getStringOption(options, "session-id") ?? getStringOption(options, "save-session");
+  const sessionId =
+    getStringOption(options, "session-id") ?? getStringOption(options, "save-session");
   const upoOutput = getStringOption(options, "upo-output") ?? getStringOption(options, "save-upo");
   const saveUpoOverwrite = getBooleanOption(options, "save-upo-overwrite");
   if (upoOutput && !waitForUpo) {
@@ -636,12 +835,14 @@ async function runSend(
 
 async function runSession(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<unknown> {
   const [subcommand, ...rest] = positionals;
   if (!subcommand) {
-    throw new CliError("session requires subcommand: list | show | status | export | import | drop | online | batch.");
+    throw new CliError(
+      "session requires subcommand: list | show | status | export | import | drop | online | batch.",
+    );
   }
 
   if (subcommand === "online") {
@@ -740,7 +941,7 @@ async function runSession(
 
 async function runSessionOnline(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<unknown> {
   const [subcommand] = positionals;
@@ -785,7 +986,8 @@ async function runSessionOnline(
 
   if (subcommand === "send") {
     const sessionId = requireSessionId(options);
-    const invoiceFile = getStringOption(options, "invoice-file") ?? getStringOption(options, "invoice");
+    const invoiceFile =
+      getStringOption(options, "invoice-file") ?? getStringOption(options, "invoice");
     if (!invoiceFile) {
       throw new CliError("session online send requires --invoice-file.");
     }
@@ -834,7 +1036,12 @@ async function runSessionOnline(
     };
 
     if (waitStatus || waitUpo) {
-      const invoiceStatus = await waitForInvoiceStatus(handle, invoiceRef, pollIntervalMs, maxAttempts);
+      const invoiceStatus = await waitForInvoiceStatus(
+        handle,
+        invoiceRef,
+        pollIntervalMs,
+        maxAttempts,
+      );
       result.invoiceStatus = toJsonValue(invoiceStatus);
       result.statusCode = extractStatusCode(invoiceStatus);
       result.ksefNumber = extractKsefNumber(invoiceStatus) ?? "";
@@ -843,15 +1050,15 @@ async function runSessionOnline(
     if (waitUpo) {
       const upoXml = await waitForInvoiceUpo(handle, invoiceRef, pollIntervalMs, maxAttempts);
       result.upoBytes = Buffer.byteLength(upoXml, "utf8");
-        if (saveUpo) {
-          const outputPath = resolveOutputPath(
-            saveUpo,
-            `upo-${updated.sessionState.referenceNumber}-${invoiceRef}.xml`,
-          );
-          await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
-          result.upoPath = path.resolve(context.cwd, outputPath);
-        } else {
-          result.upoPath = "";
+      if (saveUpo) {
+        const outputPath = resolveOutputPath(
+          saveUpo,
+          `upo-${updated.sessionState.referenceNumber}-${invoiceRef}.xml`,
+        );
+        await saveOutputFile(outputPath, upoXml, context.cwd, { overwrite: saveUpoOverwrite });
+        result.upoPath = path.resolve(context.cwd, outputPath);
+      } else {
+        result.upoPath = "";
       }
     }
 
@@ -883,7 +1090,7 @@ async function runSessionOnline(
 
 async function runSessionBatch(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<unknown> {
   const [subcommand] = positionals;
@@ -1040,9 +1247,15 @@ async function runSessionBatch(
       result.upoRef = upoRef;
       if (waitUpo) {
         if (!upoRef) {
-          throw new CliError("UPO reference number is not available in session status.", EXIT_REMOTE);
+          throw new CliError(
+            "UPO reference number is not available in session status.",
+            EXIT_REMOTE,
+          );
         }
-        const upoXml = await client.sessions.getSessionUpo(checkpoint.sessionState.referenceNumber, upoRef);
+        const upoXml = await client.sessions.getSessionUpo(
+          checkpoint.sessionState.referenceNumber,
+          upoRef,
+        );
         result.upoBytes = Buffer.byteLength(upoXml, "utf8");
         if (saveUpo) {
           const outputPath = resolveOutputPath(
@@ -1065,7 +1278,7 @@ async function runSessionBatch(
 
 async function runUpo(
   positionals: string[],
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<CliJson | string> {
   const loaded = await loadProfileContext(options, context);
@@ -1135,10 +1348,7 @@ async function runUpo(
     : xml;
 }
 
-async function runExport(
-  options: Record<string, string | boolean>,
-  context: CommandContext,
-): Promise<CliJson> {
+async function runExport(options: CliOptions, context: CommandContext): Promise<CliJson> {
   const loaded = await loadProfileContext(options, context);
   const client = await createAuthenticatedClient(loaded.profileName, loaded.profile, context);
   const filtersFile = getStringOption(options, "filters-file");
@@ -1212,7 +1422,7 @@ async function runExport(
   };
 }
 
-function requireSessionId(options: Record<string, string | boolean>, fallback?: string): string {
+function requireSessionId(options: CliOptions, fallback?: string): string {
   const value = fallback ?? getStringOption(options, "id");
   if (!value) {
     throw new CliError("Missing session id. Use --id <SESSION_ID>.");
@@ -1228,9 +1438,11 @@ function formatSessionIdError(error: unknown): string {
   return error instanceof SessionStoreError ? error.message : String(error);
 }
 
-function parseSessionFormCode(
-  options: Record<string, string | boolean>,
-): { systemCode: string; schemaVersion: string; value: string } {
+function parseSessionFormCode(options: CliOptions): {
+  systemCode: string;
+  schemaVersion: string;
+  value: string;
+} {
   const formCodeAlias = getStringOption(options, "form-code");
   if (formCodeAlias) {
     return parseFormCode(formCodeAlias);
@@ -1242,10 +1454,7 @@ function parseSessionFormCode(
   };
 }
 
-function resolvePollIntervalMs(
-  options: Record<string, string | boolean>,
-  defaultValue: number,
-): number {
+function resolvePollIntervalMs(options: CliOptions, defaultValue: number): number {
   const explicitMs = getNumberOption(options, "poll-interval-ms");
   if (explicitMs !== undefined) {
     if (!Number.isFinite(explicitMs) || explicitMs <= 0) {
@@ -1263,7 +1472,7 @@ function resolvePollIntervalMs(
   return defaultValue;
 }
 
-function resolveMaxAttempts(options: Record<string, string | boolean>, defaultValue: number): number {
+function resolveMaxAttempts(options: CliOptions, defaultValue: number): number {
   const value = getNumberOption(options, "max-attempts");
   if (value === undefined) {
     return defaultValue;
@@ -1338,7 +1547,7 @@ async function createAuthenticatedClientForBaseUrl(
 
 async function buildBatchPayloadSource(
   cwd: string,
-  options: Record<string, string | boolean>,
+  options: CliOptions,
 ): Promise<{ zipBytes: Buffer; payloadSource: BatchPayloadSource }> {
   const zipPath = getStringOption(options, "zip");
   const directory = getStringOption(options, "dir");
@@ -1374,12 +1583,13 @@ async function buildBatchPayloadSource(
   };
 }
 
-async function loadBatchPayloadSourceBytes(source: BatchPayloadSource, cwd: string): Promise<Buffer> {
+async function loadBatchPayloadSourceBytes(
+  source: BatchPayloadSource,
+  cwd: string,
+): Promise<Buffer> {
   const sourcePath = path.isAbsolute(source.path) ? source.path : path.resolve(cwd, source.path);
   const zipBytes =
-    source.kind === "zip"
-      ? await readFile(sourcePath)
-      : await buildZipFromDirectory(sourcePath);
+    source.kind === "zip" ? await readFile(sourcePath) : await buildZipFromDirectory(sourcePath);
   const currentHash = CryptographyService.sha256Base64(zipBytes);
   if (currentHash !== source.sourceSha256Base64 || zipBytes.length !== source.sourceSize) {
     throw new CliError(
@@ -1469,7 +1679,10 @@ async function waitForInvoiceUpo(
     }
   }
   if (lastError instanceof Error) {
-    throw new CliError(`Timed out while waiting for invoice UPO: ${lastError.message}`, EXIT_REMOTE);
+    throw new CliError(
+      `Timed out while waiting for invoice UPO: ${lastError.message}`,
+      EXIT_REMOTE,
+    );
   }
   throw new CliError("Timed out while waiting for invoice UPO.", EXIT_REMOTE);
 }
@@ -1547,7 +1760,8 @@ function applyTokens(client: KsefClient, tokens: StoredTokens): void {
     client.authManager.setTokens({
       accessToken: {
         token: tokens.accessToken,
-        validUntil: tokens.accessTokenValidUntil ?? new Date(Date.now() + 3600 * 1000).toISOString(),
+        validUntil:
+          tokens.accessTokenValidUntil ?? new Date(Date.now() + 3600 * 1000).toISOString(),
       },
       refreshToken: {
         token: tokens.refreshToken,
@@ -1577,7 +1791,9 @@ function createClientForBaseUrl(baseUrl: string, profile: ProfileConfig): KsefCl
     ...(profile.strictPresignedUrlValidation !== undefined && {
       strictPresignedUrlValidation: profile.strictPresignedUrlValidation,
     }),
-    ...(profile.allowedPresignedHosts ? { allowedPresignedHosts: profile.allowedPresignedHosts } : {}),
+    ...(profile.allowedPresignedHosts
+      ? { allowedPresignedHosts: profile.allowedPresignedHosts }
+      : {}),
     ...(profile.allowPrivateNetworkPresignedUrls !== undefined && {
       allowPrivateNetworkPresignedUrls: profile.allowPrivateNetworkPresignedUrls,
     }),
@@ -1585,7 +1801,7 @@ function createClientForBaseUrl(baseUrl: string, profile: ProfileConfig): KsefCl
 }
 
 async function loadProfileContext(
-  options: Record<string, string | boolean>,
+  options: CliOptions,
   context: CommandContext,
 ): Promise<{ config: CliConfigFile; profileName: string; profile: ProfileConfig }> {
   const config = await readConfig(context.cliHome);
@@ -1607,10 +1823,7 @@ async function loadProfileContext(
   };
 }
 
-function resolveContextIdentifier(
-  profile: ProfileConfig,
-  options: Record<string, string | boolean>,
-): ContextIdentifier {
+function resolveContextIdentifier(profile: ProfileConfig, options: CliOptions): ContextIdentifier {
   const contextType = getStringOption(options, "context-type");
   const contextValue = getStringOption(options, "context-value");
   if (contextType && contextValue) {
@@ -1630,7 +1843,7 @@ function resolveContextIdentifier(
 
 function resolveLighthouseEnvironment(
   profile: ProfileConfig,
-  options: Record<string, string | boolean>,
+  options: CliOptions,
 ): KsefLighthouseEnvironment {
   const explicitLighthouseEnvironmentValue = getStringOption(options, "lighthouse-env");
   if (explicitLighthouseEnvironmentValue !== undefined) {
@@ -1695,10 +1908,7 @@ function parseSortOrder(value?: string): "Asc" | "Desc" | undefined {
   throw new CliError(`Unsupported sort order "${value}". Use Asc or Desc.`);
 }
 
-function applyProfilePatch(
-  profile: ProfileConfig,
-  options: Record<string, string | boolean>,
-): ProfileConfig {
+function applyProfilePatch(profile: ProfileConfig, options: CliOptions): ProfileConfig {
   const updated: ProfileConfig = {
     ...profile,
     ...(profile.tokenStore ? { tokenStore: { ...profile.tokenStore } } : {}),
@@ -1917,6 +2127,7 @@ function helpText(): string {
     "  auth        Authenticate (login, refresh, status, logout)",
     "  health      Basic API health checks using SDK",
     "  lighthouse  Query KSeF lighthouse status endpoint",
+    "  iz          Collective identifiers (generate, query, invoices, by-ksef)",
     "  invoice     Invoice operations (get, query)",
     "  send        Open session and send invoice XML",
     "  session     Manage resumable session checkpoints",
@@ -1927,6 +2138,7 @@ function helpText(): string {
     "  ksef-ts init --profile prod --env PRD --context-type Nip --context-value 1111111111",
     "  ksef-ts auth login --token <ksef-token>",
     "  ksef-ts health --with-auth",
+    "  ksef-ts iz generate --ksef-number <n1> --ksef-number <n2>",
     "  ksef-ts invoice get <ksef-number> --output invoice.xml",
     "  ksef-ts session online open --id demo-online --form-code FA3",
     "  ksef-ts send --invoice-file ./invoice.xml --wait-upo --upo-output upo.xml",

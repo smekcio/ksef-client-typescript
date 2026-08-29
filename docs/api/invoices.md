@@ -15,6 +15,8 @@ Niskopoziomowy klient dla endpointów `/invoices/*`.
 - `exportInvoices(...)` obsługuje opcjonalne `onlyMetadata`. Gdy ustawisz `onlyMetadata: true`, eksport zwróci wyłącznie `_metadata.json` bez XML faktur.
 - Legacy alias `includeMetadata` jest nadal mapowany przez SDK do `onlyMetadata`, ale nowy kod powinien używać już tylko `onlyMetadata`.
 - `queryInvoiceMetadata(...)` i `exportInvoices(...)` wykonują lokalną walidację `filters` przed wywołaniem HTTP.
+- `exportInvoices(...)` przyjmuje opcjonalne `compressionType` (`Zip` albo `TarGz`).
+- `getInvoiceExportStatus(...)` zwraca `package.compressionType`; workflow eksportu rozpakowuje paczkę według tego pola.
 - Ten klient nie ma osobnej metody pobrania partów eksportu. Dane potrzebne do pobrania (`package.parts[]`, w tym `url` i `method`) pochodzą z `getInvoiceExportStatus(referenceNumber)`.
 
 ## Walidacja `dateRange` (lokalna, przed HTTP)
@@ -27,7 +29,7 @@ SDK waliduje `filters.dateRange` według poniższych zasad:
 - jeżeli `to` nie jest podane, SDK używa bieżącego czasu UTC,
 - jeśli `from`/`to` jest ISO date-time bez offsetu (`YYYY-MM-DDTHH:MM[:SS]`), SDK normalizuje je
   do `Europe/Warsaw` i wysyła z jawnie dodanym offsetem (`+01:00`/`+02:00`),
-- zakres `from` -> `to` nie może przekroczyć 3 miesięcy.
+- zakres `from` -> `to` nie może przekroczyć **100 dni w strefie UTC**.
 
 W przypadku naruszenia warunków rzucany jest `KsefValidationError`.
 
@@ -99,7 +101,7 @@ if (!completed) {
 }
 ```
 
-### Obsługa błędu walidacji (`dateRange` > 3 miesiące)
+### Obsługa błędu walidacji (`dateRange` > 100 dni UTC)
 
 ```ts
 import { KsefValidationError } from "ksef-client-typescript";

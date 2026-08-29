@@ -29,7 +29,7 @@ Uwaga: CI wymaga 100% coverage (statement/branch/function/line).
 
 ## Kontrola zgodności z OpenAPI
 
-Aktualny target kompatybilności repo: **KSeF API `2.7.0`**.
+Aktualny target kompatybilności repo: **KSeF API `2.7.1`**.
 
 Źródło kontraktu: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) (`open-api.json`)
 lub live TEST: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`.

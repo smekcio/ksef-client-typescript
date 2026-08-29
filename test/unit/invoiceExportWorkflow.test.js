@@ -9,6 +9,7 @@ import {
   KsefError,
   KsefValidationError,
 } from "../../dist/index.js";
+import { gzipSync } from "node:zlib";
 
 const fixturesPath = path.resolve(process.cwd(), "test", "fixtures", "xades-fixtures.json");
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, "utf8"));
@@ -17,7 +18,7 @@ function certPemToBase64Der(certPem) {
   return certPem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/g, "");
 }
 
-function buildExportStatus(parts, status = { code: 200, description: "ok" }) {
+function buildExportStatus(parts, status = { code: 200, description: "ok" }, extra = {}) {
   return {
     status,
     package: {
@@ -25,6 +26,8 @@ function buildExportStatus(parts, status = { code: 200, description: "ok" }) {
       size: parts.reduce((sum, part) => sum + part.encryptedPartSize, 0),
       parts,
       isTruncated: false,
+      compressionType: "Zip",
+      ...extra,
     },
   };
 }
@@ -420,7 +423,7 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage decrypts archive and extra
     },
     {
       fileName: "invoice-1.xml",
-      content: Buffer.from("<Invoice id=\"1\" />", "utf8"),
+      content: Buffer.from('<Invoice id="1" />', "utf8"),
     },
     {
       fileName: "readme.txt",
@@ -456,7 +459,7 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage decrypts archive and extra
   const processed = await workflow.downloadAndProcessPackage(status, encryptionData);
 
   assert.deepEqual(processed.metadataSummaries, [{ ksefNumber: "KSEF-1" }]);
-  assert.equal(processed.invoiceXmlFiles["invoice-1.xml"], "<Invoice id=\"1\" />");
+  assert.equal(processed.invoiceXmlFiles["invoice-1.xml"], '<Invoice id="1" />');
   assert.equal(processed.invoiceXmlFiles["readme.txt"], undefined);
 });
 
@@ -484,7 +487,10 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage handles missing package an
   const archive = await createZip([
     {
       fileName: "_metadata.json",
-      content: Buffer.from(JSON.stringify({ invoiceList: [{ KsefNumber: "KSEF-LIST-1" }] }), "utf8"),
+      content: Buffer.from(
+        JSON.stringify({ invoiceList: [{ KsefNumber: "KSEF-LIST-1" }] }),
+        "utf8",
+      ),
     },
   ]);
   const encryptedArchive = CryptographyService.encryptAes256Cbc(
@@ -524,6 +530,7 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage handles missing package an
           },
         ],
         isTruncated: false,
+        compressionType: "Zip",
       },
     },
     encryptionData,
@@ -581,6 +588,7 @@ test("InvoiceExportWorkflow.downloadAndProcessPackage ignores null metadata payl
           },
         ],
         isTruncated: false,
+        compressionType: "Zip",
       },
     },
     encryptionData,
@@ -700,4 +708,255 @@ test("InvoiceExportWorkflow treats non-string encryptedPartHash as missing when 
       ),
     /Missing encrypted part hash/,
   );
+});
+
+function createTarGz(entries) {
+  const blocks = [];
+  for (const entry of entries) {
+    const data = Buffer.from(entry.content);
+    const header = Buffer.alloc(512);
+    header.write(entry.fileName, 0, Math.min(entry.fileName.length, 100), "utf8");
+    header.write("0000644\0", 100, 8, "utf8");
+    header.write("0000000\0", 108, 8, "utf8");
+    header.write("0000000\0", 116, 8, "utf8");
+    header.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124, 12, "utf8");
+    header.write("00000000000\0", 136, 12, "utf8");
+    header.write("        ", 148, 8, "utf8");
+    header.write(entry.typeFlag ?? "0", 156, 1, "utf8");
+    header.write("ustar\0", 257, 6, "utf8");
+    header.write("00", 263, 2, "utf8");
+    let checksum = 0;
+    for (const byte of header) {
+      checksum += byte;
+    }
+    header.write(`${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8, "utf8");
+    blocks.push(header, data);
+    const pad = (512 - (data.length % 512)) % 512;
+    if (pad > 0) {
+      blocks.push(Buffer.alloc(pad));
+    }
+  }
+  blocks.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(blocks));
+}
+
+test("InvoiceExportWorkflow.startExport forwards compressionType", async () => {
+  const calls = [];
+  const workflow = new InvoiceExportWorkflow(
+    {
+      exportInvoices: async (request) => {
+        calls.push(request);
+        return { referenceNumber: "EXP-REF-TARGZ" };
+      },
+    },
+    {
+      getPublicKeyCertificates: async () => {
+        throw new Error("should not be called");
+      },
+    },
+    {},
+  );
+  const encryptionData = {
+    cipherKey: Buffer.alloc(32, 1),
+    cipherIv: Buffer.alloc(16, 2),
+    encryptionInfo: {
+      encryptedSymmetricKey: "abc",
+      initializationVector: "def",
+    },
+  };
+
+  await workflow.startExport({
+    filters: {
+      subjectType: "Subject1",
+      dateRange: { dateType: "Issue", from: "2025-01-01", to: "2025-01-02" },
+    },
+    encryptionData,
+    compressionType: "TarGz",
+  });
+
+  assert.equal(calls[0].compressionType, "TarGz");
+});
+
+test("InvoiceExportWorkflow.downloadAndProcessPackage unpacks TarGz packages", async () => {
+  const encryptionData = {
+    cipherKey: CryptographyService.generateAesKey(),
+    cipherIv: CryptographyService.generateIv(),
+    encryptionInfo: {},
+  };
+  const archive = createTarGz([
+    {
+      fileName: "_metadata.json",
+      content: Buffer.from(JSON.stringify({ invoices: [{ ksefNumber: "KSEF-TAR" }] }), "utf8"),
+    },
+    { fileName: "invoice-tar.xml", content: Buffer.from("<Invoice/>", "utf8") },
+  ]);
+  const encryptedArchive = CryptographyService.encryptAes256Cbc(
+    archive,
+    encryptionData.cipherKey,
+    encryptionData.cipherIv,
+  );
+  const workflow = new InvoiceExportWorkflow(
+    {},
+    {},
+    { request: async () => encryptedArchive },
+    { requireExportPartHash: false },
+  );
+
+  const processed = await workflow.downloadAndProcessPackage(
+    buildExportStatus(
+      [
+        {
+          ordinalNumber: 1,
+          partName: "part-1.bin",
+          method: "GET",
+          url: "https://uploads.example.com/part-1.bin",
+          partSize: archive.length,
+          partHash: "",
+          encryptedPartSize: encryptedArchive.length,
+          encryptedPartHash: "",
+          expirationDate: "2099-01-01T00:00:00Z",
+        },
+      ],
+      { code: 200, description: "ok" },
+      { compressionType: "TarGz" },
+    ),
+    encryptionData,
+    { requireExportPartHash: false },
+  );
+
+  assert.equal(processed.invoiceXmlFiles["invoice-tar.xml"], "<Invoice/>");
+  assert.equal(processed.metadataSummaries[0].ksefNumber, "KSEF-TAR");
+});
+
+test("InvoiceExportWorkflow.downloadAndProcessPackage requires compressionType", async () => {
+  const workflow = new InvoiceExportWorkflow({}, {}, { request: async () => Buffer.from("x") });
+  await assert.rejects(
+    () =>
+      workflow.downloadAndProcessPackage(
+        buildExportStatus(
+          [
+            {
+              ordinalNumber: 1,
+              partName: "part-1.bin",
+              method: "GET",
+              url: "https://uploads.example.com/part-1.bin",
+              partSize: 1,
+              partHash: "",
+              encryptedPartSize: 1,
+              encryptedPartHash: "",
+              expirationDate: "2099-01-01T00:00:00Z",
+            },
+          ],
+          { code: 200, description: "ok" },
+          { compressionType: null },
+        ),
+        {
+          cipherKey: Buffer.alloc(32, 1),
+          cipherIv: Buffer.alloc(16, 2),
+          encryptionInfo: {},
+        },
+        { requireExportPartHash: false },
+      ),
+    /missing compressionType/,
+  );
+});
+
+test("InvoiceExportWorkflow.downloadAndProcessPackage rejects unsupported compressionType", async () => {
+  const encryptionData = {
+    cipherKey: CryptographyService.generateAesKey(),
+    cipherIv: CryptographyService.generateIv(),
+    encryptionInfo: {},
+  };
+  const archive = await createZip([{ fileName: "a.xml", content: Buffer.from("<a/>", "utf8") }]);
+  const encryptedArchive = CryptographyService.encryptAes256Cbc(
+    archive,
+    encryptionData.cipherKey,
+    encryptionData.cipherIv,
+  );
+  const workflow = new InvoiceExportWorkflow(
+    {},
+    {},
+    { request: async () => encryptedArchive },
+    { requireExportPartHash: false },
+  );
+
+  await assert.rejects(
+    () =>
+      workflow.downloadAndProcessPackage(
+        buildExportStatus(
+          [
+            {
+              ordinalNumber: 1,
+              partName: "part-1.bin",
+              method: "GET",
+              url: "https://uploads.example.com/part-1.bin",
+              partSize: archive.length,
+              partHash: "",
+              encryptedPartSize: encryptedArchive.length,
+              encryptedPartHash: "",
+              expirationDate: "2099-01-01T00:00:00Z",
+            },
+          ],
+          { code: 200, description: "ok" },
+          { compressionType: "Rar" },
+        ),
+        encryptionData,
+        { requireExportPartHash: false },
+      ),
+    KsefError,
+  );
+});
+
+test("InvoiceExportWorkflow.downloadAndProcessPackage accepts compressionType aliases", async () => {
+  const encryptionData = {
+    cipherKey: CryptographyService.generateAesKey(),
+    cipherIv: CryptographyService.generateIv(),
+    encryptionInfo: {},
+  };
+  const zipArchive = await createZip([
+    { fileName: "invoice-zip.xml", content: Buffer.from("<Zip/>", "utf8") },
+  ]);
+  const tarArchive = createTarGz([
+    { fileName: "invoice-tar.xml", content: Buffer.from("<Tar/>", "utf8") },
+  ]);
+
+  for (const [compressionType, archive, expectedName, expectedXml] of [
+    ["zip", zipArchive, "invoice-zip.xml", "<Zip/>"],
+    ["targz", tarArchive, "invoice-tar.xml", "<Tar/>"],
+    ["tar.gz", tarArchive, "invoice-tar.xml", "<Tar/>"],
+  ]) {
+    const encryptedArchive = CryptographyService.encryptAes256Cbc(
+      archive,
+      encryptionData.cipherKey,
+      encryptionData.cipherIv,
+    );
+    const workflow = new InvoiceExportWorkflow(
+      {},
+      {},
+      { request: async () => encryptedArchive },
+      { requireExportPartHash: false },
+    );
+    const processed = await workflow.downloadAndProcessPackage(
+      buildExportStatus(
+        [
+          {
+            ordinalNumber: 1,
+            partName: "part-1.bin",
+            method: "GET",
+            url: "https://uploads.example.com/part-1.bin",
+            partSize: archive.length,
+            partHash: "",
+            encryptedPartSize: encryptedArchive.length,
+            encryptedPartHash: "",
+            expirationDate: "2099-01-01T00:00:00Z",
+          },
+        ],
+        { code: 200, description: "ok" },
+        { compressionType },
+      ),
+      encryptionData,
+      { requireExportPartHash: false },
+    );
+    assert.equal(processed.invoiceXmlFiles[expectedName], expectedXml);
+  }
 });

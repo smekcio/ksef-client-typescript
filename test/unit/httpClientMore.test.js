@@ -70,13 +70,21 @@ test("HttpClient handles text, xml, buffer and 204 responses", async () => {
   });
 
   try {
-    const textPayload = await client.http.request({ method: "GET", path: "/text", responseType: "text" });
+    const textPayload = await client.http.request({
+      method: "GET",
+      path: "/text",
+      responseType: "text",
+    });
     assert.equal(textPayload, "plain-text");
 
     const xmlPayload = await client.http.request({ method: "GET", path: "/xml" });
     assert.equal(xmlPayload, "<ok>true</ok>");
 
-    const binaryPayload = await client.http.request({ method: "GET", path: "/binary", responseType: "buffer" });
+    const binaryPayload = await client.http.request({
+      method: "GET",
+      path: "/binary",
+      responseType: "buffer",
+    });
     assert.equal(Buffer.isBuffer(binaryPayload), true);
     assert.equal(binaryPayload.toString("utf8"), "binary-data");
 
@@ -342,13 +350,12 @@ test("HttpClient non-json 429 throws KsefRateLimitError and skipAuth relative pa
       },
     );
 
-    await assert.rejects(
-      () =>
-        nonHttpClient.http.request({
-          method: "GET",
-          path: "/no-absolute",
-          skipAuth: true,
-        }),
+    await assert.rejects(() =>
+      nonHttpClient.http.request({
+        method: "GET",
+        path: "/no-absolute",
+        skipAuth: true,
+      }),
     );
   } finally {
     await closeServer(server);
@@ -443,7 +450,9 @@ test("HttpClient uses proxy dispatcher when no NO_PROXY is configured and bypass
   });
 
   try {
-    await assert.rejects(() => withProxyOnly.http.request({ method: "GET", path: "/proxy-required" }));
+    await assert.rejects(() =>
+      withProxyOnly.http.request({ method: "GET", path: "/proxy-required" }),
+    );
 
     const ok = await withWildcardBypass.http.request({ method: "GET", path: "/proxy-bypass-all" });
     assert.deepEqual(ok, { ok: true });
@@ -670,7 +679,9 @@ test("HttpClient 460 handling covers extractStatusDetails empty-mapped branch", 
   });
 
   try {
-    await assert.rejects(() => client.http.request({ method: "GET", path: "/err-460-empty-mapped" }));
+    await assert.rejects(() =>
+      client.http.request({ method: "GET", path: "/err-460-empty-mapped" }),
+    );
   } finally {
     await closeServer(server);
   }
@@ -691,11 +702,7 @@ test("HttpClient 460 handling covers suspended-details suffix false branch", asy
   const originalFilter = Array.prototype.filter;
   let lengthReads = 0;
   Array.prototype.filter = function patchedFilter(predicate, thisArg) {
-    if (
-      Array.isArray(this) &&
-      this.length === 1 &&
-      this[0] === "certificate suspended"
-    ) {
+    if (Array.isArray(this) && this.length === 1 && this[0] === "certificate suspended") {
       return {
         some: () => true,
         join: () => "",
@@ -718,6 +725,80 @@ test("HttpClient 460 handling covers suspended-details suffix false branch", asy
     );
   } finally {
     Array.prototype.filter = originalFilter;
+    await closeServer(server);
+  }
+});
+
+test("HttpClient invokes systemWarningHandler for X-System-Warning", async () => {
+  const warnings = [];
+  const server = createServer((_, res) => {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "X-System-Warning": "[test]: synthetic warning",
+    });
+    res.end(JSON.stringify({ ok: true }));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+    systemWarningHandler: (warning) => warnings.push(warning),
+  });
+
+  try {
+    const payload = await client.http.request({ method: "GET", path: "/warned" });
+    assert.deepEqual(payload, { ok: true });
+    assert.deepEqual(warnings, ["[test]: synthetic warning"]);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient ignores X-System-Warning when no handler is configured", async () => {
+  const server = createServer((_, res) => {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "X-System-Warning": "[test]: ignored",
+    });
+    res.end(JSON.stringify({ ok: true }));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+  });
+
+  try {
+    const payload = await client.http.request({ method: "GET", path: "/warned" });
+    assert.deepEqual(payload, { ok: true });
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test("HttpClient skips empty X-System-Warning values", async () => {
+  const warnings = [];
+  const server = createServer((_, res) => {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "X-System-Warning": "",
+    });
+    res.end(JSON.stringify({ ok: true }));
+  });
+  const address = await listen(server);
+  const client = new KsefClient({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    retryOn429: false,
+    retryOn5xx: false,
+    systemWarningHandler: (warning) => warnings.push(warning),
+  });
+
+  try {
+    await client.http.request({ method: "GET", path: "/warned-empty" });
+    assert.deepEqual(warnings, []);
+  } finally {
     await closeServer(server);
   }
 });

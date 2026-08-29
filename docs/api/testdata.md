@@ -25,6 +25,7 @@ Endpointy testdata są przeznaczone dla środowisk testowych (`TEST` i `DEMO`) d
 - Dozwolone typy `contextIdentifier.type` to: `Nip`, `InternalId`, `NipVatUe`, `PeppolId`.
 - `updateCertificate(serialNumber, { validTo })` skróca okres ważności certyfikatu KSeF na środowiskach testowych (`PUT /testdata/certificates/{serialNumber}`); `serialNumber` musi mieć format `^[0-9A-F]{16}$`.
 - Operacje na endpointach `/testdata/limits/*` oraz `/testdata/rate-limits*` nie są realizowane przez `client.testdata`; obsługuje je `client.limits`.
+- `changeContextSessionLimits(...)` na TEST ustawia też `collectiveIdentifier.maxInvoices`.
 
 ## Operacje limit/rate-limit (klient `limits`)
 

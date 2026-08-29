@@ -1,6 +1,9 @@
+export type CliOptionValue = string | boolean | string[];
+export type CliOptions = Record<string, CliOptionValue>;
+
 export interface ParsedArgv {
   positionals: string[];
-  options: Record<string, string | boolean>;
+  options: CliOptions;
   json: boolean;
   help: boolean;
 }
@@ -49,11 +52,34 @@ const VALUE_OPTIONS = new Set<string>([
   "parallelism",
   "zip",
   "dir",
+  "from",
+  "to",
+  "iz",
+  "from-file",
 ]);
+
+const MULTI_VALUE_OPTIONS = new Set<string>(["ksef-number", "iz"]);
+
+function assignOption(options: CliOptions, key: string, value: string): void {
+  if (MULTI_VALUE_OPTIONS.has(key)) {
+    const existing = options[key];
+    if (Array.isArray(existing)) {
+      existing.push(value);
+      return;
+    }
+    if (typeof existing === "string") {
+      options[key] = [existing, value];
+      return;
+    }
+    options[key] = value;
+    return;
+  }
+  options[key] = value;
+}
 
 export function parseArgv(argv: string[]): ParsedArgv {
   const positionals: string[] = [];
-  const options: Record<string, string | boolean> = {};
+  const options: CliOptions = {};
 
   let i = 0;
   while (i < argv.length) {
@@ -71,7 +97,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       if (equalIndex > 2) {
         const key = token.slice(2, equalIndex);
         const value = token.slice(equalIndex + 1);
-        options[key] = value;
+        assignOption(options, key, value);
         i += 1;
         continue;
       }
@@ -79,7 +105,7 @@ export function parseArgv(argv: string[]): ParsedArgv {
       const key = token.slice(2);
       const next = argv[i + 1];
       if (VALUE_OPTIONS.has(key) && next !== undefined && !next.startsWith("-")) {
-        options[key] = next;
+        assignOption(options, key, next);
         i += 2;
         continue;
       }
@@ -106,18 +132,26 @@ export function parseArgv(argv: string[]): ParsedArgv {
   };
 }
 
-export function getStringOption(
-  options: Record<string, string | boolean>,
-  key: string,
-): string | undefined {
+export function getStringOption(options: CliOptions, key: string): string | undefined {
   const value = options[key];
+  if (Array.isArray(value)) {
+    return value[value.length - 1];
+  }
   return typeof value === "string" ? value : undefined;
 }
 
-export function getBooleanOption(
-  options: Record<string, string | boolean>,
-  key: string,
-): boolean {
+export function getStringListOption(options: CliOptions, key: string): string[] {
+  const value = options[key];
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return [value];
+  }
+  return [];
+}
+
+export function getBooleanOption(options: CliOptions, key: string): boolean {
   const value = options[key];
   if (typeof value === "boolean") {
     return value;
@@ -131,10 +165,7 @@ export function getBooleanOption(
   return false;
 }
 
-export function getNumberOption(
-  options: Record<string, string | boolean>,
-  key: string,
-): number | undefined {
+export function getNumberOption(options: CliOptions, key: string): number | undefined {
   const value = getStringOption(options, key);
   if (value === undefined) {
     return undefined;
