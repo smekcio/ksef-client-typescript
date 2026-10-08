@@ -20,17 +20,20 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=low
 
       - name: Run linter
         run: npm run lint
@@ -42,12 +45,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -58,18 +61,18 @@ jobs:
         run: npm run typecheck
 
   test:
-    name: Test (Node 20)
+    name: Test (Node 22.19.0)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 22.19.0
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 20
+          node-version: 22.19.0
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -93,15 +96,14 @@ jobs:
           sh -lc 'node --test $(find test/unit -name "*.test.js" ! -name "cliArgs.test.js" ! -name "cliTokenStore.test.js" -print) test/e2e/*.test.js'
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
-          name: coverage-node-20
+          name: coverage-node-22
           path: |
             coverage/
 
   test-matrix:
     name: Test (Node ${{ matrix.node-version }})
-    if: github.event_name != 'pull_request'
     continue-on-error: ${{ matrix.experimental }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -109,17 +111,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - node-version: 22
-            experimental: false
           - node-version: 24
-            experimental: true
+            experimental: false
+          - node-version: 26
+            experimental: false
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm

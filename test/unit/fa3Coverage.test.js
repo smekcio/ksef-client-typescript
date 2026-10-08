@@ -98,7 +98,7 @@ function basicBuilder(number = "FV/1") {
   return FA3Invoice.basic(number).issueDate("2026-01-15").seller(SELLER).buyer(BUYER).addLine(LINE);
 }
 
-let hasLibxml = false;
+let hasLibxml;
 try {
   await import("libxmljs2");
   hasLibxml = true;

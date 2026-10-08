@@ -385,6 +385,28 @@ test("XadesSignatureService validates missing document element in enveloping mod
   }
 });
 
+test("XadesSignatureService rejects missing signature root in enveloping mode", () => {
+  const originalParse = DOMParser.prototype.parseFromString;
+  DOMParser.prototype.parseFromString = function (xml, mimeType) {
+    if (xml === `<ds:Signature xmlns:ds="${DS_NS}"></ds:Signature>`) {
+      return { documentElement: null };
+    }
+    return originalParse.call(this, xml, mimeType);
+  };
+  try {
+    assert.throws(
+      () =>
+        new XadesSignatureService().signXadesEnveloping({
+          xml: "<AuthTokenRequest/>",
+          keyPair: createKeyPair(),
+        }),
+      /missing signature document element/,
+    );
+  } finally {
+    DOMParser.prototype.parseFromString = originalParse;
+  }
+});
+
 test("XadesSignatureService supports environments without importNode in enveloping mode", () => {
   const originalParse = DOMParser.prototype.parseFromString;
   DOMParser.prototype.parseFromString = function patchedParseFromString(xml, mimeType) {

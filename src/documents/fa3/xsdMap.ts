@@ -136,7 +136,7 @@ function walkElement(
       minOccurs: node.getAttribute("minOccurs") || "1",
       maxOccurs: node.getAttribute("maxOccurs") || "1",
       choices: countChoices(node),
-      enumValues: localTypeName ? enums.get(localTypeName) ?? [] : [],
+      enumValues: localTypeName ? (enums.get(localTypeName) ?? []) : [],
     }),
   );
 
@@ -148,11 +148,10 @@ function walkElement(
 }
 
 export function parseFa3XsdElements(schemaText: string): XsdElement[] {
+  if (!schemaText.trim()) return [];
   const doc = new DOMParser().parseFromString(schemaText, "text/xml");
-  const root = doc?.documentElement;
-  if (!root) {
-    return [];
-  }
+  // xmldom 0.9 rejects documents without a root element.
+  const root = doc.documentElement!;
   const enums = walkSimpleTypeEnums(root);
   const allElements = root.getElementsByTagNameNS("*", "element");
   let fakturaElement: XmlLikeElement | null = null;

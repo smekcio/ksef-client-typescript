@@ -5,7 +5,7 @@ Przykłady zakładają uruchamianie z katalogu `ksef-client-typescript`.
 
 ## Wymagania
 
-- Node.js `>= 20`
+- Node.js `>= 22.19.0`
 - zainstalowana biblioteka `ksef-client-typescript`
 - dostęp do środowiska KSeF (`TEST`, `DEMO` albo `PRD`) i danych uwierzytelniających
 

@@ -5,9 +5,19 @@ README pozostaje zwięzły i skupiony na użytkowniku SDK.
 
 ## Wymagania
 
-- Node.js `>= 20`
+- Node.js `>= 22.19.0`
 - `npm`
 - snapshot kontraktu `specs/ksef-openapi.snapshot.json` jest dołączony do repo
+
+Runtime produkcyjny wymaga Node.js 22.19.0 lub nowszego. `.nvmrc` wskazuje
+Node.js 24 do pracy lokalnej i publikacji. CI testuje dokładną wersję minimalną
+22.19.0 oraz linie 24 i 26 dla każdego PR.
+
+`npm run typecheck` używa natywnego kompilatora TypeScript 7 (`typescript7`).
+TypeScript 6 (`typescript`) dostarcza API wymagane przez aktualny
+`typescript-eslint` oraz `tsup` do lintowania i generowania deklaracji.
+`tsup` ustawia `ignoreDeprecations: "6.0"` tylko dla deklaracji, ponieważ jego
+wewnętrzny generator nadal ustawia przestarzałe `baseUrl`.
 
 ## Szybki flow lokalny
 

@@ -128,15 +128,13 @@ function makeVariant(template, variant) {
 function propertyTest(schema, templatePath, xsdPath) {
   const moneyArb = fc.integer({ min: 1, max: 1_000_000 }).map((v) => v / 100);
   const rowNameArb = fc
-    .stringOf(
-      fc.constantFrom(
+    .string({
+      unit: fc.constantFrom(
         ..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_./()".split(""),
       ),
-      {
-        minLength: 1,
-        maxLength: 40,
-      },
-    )
+      minLength: 1,
+      maxLength: 40,
+    })
     .map((s) => s.trim() || "Usluga");
 
   const variantArb = fc.record({
