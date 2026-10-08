@@ -2,6 +2,7 @@
 // Do not edit manually.
 
 export const OPENAPI_SPEC_VERSION = "3.0.4" as const;
+export const KSEF_API_VERSION = "2.8.1" as const;
 export const OPENAPI_SCHEMA_COUNT = 305 as const;
 
 export type AllowedIps = {
@@ -305,11 +306,14 @@ export type CommonSessionStatus = "Cancelled" | "Failed" | "InProgress" | "Succe
 
 export type CompressionType = "TarGz" | "Zip";
 
-export type CurrencyCode = "AED" | "AFN" | "ALL" | "AMD" | "ANG" | "AOA" | "ARS" | "AUD" | "AWG" | "AZN" | "BAM" | "BBD" | "BDT" | "BGN" | "BHD" | "BIF" | "BMD" | "BND" | "BOB" | "BOV" | "BRL" | "BSD" | "BTN" | "BWP" | "BYN" | "BZD" | "CAD" | "CDF" | "CHE" | "CHF" | "CHW" | "CLF" | "CLP" | "CNY" | "COP" | "COU" | "CRC" | "CUC" | "CUP" | "CVE" | "CZK" | "DJF" | "DKK" | "DOP" | "DZD" | "EGP" | "ERN" | "ETB" | "EUR" | "FJD" | "FKP" | "GBP" | "GEL" | "GGP" | "GHS" | "GIP" | "GMD" | "GNF" | "GTQ" | "GYD" | "HKD" | "HNL" | "HRK" | "HTG" | "HUF" | "IDR" | "ILS" | "IMP" | "INR" | "IQD" | "IRR" | "ISK" | "JEP" | "JMD" | "JOD" | "JPY" | "KES" | "KGS" | "KHR" | "KMF" | "KPW" | "KRW" | "KWD" | "KYD" | "KZT" | "LAK" | "LBP" | "LKR" | "LRD" | "LSL" | "LYD" | "MAD" | "MDL" | "MGA" | "MKD" | "MMK" | "MNT" | "MOP" | "MRU" | "MUR" | "MVR" | "MWK" | "MXN" | "MXV" | "MYR" | "MZN" | "NAD" | "NGN" | "NIO" | "NOK" | "NPR" | "NZD" | "OMR" | "PAB" | "PEN" | "PGK" | "PHP" | "PKR" | "PLN" | "PYG" | "QAR" | "RON" | "RSD" | "RUB" | "RWF" | "SAR" | "SBD" | "SCR" | "SDG" | "SEK" | "SGD" | "SHP" | "SLL" | "SOS" | "SRD" | "SSP" | "STN" | "SVC" | "SYP" | "SZL" | "THB" | "TJS" | "TMT" | "TND" | "TOP" | "TRY" | "TTD" | "TWD" | "TZS" | "UAH" | "UGX" | "USD" | "USN" | "UYI" | "UYU" | "UYW" | "UZS" | "VES" | "VND" | "VUV" | "WST" | "XAF" | "XAG" | "XAU" | "XBA" | "XBB" | "XBC" | "XBD" | "XCD" | "XCG" | "XDR" | "XOF" | "XPD" | "XPF" | "XPT" | "XSU" | "XUA" | "XXX" | "YER" | "ZAR" | "ZMW" | "ZWL";
+export type CurrencyCode = "AED" | "AFN" | "ALL" | "AMD" | "ANG" | "AOA" | "ARS" | "AUD" | "AWG" | "AZN" | "BAM" | "BBD" | "BDT" | "BGN" | "BHD" | "BIF" | "BMD" | "BND" | "BOB" | "BOV" | "BRL" | "BSD" | "BTN" | "BWP" | "BYN" | "BZD" | "CAD" | "CDF" | "CHE" | "CHF" | "CHW" | "CLF" | "CLP" | "CNH" | "CNY" | "COP" | "COU" | "CRC" | "CUC" | "CUP" | "CVE" | "CZK" | "DJF" | "DKK" | "DOP" | "DZD" | "EGP" | "ERN" | "ETB" | "EUR" | "FJD" | "FKP" | "GBP" | "GEL" | "GGP" | "GHS" | "GIP" | "GMD" | "GNF" | "GTQ" | "GYD" | "HKD" | "HNL" | "HRK" | "HTG" | "HUF" | "IDR" | "ILS" | "IMP" | "INR" | "IQD" | "IRR" | "ISK" | "JEP" | "JMD" | "JOD" | "JPY" | "KES" | "KGS" | "KHR" | "KMF" | "KPW" | "KRW" | "KWD" | "KYD" | "KZT" | "LAK" | "LBP" | "LKR" | "LRD" | "LSL" | "LYD" | "MAD" | "MDL" | "MGA" | "MKD" | "MMK" | "MNT" | "MOP" | "MRU" | "MUR" | "MVR" | "MWK" | "MXN" | "MXV" | "MYR" | "MZN" | "NAD" | "NGN" | "NIO" | "NOK" | "NPR" | "NZD" | "OMR" | "PAB" | "PEN" | "PGK" | "PHP" | "PKR" | "PLN" | "PYG" | "QAR" | "RON" | "RSD" | "RUB" | "RWF" | "SAR" | "SBD" | "SCR" | "SDG" | "SEK" | "SGD" | "SHP" | "SLE" | "SLL" | "SOS" | "SRD" | "SSP" | "STN" | "SVC" | "SYP" | "SZL" | "THB" | "TJS" | "TMT" | "TND" | "TOP" | "TRY" | "TTD" | "TWD" | "TZS" | "UAH" | "UGX" | "USD" | "USN" | "UYI" | "UYU" | "UYW" | "UZS" | "VED" | "VES" | "VND" | "VUV" | "WST" | "XAF" | "XAG" | "XAU" | "XBA" | "XBB" | "XBC" | "XBD" | "XCD" | "XCG" | "XDR" | "XOF" | "XPD" | "XPF" | "XPT" | "XSU" | "XTS" | "XUA" | "XXX" | "YER" | "ZAR" | "ZMW" | "ZWG" | "ZWL";
 
 export type EffectiveApiRateLimits = {
+  anonymous: EffectiveApiRateLimitValues;
   batchSession: EffectiveApiRateLimitValues;
+  batchSessionClose: EffectiveApiRateLimitValues;
   collectiveIdentifier: EffectiveApiRateLimitValues;
+  global: EffectiveApiRateLimitValues;
   invoiceDownload: EffectiveApiRateLimitValues;
   invoiceExport: EffectiveApiRateLimitValues;
   invoiceExportStatus: EffectiveApiRateLimitValues;
@@ -317,6 +321,7 @@ export type EffectiveApiRateLimits = {
   invoiceSend: EffectiveApiRateLimitValues;
   invoiceStatus: EffectiveApiRateLimitValues;
   onlineSession: EffectiveApiRateLimitValues;
+  onlineSessionClose: EffectiveApiRateLimitValues;
   other: EffectiveApiRateLimitValues;
   sessionInvoiceList: EffectiveApiRateLimitValues;
   sessionList: EffectiveApiRateLimitValues;
@@ -444,7 +449,7 @@ export type EntityPermissionItem = {
   startDate: string;
 };
 
-export type EntityPermissionItemScope = "InvoiceRead" | "InvoiceWrite";
+export type EntityPermissionItemScope = "CollectiveIdentifierManage" | "InvoiceRead" | "InvoiceWrite";
 
 export type EntityPermissionsContextIdentifier = {
   type: EntityPermissionsContextIdentifierType;
@@ -478,7 +483,7 @@ export type EntityPermissionsSubordinateEntityIdentifier = {
 
 export type EntityPermissionsSubordinateEntityIdentifierType = "Nip";
 
-export type EntityPermissionType = "InvoiceRead" | "InvoiceWrite";
+export type EntityPermissionType = "CollectiveIdentifierManage" | "InvoiceRead" | "InvoiceWrite";
 
 export type EntityRole = {
   description: string;
@@ -613,7 +618,7 @@ export type ForbiddenProblemDetails = {
   reasonCode: string;
   security?: Record<string, unknown | null> | null;
   status: number;
-  timestamp: string;
+  timestamp?: string;
   title: string;
   traceId?: string | null;
 };
@@ -679,7 +684,7 @@ export type IndirectPermissionsTargetIdentifier = {
 
 export type IndirectPermissionsTargetIdentifierType = "AllPartners" | "InternalId" | "Nip";
 
-export type IndirectPermissionType = "InvoiceRead" | "InvoiceWrite";
+export type IndirectPermissionType = "CollectiveIdentifierManage" | "InvoiceRead" | "InvoiceWrite";
 
 export type InitTokenAuthenticationRequest = {
   authorizationPolicy?: AuthorizationPolicy | null;

@@ -39,9 +39,17 @@ interface SignedXmlLike {
     transforms: string[];
     digestAlgorithm: string;
     isEmptyUri?: boolean;
+    type?: string;
   }): void;
   getReferences(): SignedXmlReferenceLike[];
   createSignedInfo(doc: XmlDocument, prefix?: string): string;
+  calculateReferenceDigest(reference: SignedXmlReferenceLike, node: unknown): string;
+  addAllReferences(
+    doc: XmlDocument,
+    signature: XmlElement,
+    targets: Map<SignedXmlReferenceLike, Array<{ node: unknown; digestValue: string }>>,
+    prefix: string,
+  ): void;
   calculateSignatureValue(doc: XmlDocument): void;
   createSignature(prefix?: string): XmlChildNode;
   getKeyInfo(prefix?: string): string;
@@ -156,7 +164,6 @@ export class XadesSignatureService {
     sig.privateKey = privateKey;
     sig.publicCert = certificatePem;
 
-    patchSignedXmlCreateReferences(sig);
     ensureEcdsaSha256Algorithm(sig);
 
     sig.addReference({
@@ -173,8 +180,8 @@ export class XadesSignatureService {
       xpath: `//*[local-name(.)='SignedProperties' and @Id='${signedPropertiesId}']`,
       transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
       digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+      type: SIGNED_PROPERTIES_TYPE,
     });
-    (sig.getReferences().at(-1) as unknown as { type?: string }).type = SIGNED_PROPERTIES_TYPE;
 
     const doc = new DOMParser().parseFromString(options.xml, "application/xml");
     if (!doc.documentElement) {
@@ -202,6 +209,7 @@ export class XadesSignatureService {
     signatureNode.insertBefore(signedInfoNode, signatureNode.firstChild);
 
     sig.signatureNode = signatureNode;
+    addSignedXmlReferences(sig, doc, signatureNode);
 
     sig.calculateSignatureValue(doc);
 
@@ -241,7 +249,6 @@ export class XadesSignatureService {
     sig.privateKey = privateKey;
     sig.publicCert = certificatePem;
 
-    patchSignedXmlCreateReferences(sig);
     ensureEcdsaSha256Algorithm(sig);
 
     const originalDoc = new DOMParser().parseFromString(options.xml, "application/xml");
@@ -295,8 +302,8 @@ export class XadesSignatureService {
       xpath: `//*[local-name(.)='SignedProperties' and @Id='${signedPropertiesId}']`,
       transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
       digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+      type: SIGNED_PROPERTIES_TYPE,
     });
-    (sig.getReferences().at(-1) as unknown as { type?: string }).type = SIGNED_PROPERTIES_TYPE;
 
     sig.namespaceResolver = { lookupNamespaceURI: () => null };
 
@@ -307,6 +314,7 @@ export class XadesSignatureService {
     signatureNode.insertBefore(signedInfoNode, signatureNode.firstChild);
 
     sig.signatureNode = signatureNode;
+    addSignedXmlReferences(sig, signatureDoc, signatureNode);
 
     sig.calculateSignatureValue(signatureDoc);
 
@@ -483,64 +491,26 @@ function ensureEcdsaSha256Algorithm(sig: SignedXmlLike): void {
   };
 }
 
-function patchSignedXmlCreateReferences(sig: SignedXmlLike): void {
-  // xml-crypto does not emit Reference/@Type, but XAdES requires it for SignedProperties.
-  // Patch the method at runtime to keep upstream dependency untouched.
-  type SignedXmlWithCreateReferences = SignedXmlLike & {
-    createReferences: (doc: XmlDocument, prefix?: string) => string;
-  };
-  const mutableSig = sig as SignedXmlWithCreateReferences;
-  mutableSig.createReferences = function createReferences(doc: XmlDocument, prefix?: string) {
-    let res = "";
-    let currentPrefix = prefix || "";
-    currentPrefix = currentPrefix ? `${currentPrefix}:` : currentPrefix;
-
-    for (const ref of this.getReferences()) {
-      const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
-      if (!Array.isArray(nodes) || nodes.length === 0) {
-        throw new Error(
-          `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
-        );
-      }
-      for (const node of nodes) {
-        const typeAttr = ref.type ? ` Type="${ref.type}"` : "";
-        if (ref.isEmptyUri) {
-          res += `<${currentPrefix}Reference URI=""${typeAttr}>`;
-        } else {
-          const id = this.ensureHasId(node);
-          ref.uri = id;
-          res += `<${currentPrefix}Reference URI="#${id}"${typeAttr}>`;
-        }
-
-        res += `<${currentPrefix}Transforms>`;
-        for (const trans of ref.transforms || []) {
-          const transform = this.findCanonicalizationAlgorithm(trans);
-          res += `<${currentPrefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
-          if (
-            Array.isArray(ref.inclusiveNamespacesPrefixList) &&
-            ref.inclusiveNamespacesPrefixList.length
-          ) {
-            res += ">";
-            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
-              " ",
-            )}" xmlns="${transform.getAlgorithmName()}"/>`;
-            res += `</${currentPrefix}Transform>`;
-          } else {
-            res += " />";
-          }
-        }
-
-        const canonXml = this.getCanonReferenceXml(doc, ref, node);
-        const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
-        res +=
-          `</${currentPrefix}Transforms>` +
-          `<${currentPrefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-          `<${currentPrefix}DigestValue>${digestAlgorithm.getHash(canonXml)}</${currentPrefix}DigestValue>` +
-          `</${currentPrefix}Reference>`;
-      }
+function addSignedXmlReferences(sig: SignedXmlLike, doc: XmlDocument, signature: XmlElement): void {
+  // xml-crypto 6.3 builds Reference nodes separately from SignedInfo. Use its
+  // digest and DOM builders so namespace handling follows the upstream fixes.
+  const targets = new Map<SignedXmlReferenceLike, Array<{ node: unknown; digestValue: string }>>();
+  for (const reference of sig.getReferences()) {
+    const nodes = xpath.selectWithResolver(reference.xpath ?? "", doc, sig.namespaceResolver);
+    if (!Array.isArray(nodes) || nodes.length === 0) {
+      throw new Error(
+        `the following xpath cannot be signed because it was not found: ${reference.xpath}`,
+      );
     }
-    return res;
-  };
+    targets.set(
+      reference,
+      nodes.map((node) => {
+        if (!reference.isEmptyUri) sig.ensureHasId(node);
+        return { node, digestValue: sig.calculateReferenceDigest(reference, node) };
+      }),
+    );
+  }
+  sig.addAllReferences(doc, signature, targets, "ds");
 }
 
 function ensurePemCertificate(value: string): string {
@@ -687,7 +657,9 @@ async function loadFromPkcs12(
   // Fallback: match by comparing public keys
   if (!chosen) {
     for (const cert of preferredCertCandidates) {
-      const key = keyCandidates.find((k) => k.publicKeySpkiDerBase64 === cert.publicKeySpkiDerBase64);
+      const key = keyCandidates.find(
+        (k) => k.publicKeySpkiDerBase64 === cert.publicKeySpkiDerBase64,
+      );
       if (key) {
         chosen = { privateKeyPem: key.privateKeyPem, certificatePem: cert.certificatePem };
         break;

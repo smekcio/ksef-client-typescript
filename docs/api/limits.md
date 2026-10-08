@@ -2,6 +2,24 @@
 
 Niskopoziomowy klient dla `/limits/*`, `/rate-limits` oraz testowych endpointów zmiany limitów.
 
+W API 2.8.1 odpowiedź `getRateLimits()` jest typowana jako `EffectiveApiRateLimits`.
+Grupy `onlineSessionClose` i `batchSessionClose` mają osobne limity od otwierania
+sesji. `anonymous` opisuje operacje anonimowe, a `global` limity per adres IP.
+Wartość `-1` oznacza brak limitu w konkretnym oknie; nie traktuj jej jako liczby
+dozwolonych żądań. Odczytuj bieżące wartości z API.
+
+```ts
+import { getRateLimit, listRateLimits } from "ksef-client";
+
+const limits = await client.limits.getRateLimits();
+const closing = getRateLimit(limits, "onlineSessionClose");
+console.log(closing?.perMinute);
+console.log(listRateLimits(limits));
+```
+
+`isUnlimited` jest prawdziwe tylko wtedy, gdy wszystkie trzy okna mają wartość
+`-1`. Dla częściowo nieograniczonych grup sprawdzaj każde okno oddzielnie.
+
 ## Dostępne metody
 
 - `getContextLimits()`
@@ -19,7 +37,7 @@ Niskopoziomowy klient dla `/limits/*`, `/rate-limits` oraz testowych endpointów
 
 - `getContextLimits`, `getSubjectLimits` i `getRateLimits` służą do odczytu aktualnych limitów.
 - `getContextLimits()` zwraca m.in. `collectiveIdentifier.maxInvoices`.
-- Grupa `collectiveIdentifier` w kontrakcie OpenAPI 2.7.1 ma wartości domyślne `20` / `120` / `240`
+- Grupa `collectiveIdentifier` w kontrakcie OpenAPI 2.8.1 ma wartości domyślne `20` / `120` / `240`
   (na minutę / godzinę / dobę). Bieżące limity i tak odczytuj z `GET /rate-limits`.
 - Metody `change*` / `restore*` operują na endpointach testdata i są przeznaczone głównie do scenariuszy testowych.
 - Po zakończeniu testów warto przywrócić limity metodami `restore*`.

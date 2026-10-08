@@ -95,6 +95,11 @@ test("XAdES RSA: signs AuthTokenRequest and verifies locally", () => {
   );
 
   assert.equal(verifySignedXml(signedXml, certificatePem), true);
+  const tamperedXml = signedXml.replace(
+    "20250625-CR-20F5EE4000-DA48AE4124-46",
+    "tampered-challenge",
+  );
+  assert.equal(verifySignedXml(tamperedXml, certificatePem), false);
 });
 
 test("XAdES RSA (enveloping): signs AuthTokenRequest and verifies locally", () => {
@@ -120,6 +125,11 @@ test("XAdES RSA (enveloping): signs AuthTokenRequest and verifies locally", () =
   assert.match(signedXml, /<xades:QualifyingProperties\b/, "QualifyingProperties missing");
 
   assert.equal(verifySignedXml(signedXml, certificatePem), true);
+  const tamperedXml = signedXml.replace(
+    "20250625-CR-20F5EE4000-DA48AE4124-46",
+    "tampered-challenge",
+  );
+  assert.equal(verifySignedXml(tamperedXml, certificatePem), false);
 });
 
 test("XAdES ECDSA: signs AuthTokenRequest and verifies locally", () => {
@@ -142,6 +152,11 @@ test("XAdES ECDSA: signs AuthTokenRequest and verifies locally", () => {
   );
 
   assert.equal(verifySignedXml(signedXml, certificatePem), true);
+  const tamperedXml = signedXml.replace(
+    "20250625-CR-20F5EE4000-DA48AE4124-46",
+    "tampered-challenge",
+  );
+  assert.equal(verifySignedXml(tamperedXml, certificatePem), false);
 });
 
 test("XAdES ECDSA (enveloping): signs AuthTokenRequest and verifies locally", () => {
@@ -164,4 +179,9 @@ test("XAdES ECDSA (enveloping): signs AuthTokenRequest and verifies locally", ()
   );
 
   assert.equal(verifySignedXml(signedXml, certificatePem), true);
+  const tamperedXml = signedXml.replace(
+    "20250625-CR-20F5EE4000-DA48AE4124-46",
+    "tampered-challenge",
+  );
+  assert.equal(verifySignedXml(tamperedXml, certificatePem), false);
 });

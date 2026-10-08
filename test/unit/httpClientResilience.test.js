@@ -187,7 +187,7 @@ test("HttpClient rejects skipAuth combined with authToken", async () => {
   );
 });
 
-test("HttpClient falls back to UnknownApiProblem for partial 403 problem-details payload", async () => {
+test("HttpClient accepts 403 problem-details without an optional timestamp", async () => {
   const server = createServer((_, res) => {
     res.writeHead(403, { "Content-Type": "application/problem+json" });
     res.end(
@@ -222,17 +222,7 @@ test("HttpClient falls back to UnknownApiProblem for partial 403 problem-details
           detail: "Missing permissions",
           reasonCode: "missing-permissions",
         });
-        assert.deepEqual(error.problem, {
-          raw: {
-            title: "Forbidden",
-            status: 403,
-            detail: "Missing permissions",
-            reasonCode: "missing-permissions",
-          },
-          title: "Forbidden",
-          status: 403,
-          detail: "Missing permissions",
-        });
+        assert.deepEqual(error.problem, error.responseBody);
         return true;
       },
     );

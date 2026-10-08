@@ -6,8 +6,7 @@ import { fileURLToPath } from "node:url";
 import { OpenApiModels } from "../../dist/index.js";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const workspaceRoot = path.resolve(packageRoot, "..");
-const openApiPath = path.join(workspaceRoot, "ksef-docs", "open-api.json");
+const openApiPath = path.join(packageRoot, "specs", "ksef-openapi.snapshot.json");
 const apiClientsRoot = path.join(packageRoot, "src", "api");
 
 const helperOperationPatterns = [
@@ -89,11 +88,8 @@ function extractClientOperations(clientsRoot) {
   return operations;
 }
 
-test("API clients cover all operations defined in OpenAPI spec", (t) => {
-  if (!fs.existsSync(openApiPath)) {
-    t.skip("open-api.json not found; coverage test requires monorepo layout");
-    return;
-  }
+test("API clients cover all operations defined in OpenAPI spec", () => {
+  assert.ok(fs.existsSync(openApiPath), "The pinned OpenAPI snapshot must exist");
 
   const specOperations = extractSpecOperations(openApiPath);
   const clientOperations = extractClientOperations(apiClientsRoot);
