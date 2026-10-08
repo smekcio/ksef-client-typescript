@@ -4,7 +4,7 @@ Usługi XAdES służą do podpisywania `AuthTokenRequest` zgodnie z wymaganiami 
 
 ## Wymagania środowiskowe i zależności
 
-- runtime: Node.js (w pakiecie ustawione `engines.node: >=20`);
+- runtime: Node.js (w pakiecie ustawione `engines.node: >=22.19.0`);
 - używane biblioteki: `@xmldom/xmldom`, `xml-crypto`, `xpath`;
 - dla `.p12`/`.pfx` wymagane jest opcjonalne `node-forge` (tylko metody `fromPkcs12*`);
 - wykorzystywane są natywne moduły `node:crypto` i `node:fs`.

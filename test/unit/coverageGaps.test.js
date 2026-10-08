@@ -119,7 +119,7 @@ test("xsd.ts: loadLibxml resolves or throws consistently", async () => {
 });
 
 test("xsd.ts: validateFa3XmlXsd throws when libxmljs2 missing", async () => {
-  let hasLibxml = false;
+  let hasLibxml;
   try {
     await import("libxmljs2");
     hasLibxml = true;
@@ -133,7 +133,7 @@ test("xsd.ts: validateFa3XmlXsd throws when libxmljs2 missing", async () => {
 });
 
 test("xsd.ts: validateFa3XmlXsd with libxmljs2 when available", async () => {
-  let hasLibxml = false;
+  let hasLibxml;
   try {
     await import("libxmljs2");
     hasLibxml = true;
@@ -613,7 +613,7 @@ test("builder.ts: branch matrix for optional mappings and validation paths", asy
     .toXml();
   assert.doesNotMatch(attachmentEmptyTables, /<Tabela>/);
 
-  let hasLibxml = false;
+  let hasLibxml;
   try {
     await import("libxmljs2");
     hasLibxml = true;

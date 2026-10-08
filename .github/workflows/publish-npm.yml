@@ -43,20 +43,23 @@ jobs:
           esac
 
       - name: Checkout publish ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ steps.target.outputs.ref }}
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=low
 
       - name: Verify version matches release tag
         if: steps.target.outputs.tag != ''
@@ -89,7 +92,7 @@ jobs:
         run: npm pack --dry-run
 
       - name: Setup Node.js 24 for npm publish
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org

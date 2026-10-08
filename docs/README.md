@@ -13,7 +13,7 @@ Aktualny status zgodności SDK względem `ksef-api` znajdziesz w raporcie:
 
 ## Wymagania
 
-- Node.js `>= 20`
+- Node.js `>= 22.19.0`
 - dostęp do środowiska KSeF (`TEST`, `DEMO`, `PRD`)
 - dane uwierzytelniające (token KSeF lub certyfikat/XAdES)
 - opcjonalnie `qrcode`, `node-forge` i `libxmljs2` dla QR, PKCS#12/XAdES i runtime walidacji XSD FA(3)

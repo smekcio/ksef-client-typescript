@@ -262,6 +262,9 @@ export class XadesSignatureService {
       "application/xml",
     );
     const signatureNode = signatureDoc.documentElement;
+    if (!signatureNode) {
+      throw new Error("Invalid XML: missing signature document element.");
+    }
     signatureNode.setAttribute("Id", signatureId);
 
     // ds:Object holding the signed data
@@ -496,7 +499,11 @@ function addSignedXmlReferences(sig: SignedXmlLike, doc: XmlDocument, signature:
   // digest and DOM builders so namespace handling follows the upstream fixes.
   const targets = new Map<SignedXmlReferenceLike, Array<{ node: unknown; digestValue: string }>>();
   for (const reference of sig.getReferences()) {
-    const nodes = xpath.selectWithResolver(reference.xpath ?? "", doc, sig.namespaceResolver);
+    const nodes = xpath.selectWithResolver(
+      reference.xpath ?? "",
+      doc as unknown as Parameters<typeof xpath.selectWithResolver>[1],
+      sig.namespaceResolver,
+    );
     if (!Array.isArray(nodes) || nodes.length === 0) {
       throw new Error(
         `the following xpath cannot be signed because it was not found: ${reference.xpath}`,
@@ -582,7 +589,7 @@ async function loadFromPkcs12(
   } catch (err) {
     throw new Error(
       "PKCS#12 (.p12/.pfx) support requires optional dependency 'node-forge'. Install it with: npm i node-forge",
-      { cause: err as Error },
+      { cause: err },
     );
   }
 

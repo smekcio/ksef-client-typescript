@@ -6,7 +6,7 @@ Biblioteka udostępnia typowane klienty endpointów, gotowe workflowy (auth/sesj
 ## Kompatybilność
 
 - KSeF API: `v2.8.1` ([changelog API](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md#wersja-281))
-- Node.js: `>= 20`
+- Node.js: `>= 22.19.0`
 - Środowiska: `TEST`, `DEMO`, `PRD`
 
 KSeF `2.8.1` dodaje uprawnienie `CollectiveIdentifierManage`, nowe grupy limitów

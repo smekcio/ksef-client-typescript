@@ -77,7 +77,11 @@ export class BatchSessionHandle {
     encryptionData: EncryptionData,
     sessionsClient: SessionsClient,
     http: HttpClient,
-    batchFile = { fileSize: 0, fileHash: "", fileParts: [] as Array<{ ordinalNumber: number; fileSize: number; fileHash: string }> },
+    batchFile = {
+      fileSize: 0,
+      fileHash: "",
+      fileParts: [] as Array<{ ordinalNumber: number; fileSize: number; fileHash: string }>,
+    },
     partUploadRequests: PartUploadRequest[] = [],
     encryptedParts: Buffer[] = [],
     upoV43 = false,
@@ -242,7 +246,10 @@ export class BatchSessionWorkflow {
     return handle;
   }
 
-  async resume(state: BatchSessionState, options: { zipBytes: Buffer }): Promise<BatchSessionHandle> {
+  async resume(
+    state: BatchSessionState,
+    options: { zipBytes: Buffer },
+  ): Promise<BatchSessionHandle> {
     if (!state || typeof state.referenceNumber !== "string" || !state.referenceNumber.trim()) {
       throw new KsefValidationError("Batch session state requires non-empty referenceNumber.");
     }
@@ -256,13 +263,17 @@ export class BatchSessionWorkflow {
     }
     const zipHash = CryptographyService.sha256Base64(options.zipBytes);
     if (zipHash !== resolvedBatchFile.fileHash) {
-      throw new KsefValidationError("Batch session resume zipBytes hash does not match saved state.");
+      throw new KsefValidationError(
+        "Batch session resume zipBytes hash does not match saved state.",
+      );
     }
     if (options.zipBytes.length !== resolvedBatchFile.fileSize) {
-      throw new KsefValidationError("Batch session resume zipBytes size does not match saved state.");
+      throw new KsefValidationError(
+        "Batch session resume zipBytes size does not match saved state.",
+      );
     }
 
-    let encryptedParts: Buffer[] = [];
+    let encryptedParts: Buffer[];
     if (Array.isArray(state.encryptedPartsBase64) && state.encryptedPartsBase64.length > 0) {
       encryptedParts = state.encryptedPartsBase64.map((part) => Buffer.from(part, "base64"));
     } else {
@@ -273,7 +284,11 @@ export class BatchSessionWorkflow {
         partSizes.length > 0 ? Math.max(...partSizes) : MAX_BATCH_PART_SIZE_BYTES;
       const parts = splitBuffer(options.zipBytes, maxPartSizeBytes);
       encryptedParts = parts.map((part) =>
-        CryptographyService.encryptAes256Cbc(part, state.encryptionData.cipherKey, state.encryptionData.cipherIv),
+        CryptographyService.encryptAes256Cbc(
+          part,
+          state.encryptionData.cipherKey,
+          state.encryptionData.cipherIv,
+        ),
       );
     }
 
