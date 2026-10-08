@@ -7,7 +7,8 @@ export interface EntityPermissionsContextIdentifier {
   value: string;
 }
 
-export type EntityPermissionItemScope = "InvoiceWrite" | "InvoiceRead";
+export type EntityPermissionItemScope =
+  "InvoiceWrite" | "InvoiceRead" | "CollectiveIdentifierManage";
 
 export interface EntityPermissionItem {
   id: string;

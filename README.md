@@ -5,14 +5,18 @@ Biblioteka udostępnia typowane klienty endpointów, gotowe workflowy (auth/sesj
 
 ## Kompatybilność
 
-- KSeF API: `v2.7.1` ([changelog API](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md#wersja-271))
+- KSeF API: `v2.8.1` ([changelog API](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md#wersja-281))
 - Node.js: `>= 20`
 - Środowiska: `TEST`, `DEMO`, `PRD`
 
-KSeF `2.7.1` rozszerza identyfikatory zbiorcze (POST do 10 IZ, `pageSize` 500),
-wprowadza `collectiveIdentifier.maxInvoices` w limitach kontekstu oraz zakres
-query/export 100 dni UTC. SDK zachowuje dotychczasowe metody klientów; bogatszy format błędów możesz wymusić przez nagłówek
-`X-Error-Format: problem-details` ustawiony w `KsefClientOptions.headers`.
+KSeF `2.8.1` dodaje uprawnienie `CollectiveIdentifierManage`, nowe grupy limitów
+(`anonymous`, `global`, `onlineSessionClose`, `batchSessionClose`) i kody walut
+`CNH`, `VED`, `XTS`, `ZWG`, `SLE`. Błędy 403 mogą nie zawierać `timestamp`.
+SDK obsługuje wszystkie 83 operacje kontraktu; bogatszy format błędów możesz
+wymusić przez `X-Error-Format: problem-details` w `KsefClientOptions.headers`.
+
+Kontrakt jest zapisany w `specs/ksef-openapi.snapshot.json`; generowanie typów
+oraz testy pokrycia API korzystają z niego bez dodatkowych repozytoriów.
 
 ## Instalacja
 
@@ -27,7 +31,7 @@ npm install qrcode node-forge libxmljs2
 ```
 
 - `qrcode` jest wymagane dla `client.qr`
-- `node-forge` jest wymagane dla `XadesKeyPair.fromPkcs12*`
+- `node-forge` jest opcjonalnym peer dependency dla `XadesKeyPair.fromPkcs12*`; nie instaluje się automatycznie. Najnowsza wersja 1.4.0 ma zgłoszenie [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) dotyczące weryfikacji podpisów RSA. SDK używa jej wyłącznie do odczytu PKCS#12; podpisy weryfikuje `node:crypto`. Możesz użyć `XadesKeyPair.fromPem*` bez tej zależności.
 - `libxmljs2` jest wymagane tylko dla runtime walidacji `FA3Draft.toXml({ xsdValidate: true })`; schematy FA(3) są pakowane z biblioteką
 
 ## Quick Start

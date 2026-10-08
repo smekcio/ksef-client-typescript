@@ -215,7 +215,10 @@ function isForbiddenProblemDetailsPayload(
   payload: Record<string, unknown>,
 ): payload is ForbiddenProblemDetails {
   return (
-    hasRequiredProblemDetailsFields(payload) &&
+    isString(payload.title) &&
+    isNumber(payload.status) &&
+    isString(payload.detail) &&
+    (payload.timestamp === undefined || isString(payload.timestamp)) &&
     isString(payload.reasonCode) &&
     isOptionalNullableString(payload.instance) &&
     isOptionalNullableString(payload.traceId) &&

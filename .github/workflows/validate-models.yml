@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    env:
-      OPENAPI_URL: https://raw.githubusercontent.com/CIRFMF/ksef-api/main/open-api.json
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,14 +29,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Download official open-api.json
-        run: curl -L -o open-api.json "${{ env.OPENAPI_URL }}"
-
       - name: Regenerate OpenAPI models
-        run: npm run generate:openapi-models -- --openapi open-api.json --output src/types/openapi.generated.ts
+        run: npm run generate:openapi-models -- --openapi specs/ksef-openapi.snapshot.json --output src/types/openapi.generated.ts
 
       - name: Verify generated models are up to date
         run: git diff --exit-code -- src/types/openapi.generated.ts
 
       - name: Check OpenAPI endpoint coverage
-        run: node scripts/check-openapi-coverage.mjs --openapi open-api.json --src src/api
+        run: node scripts/check-openapi-coverage.mjs --openapi specs/ksef-openapi.snapshot.json --src src/api

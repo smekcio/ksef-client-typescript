@@ -7,7 +7,7 @@ README pozostaje zwięzły i skupiony na użytkowniku SDK.
 
 - Node.js `>= 20`
 - `npm`
-- lokalne repo `ksef-api` (do kontroli zgodności OpenAPI) albo pobrany `open-api.json`
+- snapshot kontraktu `specs/ksef-openapi.snapshot.json` jest dołączony do repo
 
 ## Szybki flow lokalny
 
@@ -29,7 +29,7 @@ Uwaga: CI wymaga 100% coverage (statement/branch/function/line).
 
 ## Kontrola zgodności z OpenAPI
 
-Aktualny target kompatybilności repo: **KSeF API `2.7.1`**.
+Aktualny target kompatybilności repo: **KSeF API `2.8.1`**.
 
 Źródło kontraktu: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) (`open-api.json`)
 lub live TEST: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`.
@@ -37,13 +37,13 @@ lub live TEST: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`.
 Regeneracja modeli:
 
 ```bash
-npm run generate:openapi-models -- --openapi ../ksef-api/open-api.json --output src/types/openapi.generated.ts
+npm run generate:openapi-models -- --openapi specs/ksef-openapi.snapshot.json --output src/types/openapi.generated.ts
 ```
 
 Kontrola pokrycia endpointów:
 
 ```bash
-npm run check:openapi-coverage -- --openapi ../ksef-api/open-api.json --src src/api
+npm run check:openapi-coverage -- --openapi specs/ksef-openapi.snapshot.json --src src/api
 ```
 
 ## Workflowy GitHub Actions
@@ -51,7 +51,7 @@ npm run check:openapi-coverage -- --openapi ../ksef-api/open-api.json --src src/
 - `CI` (`.github/workflows/ci.yml`) - lint, typecheck, testy i coverage.
 - `E2E Auth Flows` (`.github/workflows/e2e-token.yml`) - scenariusze token/XAdES dla `TEST` i `DEMO`.
 - `Validate API Compliance` (`.github/workflows/validate-openapi.yml`) - kontrola pokrycia endpointów.
-- `Validate OpenAPI Models` (`.github/workflows/validate-models.yml`) - pobranie OpenAPI, regeneracja modeli i diff.
+- `Validate OpenAPI Models` (`.github/workflows/validate-models.yml`) - regeneracja modeli ze snapshotu i diff.
 - `Release Please` (`.github/workflows/release-please.yml`) - automatyzacja wersjonowania i changeloga.
 - `Publish to npm` (`.github/workflows/publish-npm.yml`) - publikacja paczki po opublikowaniu GitHub Release.
 - `Publish to GitHub Packages` (`.github/workflows/publish-github-packages.yml`) - publikacja scoped package po opublikowaniu GitHub Release.

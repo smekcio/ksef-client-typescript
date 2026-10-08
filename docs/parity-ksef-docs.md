@@ -1,11 +1,11 @@
 # Raport parity: `ksef-client-typescript` vs `ksef-api`
 
-Data analizy: **2026-08-29**
+Data analizy: **2026-10-08**
 
 ## Zakres i źródła
 
-- Kontrakt API: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) `open-api.json` (`2.7.1`)
-- Changelog: [api-changelog.md](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md) (wersje do `2.7.1`)
+- Kontrakt API: [CIRFMF/ksef-api](https://github.com/CIRFMF/ksef-api) `open-api.json` (`2.8.1`)
+- Changelog: [api-changelog.md](https://github.com/CIRFMF/ksef-api/blob/main/api-changelog.md) (wersje do `2.8.1`)
 - Implementacja TypeScript: `src/api/*`, `src/types/*`, `src/services/*`, `src/client/*`, `docs/*`
 - Weryfikacja dodatkowa: `https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json`
 
@@ -14,12 +14,15 @@ Data analizy: **2026-08-29**
 - Pokrycie endpointów OpenAPI: **83/83** (78 ścieżek; IZ invoices jako POST)
 - Braki endpointowe: **0**
 - Nadmiarowe endpointy po stronie TS: **0**
-- Zgodność kontraktu `ksef-api` vs `api-test`: **zgodna**
+- Snapshot pobrany z `CIRFMF/ksef-api` wskazuje API **2.8.1 (build 2.8.1-te)**; modele są zgodne ze snapshotem klienta Python.
 
-## Zmiany uwzględnione po stronie SDK (2.7.1)
+## Zmiany uwzględnione po stronie SDK (2.8.1)
 
 1. Modele OpenAPI
-   - odświeżono `src/types/openapi.generated.ts` do kontraktu `ksef-api 2.7.1`;
+   - `CollectiveIdentifierManage` w uprawnieniach, kody `CNH`, `VED`, `XTS`, `ZWG`, `SLE`;
+   - grupy `anonymous`, `global`, `onlineSessionClose`, `batchSessionClose`;
+   - `ForbiddenProblemDetails.timestamp` jest opcjonalne;
+   - odświeżono `src/types/openapi.generated.ts` do kontraktu `ksef-api 2.8.1`;
    - `CollectiveIdentifierInvoicesQueryRequest`, `package.compressionType`,
      `SetSessionLimitsRequest.collectiveIdentifier.maxInvoices`.
 
@@ -37,7 +40,7 @@ Data analizy: **2026-08-29**
    - na TEST treść można wymusić przez `X-Test-System-Warning`.
 
 5. Dokumentacja SDK
-   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.7.1`;
+   - deklaracje kompatybilności API w README i `docs/*` wskazują `v2.8.1`;
    - CLI `ksef-ts iz`.
 
 ## Weryfikacja parity endpointów
@@ -59,9 +62,9 @@ Data analizy: **2026-08-29**
 
 ## Parity dokumentacji
 
-Dokumentacja TS została uaktualniona do spójności z KSeF `2.7.1`:
+Dokumentacja TS została uaktualniona do spójności z KSeF `2.8.1`:
 
-- deklaracje kompatybilności API (`v2.7.1`) w README i docs,
+- deklaracje kompatybilności API (`v2.8.1`) w README i docs,
 - dokumentacja `collectiveIdentifiers`, helperów IZ oraz CLI `ksef-ts iz`,
 - zakres query/export 100 dni UTC i `package.compressionType`,
 - zaktualizowany raport parity.

@@ -10,6 +10,7 @@ export * from "./services/offlineInvoiceWorkflow";
 export * from "./services/upo";
 export * from "./services/hwmCoordinator";
 export * from "./services/personTokenService";
+export * from "./services/rateLimits";
 export * from "./services/verificationLinkService";
 export * from "./services/qrCodeService";
 export * from "./services/xades";

@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesPath = path.join(__dirname, "..", "fixtures", "xades-fixtures.json");
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, "utf8"));
 const DS_NS = "http://www.w3.org/2000/09/xmldsig#";
+const RealSignedXml = xmlCrypto.SignedXml;
 const ECDSA_SHA256_URI = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
 
 function withMockSignedXml(SignedXmlCtor, run) {
@@ -37,8 +38,9 @@ function createKeyPair() {
 }
 
 function baseFakeSignedXml() {
-  return class FakeSignedXml {
+  return class FakeSignedXml extends RealSignedXml {
     constructor() {
+      super();
       this.references = [];
       this.SignatureAlgorithms = undefined;
     }
@@ -57,6 +59,10 @@ function baseFakeSignedXml() {
 
     findCanonicalizationAlgorithm(uri) {
       return { getAlgorithmName: () => uri };
+    }
+
+    calculateReferenceDigest() {
+      return "HASH";
     }
 
     getCanonReferenceXml() {
@@ -117,11 +123,10 @@ test("XadesSignatureService throws when SignedInfo node import returns null", ()
   }
 });
 
-test("XadesSignatureService propagates patched createReferences xpath-not-found error", () => {
+test("XadesSignatureService propagates reference building xpath-not-found error", () => {
   const originalSelect = xpath.selectWithResolver;
   class MissingXpathSignedXml extends baseFakeSignedXml() {
-    createSignedInfo(doc) {
-      this.createReferences(doc);
+    createSignedInfo() {
       return "<ds:SignedInfo xmlns:ds='http://www.w3.org/2000/09/xmldsig#'/>";
     }
   }
@@ -156,9 +161,8 @@ test("XadesSignatureService covers custom references, inclusive namespaces and E
       this.references.push(normalized);
     }
 
-    createSignedInfo(doc) {
-      const referencesXml = this.createReferences(doc);
-      return `<ds:SignedInfo xmlns:ds="${DS_NS}">${referencesXml}</ds:SignedInfo>`;
+    createSignedInfo() {
+      return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
 
     calculateSignatureValue() {
@@ -238,8 +242,7 @@ test("XadesSignatureService keeps preconfigured ECDSA algorithm without overridi
       this.SignatureAlgorithms = { [ECDSA_SHA256_URI]: PreconfiguredAlgorithm };
     }
 
-    createSignedInfo(doc) {
-      this.createReferences(doc);
+    createSignedInfo() {
       return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
 
@@ -407,8 +410,7 @@ test("XadesSignatureService supports environments without importNode in envelopi
 test("XadesSignatureService rejects when xpath resolver returns non-array", () => {
   const originalSelect = xpath.selectWithResolver;
   class NonArrayXpathSignedXml extends baseFakeSignedXml() {
-    createSignedInfo(doc) {
-      this.createReferences(doc);
+    createSignedInfo() {
       return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
   }
@@ -432,7 +434,7 @@ test("XadesSignatureService rejects when xpath resolver returns non-array", () =
   }
 });
 
-test("XadesSignatureService createReferences handles missing transforms array", () => {
+test("XadesSignatureService reference building handles missing transforms array", () => {
   const originalSelect = xpath.selectWithResolver;
   class NoTransformsSignedXml extends baseFakeSignedXml() {
     addReference(reference) {
@@ -443,9 +445,8 @@ test("XadesSignatureService createReferences handles missing transforms array", 
       this.references.push(normalized);
     }
 
-    createSignedInfo(doc) {
-      const referencesXml = this.createReferences(doc);
-      return `<ds:SignedInfo xmlns:ds="${DS_NS}">${referencesXml}</ds:SignedInfo>`;
+    createSignedInfo() {
+      return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
 
     calculateSignatureValue() {}
@@ -478,7 +479,7 @@ test("XadesSignatureService createReferences handles missing transforms array", 
   }
 });
 
-test("XadesSignatureService createReferences handles missing xpath by falling back to empty expression", () => {
+test("XadesSignatureService reference building handles missing xpath by falling back to empty expression", () => {
   const originalSelect = xpath.selectWithResolver;
   class MissingXpathFieldSignedXml extends baseFakeSignedXml() {
     addReference(reference) {
@@ -489,8 +490,7 @@ test("XadesSignatureService createReferences handles missing xpath by falling ba
       this.references.push(normalized);
     }
 
-    createSignedInfo(doc) {
-      this.createReferences(doc);
+    createSignedInfo() {
       return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
 
@@ -529,12 +529,11 @@ test("XadesSignatureService executes namespace resolver callbacks in both signin
 
   let resolverCalls = 0;
   class ResolverProbeSignedXml extends baseFakeSignedXml() {
-    createSignedInfo(doc) {
+    createSignedInfo() {
       if (this.namespaceResolver?.lookupNamespaceURI) {
         this.namespaceResolver.lookupNamespaceURI("ds");
         resolverCalls += 1;
       }
-      this.createReferences(doc);
       return `<ds:SignedInfo xmlns:ds="${DS_NS}"/>`;
     }
 
@@ -552,7 +551,7 @@ test("XadesSignatureService executes namespace resolver callbacks in both signin
     }
   }
 
-  xpath.selectWithResolver = (_expression, doc) => [doc.documentElement];
+  xpath.selectWithResolver = originalSelect;
 
   try {
     withMockSignedXml(ResolverProbeSignedXml, () => {
