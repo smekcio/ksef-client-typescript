@@ -13,6 +13,7 @@ async function loadQrCode(): Promise<QrCodeModule> {
     const message = error instanceof Error ? error.message : "Unknown import error";
     throw new Error(
       `Optional dependency "qrcode" is required for QrCodeService. Install it with: npm i qrcode. (${message})`,
+      { cause: error },
     );
   }
 }
