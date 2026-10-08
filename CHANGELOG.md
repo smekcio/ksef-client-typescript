@@ -12,6 +12,13 @@
 
 - **verification-link:** sign QR II certificate URLs with the raw path and KSeF-compliant RSA-PSS parameters
 
+## [0.10.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.9.0...v0.10.0) (2026-10-08)
+
+
+### Features
+
+* upgrade Node.js and dependencies and modernize CI workflows ([#53](https://github.com/smekcio/ksef-client-typescript/issues/53)) ([41fdfa3](https://github.com/smekcio/ksef-client-typescript/commit/41fdfa3320ae2bc1d0b46d10c01d3ab14ce97aa5))
+
 ## [0.9.0](https://github.com/smekcio/ksef-client-typescript/compare/v0.8.0...v0.9.0) (2026-10-08)
 
 
